@@ -1,0 +1,34 @@
+flavor retail
+entered inDungeon=true run=Ragefire Chasm paused=false history=0
+poll1 Akasha dmg=2000 dps=20.0 taken=2000 int=4 deaths=0 class=MAGE
+poll1 Girthy dmg=3000 dps=30.0 taken=3000 int=6 deaths=0 class=WARRIOR
+poll1 Hizazi dmg=800 dps=8.0 taken=900 int=1 deaths=0 class=HUNTER
+poll1 Jay dmg=1000 dps=10.0 taken=1000 int=2 deaths=0 class=SHAMAN
+poll1 Skip dmg=500 dps=5.0 taken=500 int=1 deaths=0 class=SHAMAN
+after-death Akasha dmg=2000 dps=20.0 taken=2000 int=4 deaths=1 class=MAGE
+after-death Girthy dmg=3000 dps=30.0 taken=3000 int=6 deaths=0 class=WARRIOR
+after-death Hizazi dmg=800 dps=8.0 taken=900 int=1 deaths=0 class=HUNTER
+after-death Jay dmg=1000 dps=10.0 taken=1000 int=2 deaths=0 class=SHAMAN
+after-death Skip dmg=500 dps=5.0 taken=500 int=1 deaths=0 class=SHAMAN
+settings shown true
+settings after history click false
+released inDungeon=false run=Ragefire Chasm paused=true history=0
+returned inDungeon=true run=Ragefire Chasm paused=false history=0
+after-return Akasha dmg=2200 dps=18.3 taken=2200 int=4 deaths=1 class=MAGE
+after-return Girthy dmg=3300 dps=27.5 taken=3300 int=6 deaths=0 class=WARRIOR
+after-return Hizazi dmg=880 dps=7.3 taken=990 int=1 deaths=0 class=HUNTER
+after-return Jay dmg=1100 dps=9.2 taken=1100 int=2 deaths=0 class=SHAMAN
+after-return Skip dmg=550 dps=4.6 taken=550 int=1 deaths=0 class=SHAMAN
+hover scripts fired many
+left inDungeon=false run=Ragefire Chasm paused=true history=0
+closed inDungeon=false run=none paused=false history=1
+saved run Ragefire Chasm completed=false bosses=1 players=Akasha,Girthy,Hizazi,Jay,Skip
+handlers fired 100+
+chat: [MythicScoreboard] vtest  /sb to open.
+chat: [MythicScoreboard] Run started: Ragefire Chasm [Normal]
+chat: [MythicScoreboard] No saved runs yet.
+chat: [MythicScoreboard] Run paused. Return to Ragefire Chasm within 30 minutes to continue it.
+chat: [MythicScoreboard] Run resumed: Ragefire Chasm
+chat: [MythicScoreboard] Run paused. Return to Ragefire Chasm within 30 minutes to continue it.
+chat: [MythicScoreboard] vtest  Commands: /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb help
+chat: [MythicScoreboard] No saved runs yet.

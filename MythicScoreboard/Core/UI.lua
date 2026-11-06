@@ -1,0 +1,437 @@
+local _ceil   = math.ceil
+local _slower = string.lower
+local _smatch = string.match
+
+local MS = _G["MythicScoreboard"]
+local UI = MS.UI
+-- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
+local Art, Box, Btn, BuildTimelineChrome, COLS, COL_HDR_H = UI.Art, UI.Box, UI.Btn, UI.BuildTimelineChrome, UI.COLS, UI.COL_HDR_H
+local CloseHistDropdown, ComputeColumnAnchors, DiffShort, DoClearHistory, FRAME_H, FRAME_W = UI.CloseHistDropdown, UI.ComputeColumnAnchors, UI.DiffShort, UI.DoClearHistory, UI.FRAME_H, UI.FRAME_W
+local HDR_H, HGrad, MEDIA, MakeScrollFrame, OpenHistDropdown, Outline = UI.HDR_H, UI.HGrad, UI.MEDIA, UI.MakeScrollFrame, UI.OpenHistDropdown, UI.Outline
+local P, PAD_X, RunResult, SetFont, Solid, TL_H = UI.P, UI.PAD_X, UI.RunResult, UI.SetFont, UI.Solid, UI.TL_H
+local Text, Tint, VGrad, colHdrLabels, sortState = UI.Text, UI.Tint, UI.VGrad, UI.colHdrLabels, UI.sortState
+
+-- Main window: chrome, header buttons, layout and slash commands.
+
+local sbFrame, overviewSF = nil, nil
+
+-- ===========================================================================
+-- Main frame
+-- ===========================================================================
+
+local function IconButton(parent, file, size, hoverCol)
+    local b = Btn(parent)
+    b:SetSize(size, size)
+    Box(b, true)
+    local ic = Art(b, file, "ARTWORK")
+    ic:SetSize(16, 16); ic:SetPoint("CENTER")
+    Tint(ic, P.ash)
+    b:HookScript("OnEnter", function() Tint(ic, hoverCol or P.ivory) end)
+    b:HookScript("OnLeave", function() Tint(ic, P.ash) end)
+    b._icon = ic
+    return b
+end
+
+local function BuildChrome(f)
+    -- Border: black hairline outside a dark-bronze hairline.
+    local outer = Solid(f, "BACKGROUND", -7, 0, 0, 0, 1); outer:SetAllPoints()
+    local inner = Solid(f, "BACKGROUND", -6, P.bronzeDk[1], P.bronzeDk[2], P.bronzeDk[3], 1)
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
+
+    -- Stone body with grain.
+    local body = f:CreateTexture(nil, "BACKGROUND", nil, -5)
+    body:SetPoint("TOPLEFT", 2, -2); body:SetPoint("BOTTOMRIGHT", -2, 2)
+    VGrad(body, P.stoneBot, P.stoneTop)
+    f._body = body
+    local grain = Art(f, "Grain", "BACKGROUND", -4, true)
+    grain:SetPoint("TOPLEFT", 2, -2); grain:SetPoint("BOTTOMRIGHT", -2, 2)
+    grain:SetBlendMode("ADD")
+    grain:SetAlpha(0.5)
+
+    -- Bronze top rule, bright in the middle and fading to the corners.
+    local half = (FRAME_W - 4) / 2
+    local tl = f:CreateTexture(nil, "BORDER", nil, 5)
+    tl:SetPoint("TOPLEFT", 2, -2); tl:SetSize(half, 2)
+    HGrad(tl, P.bronze, P.bronzeHi, 0, 1)
+    local tr = f:CreateTexture(nil, "BORDER", nil, 5)
+    tr:SetPoint("TOPRIGHT", -2, -2); tr:SetSize(half, 2)
+    HGrad(tr, P.bronzeHi, P.bronze, 1, 0)
+    -- A faint warm light falling from the top rule.
+    local wash = f:CreateTexture(nil, "BACKGROUND", nil, -3)
+    wash:SetPoint("TOPLEFT", 2, -4); wash:SetPoint("TOPRIGHT", -2, -4); wash:SetHeight(70)
+    VGrad(wash, P.bronze, P.bronze, 0, 0.05)
+end
+
+function MS:BuildUI()
+    if sbFrame then return end
+
+    sbFrame = CreateFrame("Frame", "MythicScoreboardFrame", UIParent)
+    UI.frame = sbFrame
+    sbFrame:SetSize(FRAME_W, FRAME_H)
+    sbFrame:SetFrameStrata("DIALOG")
+    sbFrame:SetMovable(true); sbFrame:EnableMouse(true)
+    sbFrame:RegisterForDrag("LeftButton")
+    sbFrame:SetScript("OnDragStart", sbFrame.StartMoving)
+    sbFrame:SetScript("OnDragStop",  sbFrame.StopMovingOrSizing)
+    sbFrame:SetScript("OnMouseDown", function()
+        CloseHistDropdown()
+        if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
+    end)
+    sbFrame:SetScript("OnShow", function()
+        if sbFrame.SetBackdrop then sbFrame:SetBackdrop(nil) end
+    end)
+    sbFrame:SetScript("OnHide", function()
+        CloseHistDropdown()
+        if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
+    end)
+    sbFrame:SetClampedToScreen(true)
+    sbFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    sbFrame:Hide()
+    tinsert(UISpecialFrames, "MythicScoreboardFrame")
+
+    BuildChrome(sbFrame)
+
+    -- ── Header ──────────────────────────────────────────────────────────
+    local hdr = CreateFrame("Frame", nil, sbFrame)
+    hdr:SetPoint("TOPLEFT", 1, -1); hdr:SetPoint("TOPRIGHT", -1, -1)
+    hdr:SetHeight(HDR_H)
+
+    local title = Text(hdr, "title", 24, P.ivory)
+    title:SetPoint("TOPLEFT", hdr, "TOPLEFT", PAD_X, -17)
+    title:SetShadowOffset(0, -2); title:SetShadowColor(0, 0, 0, 1)
+    sbFrame.DungeonName = title
+
+    -- Difficulty badge: filled bronze for keystones, outlined otherwise.
+    local badge = CreateFrame("Frame", nil, hdr)
+    badge:SetHeight(20)
+    badge:SetPoint("LEFT", title, "RIGHT", 12, 1)
+    local badgeFill = badge:CreateTexture(nil, "BACKGROUND")
+    badgeFill:SetAllPoints()
+    local badgeLine = Outline(badge, P.bronze, 0.8, "BORDER")
+    local badgeTxt = Text(badge, "semibold", 15, P.dark, "CENTER")
+    badgeTxt:SetPoint("CENTER", 0, 0)
+    sbFrame.SetBadge = function(text, filled)
+        if not text then badge:Hide(); return end
+        badge:Show()
+        badgeTxt:SetText(text)
+        if filled then
+            VGrad(badgeFill, {0.66, 0.45, 0.23}, {0.93, 0.76, 0.52})
+            badgeFill:Show(); badgeLine:SetShown(false)
+            SetFont(badgeTxt, "semibold", 15)
+            badgeTxt:SetTextColor(P.dark[1], P.dark[2], P.dark[3])
+        else
+            badgeFill:Hide(); badgeLine:SetShown(true)
+            SetFont(badgeTxt, "medium", 13)
+            badgeTxt:SetTextColor(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        end
+        badge:SetWidth(_ceil(badgeTxt:GetStringWidth()) + 16)
+    end
+
+    local subline = Text(hdr, "regular", 14, P.ash)
+    subline:SetPoint("TOPLEFT", hdr, "TOPLEFT", PAD_X + 1, -55)
+    sbFrame.Subline = subline
+
+    local pbLabel = Text(hdr, "medium", 13, P.bronzeHi, "RIGHT")
+    pbLabel:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", -16, -58)
+    pbLabel:SetText("New personal best")
+    pbLabel:Hide()
+    sbFrame.PBLabel = pbLabel
+
+    -- Affix icons sit at the end of the subline.
+    local AFFIX = 18
+    local affixIcons = {}
+    for i = 1, 4 do
+        local fr = CreateFrame("Frame", nil, hdr)
+        fr:SetSize(AFFIX, AFFIX)
+        fr:Hide()
+        fr:EnableMouse(true)
+        local portrait = fr:CreateTexture(nil, "ARTWORK")
+        portrait:SetSize(AFFIX - 2, AFFIX - 2)
+        portrait:SetPoint("CENTER")
+        local mask = fr:CreateMaskTexture()
+        mask:SetTexture(MEDIA .. "CircleMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+        mask:SetAllPoints(portrait)
+        portrait:AddMaskTexture(mask)
+        fr.Portrait = portrait
+        local ring = Art(fr, "Ring", "OVERLAY")
+        ring:SetAllPoints(); Tint(ring, P.bronze)
+        fr.Border = ring
+        if ScenarioChallengeModeAffixMixin then
+            fr.SetUp = function(self2, affixID)
+                ScenarioChallengeModeAffixMixin.SetUp(self2, affixID)
+                self2.Border:SetTexture(MEDIA .. "Ring")   -- keep our ring over Blizzard's atlas
+                Tint(self2.Border, P.bronze)
+                self2.Border:SetAllPoints()
+            end
+            fr:SetScript("OnEnter", ScenarioChallengeModeAffixMixin.OnEnter)
+        else
+            fr.SetUp = function(self2, affixID)
+                self2.affixID = affixID
+                if C_ChallengeMode and C_ChallengeMode.GetAffixInfo then
+                    local _, _, fileID = C_ChallengeMode.GetAffixInfo(affixID)
+                    if fileID then self2.Portrait:SetTexture(fileID) end
+                end
+            end
+        end
+        fr:SetScript("OnLeave", GameTooltip_Hide)
+        affixIcons[i] = fr
+    end
+    sbFrame.AffixIcons = affixIcons
+    sbFrame.LayoutAffixIcons = function(count)
+        for i = 1, 4 do
+            local fr = affixIcons[i]
+            fr:ClearAllPoints()
+            if i <= count then
+                if i == 1 then fr:SetPoint("LEFT", subline, "RIGHT", 16, 0)
+                else fr:SetPoint("LEFT", affixIcons[i - 1], "RIGHT", 5, 0) end
+                fr:Show()
+            else
+                fr:Hide()
+            end
+        end
+    end
+
+    -- ── Controls: history selector, settings, close ─────────────────────
+    local closeBtn = IconButton(hdr, "Close", 30, P.bloodHi)
+    closeBtn:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", -16, -17)
+    closeBtn:SetScript("OnClick", function() CloseHistDropdown(); sbFrame:Hide() end)
+    -- HookScript, not SetScript: IconButton's hover glow lives in these handlers.
+    closeBtn:HookScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText("Close"); GameTooltip:Show()
+    end)
+    closeBtn:HookScript("OnLeave", GameTooltip_Hide)
+    sbFrame.CloseButton = closeBtn
+
+    local settBtn = IconButton(hdr, "Gear", 30)
+    settBtn:SetPoint("RIGHT", closeBtn, "LEFT", -8, 0)
+    settBtn:SetScript("OnClick", function()
+        CloseHistDropdown()
+        local pop = sbFrame.SettingsPopup
+        if pop:IsShown() then pop:Hide() else pop:Show() end
+        GameTooltip:Hide()
+    end)
+    settBtn:HookScript("OnEnter", function(b)
+        if UI.IsHistOpen() or sbFrame.SettingsPopup:IsShown() then return end
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText("Settings"); GameTooltip:Show()
+    end)
+    settBtn:HookScript("OnLeave", GameTooltip_Hide)
+    sbFrame.SettingsBtn = settBtn
+
+    local histBtn = Btn(hdr)
+    histBtn:SetSize(300, 30)
+    histBtn:SetPoint("RIGHT", settBtn, "LEFT", -8, 0)
+    Box(histBtn, true)
+
+    local chev = Art(histBtn, "Chevron", "ARTWORK")
+    chev:SetSize(14, 14); chev:SetPoint("RIGHT", -8, 0); Tint(chev, P.ash)
+    local hbIndex = Text(histBtn, "medium", 12, P.ash2, "CENTER")
+    hbIndex:SetPoint("LEFT", 6, 0); hbIndex:SetWidth(28)
+    local hbResult = Text(histBtn, "medium", 13, P.verd, "RIGHT")
+    hbResult:SetPoint("RIGHT", chev, "LEFT", -6, 0)
+    local hbTime = Text(histBtn, "medium", 13, P.ash, "RIGHT")
+    hbTime:SetPoint("RIGHT", hbResult, "LEFT", -8, 0)
+    local hbLevel = Text(histBtn, "semibold", 13, P.bronzeHi, "RIGHT")
+    hbLevel:SetPoint("RIGHT", hbTime, "LEFT", -8, 0)
+    local hbDungeon = Text(histBtn, "game", 12, P.ivory, "LEFT")
+    hbDungeon:SetPoint("LEFT", hbIndex, "RIGHT", 6, 0)
+    hbDungeon:SetPoint("RIGHT", hbLevel, "LEFT", -6, 0)
+    local hbEmpty = Text(histBtn, "medium", 13, P.ash, "LEFT")
+    hbEmpty:SetPoint("LEFT", 12, 0)
+    hbEmpty:SetText("No saved runs yet")
+
+    local function RefreshHistBtn()
+        local runs = MythicScoreboardDB and MythicScoreboardDB.runs
+        local r, idx = MS.displayRun, 1
+        if r and runs then
+            for i, v in ipairs(runs) do if v == r then idx = i; break end end
+        elseif MS.currentRun then
+            r, idx = MS.currentRun, "Now"            -- the live run
+        else
+            r = runs and runs[1]
+        end
+        local has = r ~= nil
+        hbEmpty:SetShown(not has)
+        for _, fs in ipairs({ hbIndex, hbDungeon, hbLevel, hbTime, hbResult }) do fs:SetShown(has) end
+        if not has then return end
+        local isMPlus = (r.keystoneLevel or 0) > 0
+        hbIndex:SetText(idx)
+        hbDungeon:SetText(r.dungeonName or "?")
+        hbLevel:SetText(isMPlus and ("+" .. r.keystoneLevel) or DiffShort(r))
+        local lc = isMPlus and P.bronzeHi or P.ash
+        hbLevel:SetTextColor(lc[1], lc[2], lc[3])
+        hbTime:SetText(MS:FormatTime(MS:GetRunDuration(r)))
+        local res, rc = RunResult(r)
+        hbResult:SetText(res); hbResult:SetTextColor(rc[1], rc[2], rc[3])
+    end
+    sbFrame.RefreshHistBtn = RefreshHistBtn
+    RefreshHistBtn()
+
+    histBtn:HookScript("OnEnter", function()
+        Tint(chev, P.ivory)
+        local runs = MythicScoreboardDB and MythicScoreboardDB.runs
+        local menuOpen = UI.IsHistOpen() or (sbFrame.SettingsPopup and sbFrame.SettingsPopup:IsShown())
+        if runs and #runs > 0 and not menuOpen then
+            GameTooltip:SetOwner(histBtn, "ANCHOR_BOTTOM")
+            GameTooltip:SetText("Run history")
+            GameTooltip:AddLine("Pick one of " .. #runs .. " saved run" .. (#runs == 1 and "" or "s") .. " to view.", 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end
+    end)
+    histBtn:HookScript("OnLeave", function() Tint(chev, P.ash); GameTooltip:Hide() end)
+    histBtn:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
+        OpenHistDropdown(histBtn)
+    end)
+    sbFrame.HistoryButton = histBtn
+
+    -- ── Stats button (UI_Stats.lua): three rising bars ──────────────────
+    local statsBtn = Btn(hdr)
+    statsBtn:SetSize(30, 30)
+    statsBtn:SetPoint("RIGHT", histBtn, "LEFT", -8, 0)
+    Box(statsBtn, true)
+    local statBars = {}
+    for i, h in ipairs({ 6, 10, 14 }) do
+        local bar = Solid(statsBtn, "ARTWORK", 0, 1, 1, 1, 1)
+        bar:SetSize(3, h)
+        bar:SetPoint("BOTTOMLEFT", statsBtn, "CENTER", -7 + (i - 1) * 5, -7)
+        statBars[i] = bar
+    end
+    local function TintBars(c) for _, bar in ipairs(statBars) do bar:SetColorTexture(c[1], c[2], c[3], 1) end end
+    TintBars(P.ash)
+    statsBtn.SetActive = function(on)
+        statsBtn._active = on
+        TintBars(on and P.bronzeHi or P.ash)
+    end
+    statsBtn:HookScript("OnEnter", function(b)
+        if not b._active then TintBars(P.ivory) end
+        if UI.IsHistOpen() or sbFrame.SettingsPopup:IsShown() then return end
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
+        GameTooltip:SetText(b._active and "Back to the scoreboard" or "Your stats")
+        GameTooltip:Show()
+    end)
+    statsBtn:HookScript("OnLeave", function(b)
+        TintBars(b._active and P.bronzeHi or P.ash)
+        GameTooltip:Hide()
+    end)
+    statsBtn:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        CloseHistDropdown()
+        UI.ToggleStats()
+    end)
+    sbFrame.StatsBtn = statsBtn
+
+    -- ── Settings popup (UI_Settings.lua) ─────────────────────────────────
+    local settPop = UI.BuildSettingsPopup(sbFrame, settBtn)
+    sbFrame.SettingsPopup = settPop
+
+    -- ── Column header row ───────────────────────────────────────────────
+    local colHdr = CreateFrame("Frame", nil, sbFrame)
+    colHdr:SetPoint("TOPLEFT",  sbFrame, "TOPLEFT",  2, -(HDR_H + 1))
+    colHdr:SetPoint("TOPRIGHT", sbFrame, "TOPRIGHT", -2, -(HDR_H + 1))
+    sbFrame.ColHeader = colHdr
+    colHdr:SetHeight(COL_HDR_H)
+    local chBg = Solid(colHdr, "BACKGROUND", 0, 0, 0, 0, 0.25); chBg:SetAllPoints()
+    local chTop = Solid(colHdr, "BORDER", 0, P.line[1], P.line[2], P.line[3], 1)
+    chTop:SetPoint("TOPLEFT"); chTop:SetPoint("TOPRIGHT"); chTop:SetHeight(1)
+    local chBot = Solid(colHdr, "BORDER", 0, P.line[1], P.line[2], P.line[3], 1)
+    chBot:SetPoint("BOTTOMLEFT"); chBot:SetPoint("BOTTOMRIGHT"); chBot:SetHeight(1)
+
+    local function RefreshHeaderLabels()
+        for _, c in ipairs(COLS) do
+            local h = colHdrLabels[c.key]
+            local active = (sortState.key == c.key)
+            local col = (active or c.key == "dps") and P.ivory or P.ash
+            h.label:SetTextColor(col[1], col[2], col[3])
+            h.arrow:SetShown(active)
+            if active then
+                h.arrow:SetRotation(sortState.dir == 1 and 0 or math.pi)
+            end
+        end
+    end
+
+    ComputeColumnAnchors()
+    local x = PAD_X - 2
+    for _, col in ipairs(COLS) do
+        local cell = Btn(colHdr)
+        cell:SetPoint("LEFT", colHdr, "LEFT", x, 0)
+        cell:SetSize(col.w, COL_HDR_H)
+        local hov = Solid(cell, "HIGHLIGHT", 0, 1, 0.94, 0.86, 0.04); hov:SetAllPoints()
+
+        local lbl = Text(cell, "medium", 13, P.ash, col.left and "LEFT" or "CENTER")
+        lbl:SetText(col.label)
+        local arrow = Art(cell, "Chevron", "OVERLAY")
+        arrow:SetSize(12, 12); Tint(arrow, P.bronzeHi); arrow:Hide()
+        if col.left then
+            lbl:SetPoint("LEFT", cell, "LEFT", 0, 0)
+            arrow:SetPoint("LEFT", lbl, "RIGHT", 3, 0)
+        else
+            lbl:SetPoint("CENTER", cell, "CENTER", 0, 0)
+            arrow:SetPoint("RIGHT", lbl, "LEFT", -2, 0)
+        end
+        colHdrLabels[col.key] = { label = lbl, arrow = arrow }
+
+        local key = col.key
+        cell:SetScript("OnClick", function()
+            if sortState.key == key then
+                if sortState.dir == 1 then sortState.dir = -1
+                else sortState.key = nil; sortState.dir = 1 end
+            else
+                sortState.key = key; sortState.dir = 1
+            end
+            RefreshHeaderLabels()
+            MS:RefreshOverview()
+        end)
+        x = x + col.w
+    end
+    RefreshHeaderLabels()
+
+    -- ── Player rows + timeline containers ───────────────────────────────
+    overviewSF = MakeScrollFrame(sbFrame)
+    UI.overviewSF = overviewSF
+    overviewSF:SetPoint("TOPLEFT",     sbFrame, "TOPLEFT",     1, -(HDR_H + COL_HDR_H + 1))
+    overviewSF:SetPoint("BOTTOMRIGHT", sbFrame, "BOTTOMRIGHT", -1, TL_H + 1)
+    sbFrame.overviewSF = overviewSF
+
+    local tlc = CreateFrame("Frame", nil, sbFrame)
+    tlc:SetPoint("BOTTOMLEFT",  sbFrame, "BOTTOMLEFT",  1, 1)
+    tlc:SetPoint("BOTTOMRIGHT", sbFrame, "BOTTOMRIGHT", -1, 1)
+    tlc:SetHeight(TL_H)
+    BuildTimelineChrome(tlc)
+    tlc:Hide()
+    sbFrame.timelineContainer = tlc
+
+    UI.BuildStatsView(sbFrame)
+
+    MS:SetSBFrameVisibleCallback(function() return sbFrame and sbFrame:IsShown() end)
+
+end
+
+-- Slash commands work before the window is first opened (it is built then).
+SLASH_MYTHICSCOREBOARD1 = "/sb"
+SLASH_MYTHICSCOREBOARD2 = "/mscoreboard"
+SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
+    local cmd = _slower(_smatch(msg or "", "^%s*(.-)%s*$"))
+    if cmd == "" then
+        MS:ShowScoreboard()
+    elseif cmd == "stats" then
+        MS:ShowScoreboard()
+        UI.OpenStats()
+    elseif cmd == "abandon" then
+        if not MS:AbandonRun() then
+            print("|cff00ccff[MythicScoreboard]|r No run in progress to abandon.")
+        end
+    elseif cmd == "help" then
+        print("|cff00ccff[MythicScoreboard]|r v" .. MS.version
+            .. "  Commands: /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb help")
+    elseif cmd == "autoreset" then
+        local newVal = not MS:GetAutoResetMeter()
+        MS:SetAutoResetMeter(newVal)
+        print("|cff00ccff[MythicScoreboard]|r Reset meter on zone-in: "
+            .. (newVal and "|cff00ff00on|r" or "|cffff4444off|r"))
+    elseif cmd == "clear" then
+        DoClearHistory()
+    else
+        print("|cff00ccff[MythicScoreboard]|r Unknown command. Type /sb help for a list.")
+    end
+end
