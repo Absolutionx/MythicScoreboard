@@ -3,6 +3,7 @@ local _ins    = table.insert
 local _rem    = table.remove
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Art, Box, Btn, DiffShort, P, RunResult = UI.Art, UI.Box, UI.Btn, UI.DiffShort, UI.P, UI.RunResult
@@ -30,7 +31,7 @@ end
 local function DoClearHistory()
     MS:ClearHistory()                       -- History.lua (a run in progress carries on)
     if UI.frame and UI.frame.RefreshHistBtn then UI.frame.RefreshHistBtn() end
-    print("|cff00ccff[MythicScoreboard]|r History cleared. Your stats still have these runs.")
+    print("|cff00ccff[MythicScoreboard]|r " .. L["History cleared. Your stats still have these runs."])
 end
 
 local DROP_ROW_H = 28
@@ -72,8 +73,8 @@ local function MakeRow()
     delBtn:SetScript("OnEnter", function()
         hov:Show(); Tint(delIcon, P.bloodHi)
         GameTooltip:SetOwner(delBtn, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Delete run", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
-        GameTooltip:AddLine("Removes this run from history and from your stats.", 0.8, 0.8, 0.8)
+        GameTooltip:SetText(L["Delete run"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddLine(L["Removes this run from history and from your stats."], 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     delBtn:SetScript("OnLeave", function()
@@ -116,11 +117,11 @@ local function MakeClearRow()
     local caHov = Solid(cr, "BACKGROUND", 1, P.blood[1], P.blood[2], P.blood[3], 0)
     caHov:SetAllPoints()
     local caTxt = Text(cr, "medium", 13, P.blood, "CENTER")
-    caTxt:SetAllPoints(); caTxt:SetText("Clear all history")
+    caTxt:SetAllPoints(); caTxt:SetText(L["Clear all history"])
     function cr.Disarm()
         armed = false
         if armTimer then armTimer:Cancel(); armTimer = nil end
-        caTxt:SetText("Clear all history")
+        caTxt:SetText(L["Clear all history"])
         caHov:SetColorTexture(P.blood[1], P.blood[2], P.blood[3], 0)
     end
     cr:SetScript("OnEnter", function()
@@ -134,7 +135,7 @@ local function MakeClearRow()
             cr.Disarm(); CloseHistDropdown(); DoClearHistory()
         else
             armed = true
-            caTxt:SetText("Click again: history only, stats are kept")
+            caTxt:SetText(L["Click again: history only, stats are kept"])
             caHov:SetColorTexture(P.blood[1], P.blood[2], P.blood[3], 0.35)
             armTimer = C_Timer.NewTimer(3, cr.Disarm)
         end
@@ -179,7 +180,7 @@ function Fill()
         local isMPlus = (run.keystoneLevel or 0) > 0
         local result, rc = RunResult(run)
         Colour(row.fIdx, entry.live and P.bronzeHi or P.ash2)
-        row.fIdx:SetText(entry.live and "Now" or idx)
+        row.fIdx:SetText(entry.live and L["Now"] or idx)
         Colour(row.fRes, rc); row.fRes:SetText(result)
         row.fTime:SetText(MS:FormatTime(MS:GetRunDuration(run)))
         Colour(row.fLvl, isMPlus and P.bronzeHi or P.ash)
@@ -201,7 +202,7 @@ local function OpenHistDropdown(anchorBtn)
     if histDropdown then CloseHistDropdown(); return end
     local runs = (MythicScoreboardDB and MythicScoreboardDB.runs) or {}
     if #runs == 0 then
-        print("|cff00ccff[MythicScoreboard]|r No saved runs yet.")
+        print("|cff00ccff[MythicScoreboard]|r " .. L["No saved runs yet."])
         return
     end
     if not drop then

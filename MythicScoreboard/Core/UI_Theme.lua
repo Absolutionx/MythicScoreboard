@@ -5,6 +5,8 @@ local _min    = math.min
 local _fmt    = string.format
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
+local LK = MS.LK      -- a label kept in English, translated where it is shown
 
 MS.UI = MS.UI or {}
 local UI = MS.UI
@@ -96,22 +98,22 @@ local FRAME_H   = HDR_H + COL_HDR_H + ROW_H * MAX_ROWS + TL_H + 2
 local PAD_X     = 22
 
 local COLS = {
-    { key="player",     label="Player",       w=190, left=true },
-    { key="loot",       label="Loot",         w=108, left=true },
+    { key="player",     label=LK("Player"),       w=190, left=true },
+    { key="loot",       label=LK("Loot"),         w=108, left=true },
     -- num="int":  whole numbers, right-aligned on an anchor that centres a
     --             full-width value (digits wide) under the header.
     -- num="abbr": 12.3K style, aligned on the decimal point; the suffix sits
     --             in its own slot after it.
-    { key="score",      label="Rating",       w=68,  num="int", digits=4 },
-    { key="deaths",     label="Deaths",       w=60,  num="int", digits=2 },
-    { key="dmgTaken",   label="Damage taken", w=100, num="abbr" },
-    { key="avoidable",  label="Avoidable",    w=84,  num="abbr" },
-    { key="damage",     label="Damage",       w=88,  num="abbr" },
-    { key="dps",        label="DPS",          w=86,  num="abbr", strong=true },
-    { key="healing",    label="Healing",      w=88,  num="abbr" },
-    { key="hps",        label="HPS",          w=84,  num="abbr", strong=true },
-    { key="interrupts", label="Interrupts",   w=80,  num="int", digits=2 },
-    { key="dispels",    label="Dispels",      w=66,  num="int", digits=2 },
+    { key="score",      label=LK("Rating"),       w=68,  num="int", digits=4 },
+    { key="deaths",     label=LK("Deaths"),       w=60,  num="int", digits=2 },
+    { key="dmgTaken",   label=LK("Damage taken"), w=100, num="abbr" },
+    { key="avoidable",  label=LK("Avoidable"),    w=84,  num="abbr" },
+    { key="damage",     label=LK("Damage"),       w=88,  num="abbr" },
+    { key="dps",        label=LK("DPS"),          w=86,  num="abbr", strong=true },
+    { key="healing",    label=LK("Healing"),      w=88,  num="abbr" },
+    { key="hps",        label=LK("HPS"),          w=84,  num="abbr", strong=true },
+    { key="interrupts", label=LK("Interrupts"),   w=80,  num="int", digits=2 },
+    { key="dispels",    label=LK("Dispels"),      w=66,  num="int", digits=2 },
 }
 local CELL_FONT_SIZE = 16
 
@@ -119,7 +121,7 @@ local CELL_FONT_SIZE = 16
 if MS.Flavor.dungeonLevels then
     for i, c in ipairs(COLS) do
         if c.key == "score" then
-            COLS[i] = { key="level", label="Level", w=c.w, num="int", digits=2 }
+            COLS[i] = { key="level", label=LK("Level"), w=c.w, num="int", digits=2 }
         end
     end
 end
@@ -130,9 +132,35 @@ end
 
 local _FONT_PATH = GameFontNormal:GetFont()
 
--- Custom fonts only cover Latin script; fall back to the game font elsewhere.
-local _locale = GetLocale and GetLocale() or "enUS"
-local LATIN = not ({ ruRU=true, koKR=true, zhCN=true, zhTW=true })[_locale]
+-- The addon's fonts only cover Latin script. On a Russian, Korean or Chinese
+-- client every piece of text uses the game's own font instead.
+-- (MS.Locale is the language shown: settled when the addon has loaded, and
+-- every piece of text is created after that.)
+local LOCALE_SCRIPT = { ruRU = "cyrillic", koKR = "hangul", zhCN = "han", zhTW = "han" }
+local function ShownScript() return LOCALE_SCRIPT[MS.Locale or "enUS"] end
+
+-- On a Latin client, a name in another script (a Russian player in the group)
+-- is shown in the game font that has those letters. Found by the UTF-8 lead
+-- byte: D0-D3 Cyrillic, EA-ED Hangul, E4-E9 Chinese characters.
+-- (The game's own name-font globals when it has them.)
+local function GameFont(global, default)
+    local v = rawget(_G, global)
+    return (type(v) == "string" and v ~= "") and v or default
+end
+local SCRIPT_FONTS = {
+    cyrillic = GameFont("UNIT_NAME_FONT_CYRILLIC", "Fonts\\FRIZQT___CYR.TTF"),
+    hangul   = GameFont("UNIT_NAME_FONT_KOREAN",   "Fonts\\2002.TTF"),
+    han      = GameFont("UNIT_NAME_FONT_CHINESE",  "Fonts\\ARKai_T.ttf"),
+}
+local function ScriptOf(text)
+    if type(text) ~= "string" or not text:find("[\208-\237]") then return nil end
+    for i = 1, #text do
+        local b = text:byte(i)
+        if b >= 0xD0 and b <= 0xD3 then return "cyrillic" end
+        if b >= 0xEA and b <= 0xED then return "hangul" end
+        if b >= 0xE4 and b <= 0xE9 then return "han" end
+    end
+end
 
 local FONTS = {
     title    = MEDIA .. "Fonts\\Cinzel-Bold.ttf",
@@ -141,14 +169,31 @@ local FONTS = {
     semibold = MEDIA .. "Fonts\\BarlowSemiCondensed-SemiBold.ttf",
 }
 
-local function SetFont(fs, kind, size, flags)
+local function SetFont(fs, kind, size, flags, script)
     flags = flags or ""
     local path = (kind == "game") and _FONT_PATH or FONTS[kind] or _FONT_PATH
-    if kind == "title" and not LATIN then path = _FONT_PATH end
+    local shown = ShownScript()
+    if shown then
+        -- The game font has these letters in that language's own client; a
+        -- preview (/sb lang) on another client takes the font that has them.
+        path = (MS.Locale == MS.ClientLocale) and _FONT_PATH or SCRIPT_FONTS[shown] or _FONT_PATH
+    end
+    if script then path = SCRIPT_FONTS[script] or _FONT_PATH end
+    fs._msKind, fs._msSize, fs._msFlags, fs._msScript = kind, size, flags, script
     local ok = fs:SetFont(path, size, flags)
     if ok == false or not fs:GetFont() then
         fs:SetFont(_FONT_PATH, size, flags)
     end
+end
+
+-- SetText for text that may hold a name in another script: switches the
+-- font when the script changes, and back again for the next name.
+local function SetNameText(fs, text)
+    local script = (not ShownScript()) and ScriptOf(text) or nil
+    if script ~= fs._msScript and fs._msKind then
+        SetFont(fs, fs._msKind, fs._msSize, fs._msFlags, script)
+    end
+    fs:SetText(text)
 end
 
 local function Text(parent, kind, size, col, justify, flags, layer)
@@ -337,9 +382,9 @@ end
 
 local function Abbrev(n)
     n = n or 0
-    if     n >= 1e9 then return _fmt("%.1fB", n / 1e9)
-    elseif n >= 1e6 then return _fmt("%.1fM", n / 1e6)
-    elseif n >= 1e3 then return _fmt("%.1fK", n / 1e3)
+    if     n >= 1e9 then return _fmt("%.1f", n / 1e9) .. L["B"]
+    elseif n >= 1e6 then return _fmt("%.1f", n / 1e6) .. L["M"]
+    elseif n >= 1e3 then return _fmt("%.1f", n / 1e3) .. L["K"]
     else                 return tostring(_floor(n))
     end
 end
@@ -374,31 +419,33 @@ local function DiffShort(run)
         if MS.ForeverLevelRange then lo, hi = MS:ForeverLevelRange(run) end
         return lo and (lo .. "-" .. hi) or ""
     end
+    -- By difficulty ID: the stored label is in the client's language.
+    local id = run.difficultyID
     local label = run.difficultyLabel or ""
-    if label:find("Follower") then return "Follower" end
-    if label == "Timewalking" then return "TW" end
-    return label ~= "" and label or "?"
+    if id == 205 or label:find("Follower") then return L["Follower"] end
+    if id == 24 or id == 33 then return L["TW"] end
+    return label ~= "" and L[label] or "?"
 end
 
 -- How each result reads (MS:RunStatus / MS:ArchiveStatus in RunModel.lua).
 local STATUS = {
-    inTime    = { "In time",     P.verd },
-    overTime  = { "Over time",   P.avoid },
-    cleared   = { "Cleared",     P.verd },
-    live      = { "In progress", P.bronzeHi },
-    paused    = { "Paused",      P.bronzeHi },
-    finished  = { "Finished",    P.ivory },
-    abandoned = { "Abandoned",   P.ash },
+    inTime    = { LK("In time"),     P.verd },
+    overTime  = { LK("Over time"),   P.avoid },
+    cleared   = { LK("Cleared"),     P.verd },
+    live      = { LK("In progress"), P.bronzeHi },
+    paused    = { LK("Paused"),      P.bronzeHi },
+    finished  = { LK("Finished"),    P.ivory },
+    abandoned = { LK("Abandoned"),   P.ash },
 }
 
 -- Result text + colour for a run, or for an archive entry.
 local function RunResult(run)
     local s = STATUS[MS:RunStatus(run)] or STATUS.abandoned
-    return s[1], s[2]
+    return L[s[1]], s[2]
 end
 local function ArchiveResult(e)
     local s = STATUS[MS:ArchiveStatus(e)] or STATUS.abandoned
-    return s[1], s[2]
+    return L[s[1]], s[2]
 end
 
 -- Item quality colour (r, g, b), bronze when unknown.
@@ -538,19 +585,19 @@ function UI.AddProgressLines(prog, fromArchive)
     local quests = fromArchive and (prog.q or 0) or #(prog.quests or {})
     local gold   = (fromArchive and prog.g or prog.gold) or 0
     local a, b, c = P.ash[1], P.ash[2], P.ash[3]
-    GameTooltip:AddDoubleLine("Experience", MS.FormatThousands(xp)
-        .. (levels > 0 and ("  (+" .. levels .. (levels == 1 and " level)" or " levels)")) or ""), a, b, c, 1, 1, 1)
-    GameTooltip:AddDoubleLine("Mobs killed", kills, a, b, c, 1, 1, 1)
-    GameTooltip:AddDoubleLine("Quests completed", quests, a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Experience"], MS.FormatThousands(xp)
+        .. (levels > 0 and ("  (" .. MS.Plural(levels, "+%d level", "+%d levels") .. ")") or ""), a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Mobs killed"], kills, a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Quests completed"], quests, a, b, c, 1, 1, 1)
     if not fromArchive then
         for _, t in ipairs(prog.quests or {}) do GameTooltip:AddLine("   " .. t, 0.8, 0.8, 0.8) end
     end
-    GameTooltip:AddDoubleLine("Gold looted", MS.FormatGold(gold), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+    GameTooltip:AddDoubleLine(L["Gold looted"], MS.FormatGold(gold), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
     local reps = {}
     for f, n in pairs(prog.rep or {}) do reps[#reps + 1] = { f = f, n = n } end
     table.sort(reps, function(x, y) return x.n > y.n end)
     for _, r in ipairs(reps) do
-        GameTooltip:AddDoubleLine(r.f, "+" .. MS.FormatThousands(r.n) .. " reputation", a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
+        GameTooltip:AddDoubleLine(r.f, _fmt(L["+%s reputation"], MS.FormatThousands(r.n)), a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
     end
 end
 
@@ -589,6 +636,8 @@ UI.ArchiveResult = ArchiveResult
 UI.QualityColor = QualityColor
 UI.ScoreColor = ScoreColor
 UI.SetFont = SetFont
+UI.SetNameText = SetNameText
+UI.ScriptOf = ScriptOf
 UI.Solid = Solid
 UI.SplitAbbrev = SplitAbbrev
 UI.TL_H = TL_H

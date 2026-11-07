@@ -5,6 +5,7 @@
 -- Encounters.lua. Loading saved data: Bootstrap.lua.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local _issecret = issecretvalue
 
 local MYTHIC_PLUS = MS.MYTHIC_PLUS
@@ -85,6 +86,14 @@ function H.CHALLENGE_MODE_RESET()
     end
 end
 
+function H.PLAYER_REGEN_ENABLED()
+    if MS.inDungeon and MS.OnCombatEnded then MS:OnCombatEnded() end
+end
+function H.PLAYER_REGEN_DISABLED()
+    local run = MS.currentRun
+    if run then run._combatEndedAt = nil end
+end
+
 -- encounterID is the dungeonEncounterID (as in EJ_GetEncounterInfoByIndex's
 -- seventh value), not the journal's own encounter ID.
 function H.ENCOUNTER_START(encounterID, bossName)
@@ -156,7 +165,7 @@ local EVENTS = {
     "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_LEAVING_WORLD", "PLAYER_LOGOUT",
     "PLAYER_DIFFICULTY_CHANGED",
     "CHALLENGE_MODE_START", "CHALLENGE_MODE_COMPLETED", "CHALLENGE_MODE_RESET",
-    "ENCOUNTER_START", "ENCOUNTER_END",
+    "ENCOUNTER_START", "ENCOUNTER_END", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED",
     "PLAYER_DEAD", "GROUP_ROSTER_UPDATE",
     "UNIT_PET",
     "SCENARIO_CRITERIA_UPDATE",

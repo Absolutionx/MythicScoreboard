@@ -9,6 +9,7 @@ local _rem    = table.remove
 local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Abbrev, Art, Btn, BuildTimeline, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.BuildTimeline, UI.CELL_FONT_SIZE
@@ -151,20 +152,20 @@ local function RowOnEnter(self2)
 
     if (pc.level or 0) > 0 and MS.Flavor.dungeonLevels then
         local lo, hi = MS:ForeverLevelRange(self2._run)
-        GameTooltip:AddDoubleLine("Level", pc.level .. (lo and ("  (dungeon " .. lo .. "-" .. hi .. ")") or ""),
+        GameTooltip:AddDoubleLine(L["Level"], pc.level .. (lo and ("  (" .. _fmt(L["dungeon %d-%d"], lo, hi) .. ")") or ""),
             0.8, 0.8, 0.8, 1, 1, 1)
     end
     local sc = pc.mythicScore or 0
     if sc > 0 then
         local sr, sg, sb2 = ScoreColor(sc)
-        GameTooltip:AddDoubleLine("Mythic+ rating", sc, 0.8, 0.8, 0.8, sr, sg, sb2)
+        GameTooltip:AddDoubleLine(L["Mythic+ rating"], sc, 0.8, 0.8, 0.8, sr, sg, sb2)
     end
     if (pc.itemLevel or 0) > 0 then
-        GameTooltip:AddDoubleLine("Item level", pc.itemLevel, 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Item level"], pc.itemLevel, 0.8, 0.8, 0.8, 1, 1, 1)
     end
     local avoid = pc.avoidableDamageTaken or 0
     if avoid > 0 then
-        GameTooltip:AddDoubleLine("Avoidable damage", Abbrev(avoid), 0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
+        GameTooltip:AddDoubleLine(L["Avoidable damage"], Abbrev(avoid), 0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
     end
 
     -- Highest / lowest interrupt badge (healers other than Shaman excluded from "lowest").
@@ -184,30 +185,30 @@ local function RowOnEnter(self2)
             end
         end
         if n > 1 then
-            if intCount > 0 and intCount == hi then badge = "  |cffe7b877most in group|r"
-            elseif loN > 1 and canKick and intCount == lo then badge = "  |cffe57068fewest in group|r" end
+            if intCount > 0 and intCount == hi then badge = "  |cffe7b877" .. L["most in group"] .. "|r"
+            elseif loN > 1 and canKick and intCount == lo then badge = "  |cffe57068" .. L["fewest in group"] .. "|r" end
         end
     end
     if intCount > 0 or badge ~= "" then
-        GameTooltip:AddDoubleLine("Interrupts", intCount .. badge, 0.8, 0.8, 0.8, P.kick[1], P.kick[2], P.kick[3])
+        GameTooltip:AddDoubleLine(L["Interrupts"], intCount .. badge, 0.8, 0.8, 0.8, P.kick[1], P.kick[2], P.kick[3])
     end
 
     if pc.loot and #pc.loot > 0 then
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine("Loot", P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:AddLine(L["Loot"], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
         for _, e in ipairs(pc.loot) do
             local link, _, _, ilvl = LootDetails(e)
-            local shownLink = (type(link) == "string" and link:find("|H")) and link or "Item not loaded yet"
-            GameTooltip:AddDoubleLine("  " .. shownLink, ilvl and ("ilvl " .. ilvl) or "", 1, 1, 1, 0.8, 0.8, 0.8)
+            local shownLink = (type(link) == "string" and link:find("|H")) and link or L["Item not loaded yet"]
+            GameTooltip:AddDoubleLine("  " .. shownLink, ilvl and _fmt(L["ilvl %d"], ilvl) or "", 1, 1, 1, 0.8, 0.8, 0.8)
         end
         GameTooltip:AddLine(" ")
     end
 
     local deathCount = pc.deaths or 0
     if deathCount == 0 then
-        GameTooltip:AddDoubleLine("Deaths", "None", 0.8, 0.8, 0.8, P.verdHi[1], P.verdHi[2], P.verdHi[3])
+        GameTooltip:AddDoubleLine(L["Deaths"], L["None"], 0.8, 0.8, 0.8, P.verdHi[1], P.verdHi[2], P.verdHi[3])
     else
-        GameTooltip:AddDoubleLine("Deaths", deathCount, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddDoubleLine(L["Deaths"], deathCount, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
         if pc.deathEvents and #pc.deathEvents > 0 then
             GameTooltip:AddLine(" ")
             for _, de in ipairs(pc.deathEvents) do
@@ -219,8 +220,8 @@ local function RowOnEnter(self2)
                         or rr.duration or _huge
                     if dt >= pullT and dt <= killT then
                         segStr = "  |cff999999" .. (boss.name or "?")
-                            .. ((boss.wipeTime and not boss.killTime) and " (wipe)" or "")
-                            .. ", " .. MS:FormatTime(dt - pullT) .. " into the fight|r"
+                            .. ((boss.wipeTime and not boss.killTime) and (" " .. L["(wipe)"]) or "")
+                            .. ", " .. _fmt(L["%s into the fight"], MS:FormatTime(dt - pullT)) .. "|r"
                         break
                     end
                 end
@@ -228,9 +229,10 @@ local function RowOnEnter(self2)
                 do
                     local kill = MS.KillingBlow(de.events)
                     if kill then
-                        local line = "  |cffff9944" .. (kill.spellName or "Unknown") .. "|r"
+                        local line = "  |cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r"
                         if kill.caster and kill.caster ~= "" then
-                            line = line .. " |cff888888by|r |cffffd700" .. kill.caster .. "|r"
+                            line = "  " .. _fmt(L["%s |cff888888by|r %s"], "|cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r",
+                                "|cffffd700" .. kill.caster .. "|r")
                         end
                         if (kill.amount or 0) > 0 then
                             line = line .. " |cffff4444(" .. Abbrev(-kill.amount) .. ")|r"
@@ -498,17 +500,17 @@ local function WholeRunButton()
     if f.WholeRunBtn then return f.WholeRunBtn end
     local b = Btn(f)
     b:SetSize(112, 22)
-    b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -54)   -- where "New personal best" sits
+    b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -54)   -- where L["New personal best"] sits
     b:SetFrameLevel(f:GetFrameLevel() + 20)
     local arrow = Art(b, "Chevron", "OVERLAY")
     arrow:SetSize(12, 12); arrow:SetRotation(-math.pi / 2); Tint(arrow, P.ash)
     local txt = Text(b, "medium", 13, P.ash, "RIGHT")
-    txt:SetPoint("RIGHT", b, "RIGHT", -4, 0); txt:SetText("Whole run")
+    txt:SetPoint("RIGHT", b, "RIGHT", -4, 0); txt:SetText(L["Whole run"])
     arrow:SetPoint("RIGHT", txt, "LEFT", -4, 0)
     b:SetScript("OnEnter", function(self2)
         Tint(arrow, P.ivory); txt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
         GameTooltip:SetOwner(self2, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:SetText("Back to the whole run", P.ivory[1], P.ivory[2], P.ivory[3])
+        GameTooltip:SetText(L["Back to the whole run"], P.ivory[1], P.ivory[2], P.ivory[3])
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function()
@@ -521,7 +523,7 @@ local function WholeRunButton()
     return b
 end
 
--- "Abandon run": on the run in progress (or paused), two clicks.
+-- L["Abandon run"]: on the run in progress (or paused), two clicks.
 local function AbandonButton()
     local f = UI.frame
     if f.AbandonBtn then return f.AbandonBtn end
@@ -534,7 +536,7 @@ local function AbandonButton()
     local armed, timer = false, nil
     local function Look()
         local c = armed and P.bloodHi or P.ash2
-        txt:SetText(armed and "Click again to abandon" or "Abandon run")
+        txt:SetText(armed and L["Click again to abandon"] or L["Abandon run"])
         txt:SetTextColor(c[1], c[2], c[3])
     end
     local function Disarm()
@@ -556,9 +558,9 @@ local function AbandonButton()
     b:SetScript("OnEnter", function(self2)
         if not armed then txt:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
         GameTooltip:SetOwner(self2, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:SetText("Abandon run", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
-        GameTooltip:AddLine("Ends this run now and saves it as abandoned. A new run starts the next "
-            .. "time you enter a dungeon.", 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Abandon run"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddLine(L["Ends this run now and saves it as abandoned. A new run starts the next time you enter a dungeon."],
+            0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     b:SetScript("OnLeave", function()
@@ -622,9 +624,9 @@ end
 
 local function RefreshHeader(run)
     if not run then
-        UI.frame.DungeonName:SetText("Dungeon Scoreboard")
+        UI.frame.DungeonName:SetText(L["Dungeon Scoreboard"])
         UI.frame.SetBadge(nil)
-        UI.frame.Subline:SetText("No runs yet. Enter a dungeon you track and the scoreboard fills in as you play.")
+        UI.frame.Subline:SetText(L["No runs yet. Enter a dungeon you track and the scoreboard fills in as you play."])
         UI.frame.SublineRun = nil
         UI.frame.PBLabel:Hide()
         UI.frame.LayoutAffixIcons(0)
@@ -647,7 +649,7 @@ local function RefreshHeader(run)
     local parts = {}
     local dur = MS:GetRunDuration(run)
     local limit = tonumber(run.keystoneTimeLimit)
-    if isMPlus then _ins(parts, "Mythic Keystone") end
+    if isMPlus then _ins(parts, L["Mythic Keystone"]) end
     if isMPlus and limit and limit > 0 then
         _ins(parts, CT(P.ivory, MS:FormatTime(dur)) .. " / " .. MS:FormatTime(limit))
     else
@@ -657,12 +659,12 @@ local function RefreshHeader(run)
     if run.completed then
         if isMPlus and limit and limit > 0 then
             local diff = _abs(limit - dur)
-            if run.inTime then _ins(parts, CT(P.verd, "In time, " .. MS:FormatTime(diff) .. " to spare"))
-            else _ins(parts, CT(P.avoid, "Over time by " .. MS:FormatTime(diff))) end
+            if run.inTime then _ins(parts, CT(P.verd, _fmt(L["In time, %s to spare"], MS:FormatTime(diff))))
+            else _ins(parts, CT(P.avoid, _fmt(L["Over time by %s"], MS:FormatTime(diff)))) end
         elseif isMPlus then
-            _ins(parts, run.inTime and CT(P.verd, "In time") or CT(P.avoid, "Over time"))
+            _ins(parts, run.inTime and CT(P.verd, L["In time"]) or CT(P.avoid, L["Over time"]))
         else
-            _ins(parts, CT(P.verd, "Cleared"))
+            _ins(parts, CT(P.verd, L["Cleared"]))
         end
     else
         local text, col = UI.RunResult(run)    -- in progress, paused, finished or abandoned
@@ -672,22 +674,22 @@ local function RefreshHeader(run)
     if MS.Flavor.bossProgress and not isMPlus then
         local killed, total = MS:ForeverBossProgress(run)
         if total then
-            _ins(parts, CT(P.ivory, killed .. " of " .. total) .. " bosses")
+            _ins(parts, _fmt(L["%s of %s bosses"], CT(P.ivory, killed), CT(P.ivory, total)))
         else
             local n = 0
             for _, b in ipairs(run.bosses or {}) do if b.killTime then n = n + 1 end end
-            _ins(parts, n .. (n == 1 and " boss" or " bosses") .. " killed")
+            _ins(parts, MS.Plural(n, "%d boss killed", "%d bosses killed"))
         end
         local lo, hi = MS:ForeverLevelRange(run)
-        if lo then _ins(parts, "Levels " .. lo .. "-" .. hi) end
+        if lo then _ins(parts, _fmt(L["Levels %d-%d"], lo, hi)) end
     end
 
     local deaths = 0
     for _, p in pairs(run.players or {}) do deaths = deaths + (p.deaths or 0) end
     if deaths == 0 then
-        _ins(parts, "No deaths")
+        _ins(parts, L["No deaths"])
     else
-        local s = deaths .. " death" .. (deaths == 1 and "" or "s")
+        local s = MS.Plural(deaths, "%d death", "%d deaths")
         local penalty = run.deathPenaltySeconds or 0
         if isMPlus and penalty > 0 then s = s .. ", -" .. MS:FormatTime(penalty) end
         _ins(parts, CT(P.blood, s))
@@ -695,14 +697,14 @@ local function RefreshHeader(run)
     -- Forever: what the run did for you (the full list is in the tooltip).
     local pr = MS.Flavor.progressStats and run.progress
     if pr then
-        local xp = CT(P.ivory, MS.FormatThousands(pr.xp)) .. " XP"
+        local xp = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(pr.xp)))
         if (pr.levels or 0) > 0 then
-            xp = xp .. CT(P.verdHi, "  +" .. pr.levels .. (pr.levels == 1 and " level" or " levels"))
+            xp = xp .. CT(P.verdHi, "  " .. MS.Plural(pr.levels, "+%d level", "+%d levels"))
         end
         _ins(parts, xp)
-        _ins(parts, CT(P.ivory, pr.kills or 0) .. ((pr.kills or 0) == 1 and " kill" or " kills"))
+        _ins(parts, MS.Plural(pr.kills or 0, "%d kill", "%d kills", CT(P.ivory, pr.kills or 0)))
         local nq = #(pr.quests or {})
-        if nq > 0 then _ins(parts, CT(P.ivory, nq) .. (nq == 1 and " quest" or " quests")) end
+        if nq > 0 then _ins(parts, MS.Plural(nq, "%d quest", "%d quests", CT(P.ivory, nq))) end
         if (pr.gold or 0) > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(pr.gold))) end
     end
     -- (A tighter gap when the line also carries the run's progress.)
@@ -744,9 +746,9 @@ local function RefreshHeader(run)
     local isWipe = boss.wipeTime and not boss.killTime
     local endT = FightEnd(run, boss)
     local fp = {
-        CT(P.bronzeHi, boss.name or "Boss"),
-        "Fight " .. CT(P.ivory, MS:FormatTime(endT - (boss.pullTime or 0))),
-        isWipe and CT(P.blood, "Wipe at " .. MS:FormatTime(endT)) or ("Killed at " .. CT(P.ivory, MS:FormatTime(endT))),
+        CT(P.bronzeHi, boss.name or L["Boss"]),
+        _fmt(L["Fight %s"], CT(P.ivory, MS:FormatTime(endT - (boss.pullTime or 0)))),
+        isWipe and CT(P.blood, _fmt(L["Wipe at %s"], MS:FormatTime(endT))) or _fmt(L["Killed at %s"], CT(P.ivory, MS:FormatTime(endT))),
     }
     local fd = 0
     for _, p in pairs(run.players or {}) do
@@ -754,11 +756,11 @@ local function RefreshHeader(run)
             if (de.time or 0) >= (boss.pullTime or 0) and (de.time or 0) <= endT then fd = fd + 1 end
         end
     end
-    _ins(fp, fd == 0 and "No deaths" or CT(P.blood, fd .. (fd == 1 and " death" or " deaths")))
+    _ins(fp, fd == 0 and L["No deaths"] or CT(P.blood, MS.Plural(fd, "%d death", "%d deaths")))
     if not boss.stats then
         local waiting = run == MS.currentRun and (boss._session or boss._before)
-        _ins(fp, CT(P.ash2, waiting and "Damage and healing appear once you're out of combat"
-            or "Damage and healing weren't recorded for this fight"))
+        _ins(fp, CT(P.ash2, waiting and L["Damage and healing appear once you're out of combat"]
+            or L["Damage and healing weren't recorded for this fight"]))
     end
     UI.frame.Subline:SetText(table.concat(fp, "      "))
     UI.frame.SublineRun = nil
@@ -916,7 +918,7 @@ function MS:_DoRefreshOverview()
             UI.frame._emptyLbl = Text(content, "regular", 14, P.ash, "CENTER")
             UI.frame._emptyLbl:SetPoint("TOP", content, "TOP", 0, -90)
         end
-        UI.frame._emptyLbl:SetText("Your group's damage, healing, deaths and interrupts will show here.")
+        UI.frame._emptyLbl:SetText(L["Your group's damage, healing, deaths and interrupts will show here."])
         UI.frame._emptyLbl:Show()
         content:SetHeight(60); sf.UpdateRange()
         return
@@ -979,12 +981,12 @@ function MS:_DoRefreshOverview()
             row._roleIcon:SetTexCoord(rc[1], rc[2], rc[3], rc[4])
         end
 
-        row._nameFs:SetText(DN(p.name) or "?")
+        UI.SetNameText(row._nameFs, DN(p.name) or "?")
         row._nameFs:SetTextColor(cr * dim, cg * dim, cb * dim)
         if hasLeft then
-            row._subFs:SetText("Left the group")
+            row._subFs:SetText(L["Left the group"])
         elseif (p.itemLevel or 0) > 0 then
-            row._subFs:SetText(p.itemLevel .. " item level")
+            row._subFs:SetText(_fmt(L["%d item level"], p.itemLevel))
         else
             row._subFs:SetText("")
         end

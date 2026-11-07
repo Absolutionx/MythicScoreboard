@@ -1,6 +1,7 @@
 local _ins    = table.insert
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Art, Box, Btn, Outline, P, Solid = UI.Art, UI.Box, UI.Btn, UI.Outline, UI.P, UI.Solid
@@ -65,17 +66,17 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
 
     -- On/off settings, top to bottom (getters and setters: Settings.lua).
     local TOGGLES = {
-        { "Reset meter on zone-in", "AutoResetMeter",
-          "Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers." },
+        { L["Reset meter on zone-in"], "AutoResetMeter",
+          L["Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers."] },
         -- Enemy forces only exist in Mythic+.
-        { "Forces % on nameplates", "MobForcesNameplate",
-          "Shows each mob's enemy forces % above its nameplate in Mythic+.", MS.Flavor.mythicPlus },
-        { "Forces % in tooltips", "MobForcesTooltip",
-          "Adds enemy forces % to the unit tooltip in Mythic+.", MS.Flavor.mythicPlus },
-        { "Open after a run", "AutoOpenOnComplete",
-          "Opens the scoreboard when you finish a dungeon." },
-        { "Minimap button", "MinimapButton",
-          "Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap." },
+        { L["Forces % on nameplates"], "MobForcesNameplate",
+          L["Shows each mob's enemy forces % above its nameplate in Mythic+."], MS.Flavor.mythicPlus },
+        { L["Forces % in tooltips"], "MobForcesTooltip",
+          L["Adds enemy forces % to the unit tooltip in Mythic+."], MS.Flavor.mythicPlus },
+        { L["Open after a run"], "AutoOpenOnComplete",
+          L["Opens the scoreboard when you finish a dungeon."] },
+        { L["Minimap button"], "MinimapButton",
+          L["Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap."] },
     }
 
     local yOff = -6
@@ -93,7 +94,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
     -- History limit stepper
     local hl = CreateFrame("Frame", nil, settPop)
     hl:SetSize(SETT_W - 8, SROW); hl:SetPoint("TOPLEFT", settPop, "TOPLEFT", 4, yOff)
-    local hlLbl = Text(hl, "regular", 14, P.ivory); hlLbl:SetPoint("LEFT", 8, 0); hlLbl:SetText("Runs to keep")
+    local hlLbl = Text(hl, "regular", 14, P.ivory); hlLbl:SetPoint("LEFT", 8, 0); hlLbl:SetText(L["Runs to keep"])
     local function Step(txt)
         local b = Btn(hl)
         b:SetSize(20, 20); Box(b, true)
@@ -129,12 +130,12 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
 
         local diffHdr = Text(settPop, "medium", 13, P.bronzeHi)
         diffHdr:SetPoint("TOPLEFT", settPop, "TOPLEFT", 12, yOff - 4)
-        diffHdr:SetText("Track these difficulties")
+        diffHdr:SetText(L["Track these difficulties"])
         yOff = yOff - 22
 
         for _, grp in ipairs(MS.DIFF_GROUPS) do
             local key = grp.key
-            _ins(rows, MakeToggleRow(yOff, grp.label,
+            _ins(rows, MakeToggleRow(yOff, L[grp.label],
                 function() return MS:IsDifficultyGroupOn(key) end,
                 function(v) MS:SetDifficultyGroupOn(key, v) end))
             yOff = yOff - SROW
@@ -150,15 +151,13 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
         yOff = yOff - 14
         local crHdr = Text(settPop, "medium", 13, P.bronzeHi)
         crHdr:SetPoint("TOPLEFT", settPop, "TOPLEFT", 12, yOff - 4)
-        crHdr:SetText("Mark a run cleared when")
+        crHdr:SetText(L["Mark a run cleared when"])
         yOff = yOff - 22
 
         local TIPS = {
-            final = "The run is cleared when the dungeon's final boss dies. If other main bosses are still alive "
-                 .. "(some dungeons can be done in any order), it waits until they're dead too, or until you "
-                 .. "leave, so skipped bosses don't cost you the clear.",
-            all   = "The run is cleared once every boss except rare and optional ones is dead.",
-            leave = "Runs are never marked cleared or abandoned; each is saved as finished when you leave.",
+            final = L["The run is cleared when the dungeon's final boss dies. If other main bosses are still alive (some dungeons can be done in any order), it waits until they're dead too, or until you leave, so skipped bosses don't cost you the clear."],
+            all   = L["The run is cleared once every boss except rare and optional ones is dead."],
+            leave = L["Runs are never marked cleared or abandoned; each is saved as finished when you leave."],
         }
         for _, rule in ipairs(MS.CLEAR_RULES) do
             local key = rule.key
@@ -174,7 +173,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
             dot:SetSize(7, 7); dot:SetPoint("CENTER", ring); Tint(dot, P.bronzeHi)
             local lbl = Text(row, "regular", 14, P.ivory)
             lbl:SetPoint("LEFT", ring, "RIGHT", 8, 0)
-            lbl:SetText(rule.label)
+            lbl:SetText(L[rule.label])
             local note
             if rule.note then
                 -- Two lines: the name, and a short note under it.
@@ -182,7 +181,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
                 lbl:ClearAllPoints(); lbl:SetPoint("LEFT", ring, "RIGHT", 8, 0)
                 note = Text(row, "regular", 11, P.ash)
                 note:SetPoint("TOPLEFT", lbl, "BOTTOMLEFT", 0, -2)
-                note:SetText(rule.note)
+                note:SetText(L[rule.note])
             end
             local function Refresh()
                 local on = MS:GetClearRule() == key
@@ -198,7 +197,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
             row:SetScript("OnEnter", function()
                 hov:Show()
                 GameTooltip:SetOwner(row, "ANCHOR_LEFT")
-                GameTooltip:SetText(rule.label)
+                GameTooltip:SetText(L[rule.label])
                 GameTooltip:AddLine(TIPS[key], 0.8, 0.8, 0.8, true)
                 GameTooltip:Show()
             end)

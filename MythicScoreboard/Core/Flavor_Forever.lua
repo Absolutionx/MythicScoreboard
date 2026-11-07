@@ -5,6 +5,8 @@
 -- Mythic+. The dungeons themselves are described in Forever.lua.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
+local LK = MS.LK      -- a label kept in English, translated where it is shown
 
 local F = MS.Flavor
 F.name          = "forever"
@@ -19,12 +21,12 @@ MS.FLAVOR = F.name
 -- Forever dungeons have a single difficulty: every dungeon run is tracked and
 -- the difficulty options are hidden from settings.
 MS.DIFF_GROUPS = {
-    { key = "dungeons", label = "Dungeons", ids = {}, default = true, catchAll = true, alwaysOn = true },
+    { key = "dungeons", label = LK("Dungeons"), ids = {}, default = true, catchAll = true, alwaysOn = true },
 }
 
 MS.CLEAR_RULES = {
-    { key = "final", label = "Final boss killed", note = "Waits for other bosses or leaving" },
-    { key = "all",   label = "Every non-rare boss killed" },
-    { key = "leave", label = "Leaving the dungeon" },
+    { key = "final", label = LK("Final boss killed"), note = LK("Waits for other bosses or leaving") },
+    { key = "all",   label = LK("Every non-rare boss killed") },
+    { key = "leave", label = LK("Leaving the dungeon") },
 }
 

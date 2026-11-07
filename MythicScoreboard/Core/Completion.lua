@@ -15,6 +15,7 @@
 local _max = math.max
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local _issecret = issecretvalue
 
 local function Readable(v) return v ~= nil and not (_issecret and _issecret(v)) and v or nil end
@@ -86,6 +87,7 @@ function MS:LeaveEndsRuns() return self:GetClearRule() == "leave" end
 function MS:MarkCleared(run, at)
     run.completed = true
     run.clearedAt = at
+    run._clearedClock = GetTime()
     self:SaveCurrentRun()
     C_Timer.After(0.5, function()
         if MS:GetAutoOpenOnComplete() then MS:ShowScoreboard() end
@@ -113,12 +115,31 @@ end
 -- when the "leaving" clear rule is in force.
 function MS:ApplyLeaveRules(run)
     if not run then return false end
+    -- A fight still open is over: ended when combat did, if that's known.
+    local ab = run.activeBoss
+    if ab and not ab.killTime and not ab.wipeTime then
+        self:CloseOpenFight(run, run._combatEndedAt or ab.pullTime)
+    end
     -- Final boss down with optional bosses left: leaving finishes it, cleared.
     if not run.completed and run.finalDown then
         local last = 0
         for _, b in ipairs(run.bosses or {}) do last = _max(last, b.killTime or 0) end
         run.completed = true
-        if last > 0 then run.clearedAt = last end
+        if last > 0 then
+            run.clearedAt = last
+            -- The run ended at that kill: deaths after it (waiting around
+            -- before leaving) aren't the run's.
+            for _, p in pairs(run.players or {}) do
+                local kept = {}
+                for _, de in ipairs(p.deathEvents or {}) do
+                    if (de.time or 0) <= last + 2 then kept[#kept + 1] = de end
+                end
+                if p.deathEvents and #kept < #p.deathEvents then
+                    p.deaths = math.max(0, (p.deaths or 0) - (#p.deathEvents - #kept))
+                    p.deathEvents = kept
+                end
+            end
+        end
     end
     local leaveMode = self:LeaveEndsRuns()
     -- Dungeons the addon has no boss data for can never be marked cleared,

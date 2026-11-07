@@ -2,6 +2,7 @@
 -- progress (if a /reload happened inside one) picked up again.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 local function InitDB()
     MythicScoreboardDB = MythicScoreboardDB or {}
@@ -13,9 +14,12 @@ local function InitDB()
 end
 
 local function OnLoaded()
+    -- The client's language, or the one picked with /sb lang to preview it.
+    local acc = rawget(_G, "MythicScoreboardAccountDB")
+    MS:UseLocale(type(acc) == "table" and acc.previewLocale or nil)
     local db = InitDB()
     if not (C_DamageMeter and C_DamageMeter.IsDamageMeterAvailable) then
-        print("|cffff4444[MythicScoreboard]|r C_DamageMeter unavailable — requires WoW 12.0+.")
+        print("|cffff4444[MythicScoreboard]|r " .. L["C_DamageMeter unavailable — requires WoW 12.0+."])
     end
     MS:RunMigrations()                      -- saved data up to date before anything reads it
     MS:SyncAccountStats()                   -- this character's runs, account-wide
@@ -50,7 +54,7 @@ local function OnLoaded()
         end
         C_Timer.After(0.2, function() MS:RefreshOverview() end)
     end
-    print("|cff00ccff[MythicScoreboard]|r v" .. MS.version .. "  /sb to open.")
+    print("|cff00ccff[MythicScoreboard]|r v" .. MS.version .. "  " .. L["/sb to open."])
 end
 
 MS.EventHandlers.ADDON_LOADED = function(name)

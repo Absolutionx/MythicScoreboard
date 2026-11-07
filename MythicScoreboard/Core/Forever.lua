@@ -7,6 +7,7 @@
 -- otherwise the bundled copy in Core/BossPortraits.lua is used.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 -- (How Forever differs from retail is in Flavor_Forever.lua.)
 
 -- ── Dungeon data ────────────────────────────────────────────────────────
@@ -46,7 +47,8 @@ local DUNGEONS = {
         "Wolf Master Nandos", "Archmage Arugal",
     }},
     ["Blackfathom Deeps"] = { levels = {24, 32}, final = "Aku'mai", bosses = {
-        "Ghamoo-ra", "Lady Sarevess", { "Gelihast", aka = { "Geilhast" } }, "Lorgus Jett",
+        "Ghamoo-ra", "Lady Sarevess", { "Gelihast", aka = { "Geilhast" } },
+        { "Lorgus Jett", rare = true },                -- doesn't always spawn
         "Old Serra'kis", "Twilight Lord Kelris", "Aku'mai",
     }},
     ["The Stockade"] = { levels = {24, 32}, final = "Bazil Thredd", bosses = {
@@ -156,7 +158,15 @@ local DUNGEONS = {
     }},
     -- Announced, bosses not documented yet: runs are saved as "Finished".
     ["The Drowned City"]    = { levels = {35, 40}, bosses = {} },
-    ["Krol'dok Stronghold"] = { levels = {40, 45}, bosses = {} },
+    -- (ForeverDungeonJournal 1.7.2: bosses in its order, the last one final.)
+    ["Krol'dok Stronghold"] = { levels = {40, 45}, final = "Overlord Mugg", bosses = {
+        "Slavecrusher Grox", "Twilight Commander Zarmok", "War Handler Ashka", "Nar'gurk",
+        "Bossman Toof", "Overlord Mugg",
+    }},
+    ["The Drowned City"] = { levels = {35, 40}, final = "Min'loth the Serpent", bosses = {
+        "Zul'Alai", "Var'Taka", "Captain Dreadrise", "Deathless Marrow",
+        { "Gill", rare = true }, "Min'loth the Serpent",
+    }},
     ["Alcaz Prison"]        = { levels = {48, 53}, bosses = {} },
     ["Blackmaw Hold"]       = { levels = {55, 60}, bosses = {} },
     ["Shaper's Terrace"]    = { levels = {58, 60}, bosses = {} },
@@ -186,6 +196,19 @@ local function Canonical(name)
     name = (name or ""):gsub("\226\128\153", "'")
     return INSTANCE_ALIASES[name] or name
 end
+
+-- The classic dungeons by instance ID (GetInstanceInfo), for clients in other
+-- languages, where the dungeon's name isn't the English one in DUNGEONS.
+-- Dungeons with wings map to the instance; the wing is found by its bosses.
+local INSTANCE_IDS = {
+    [389] = "Ragefire Chasm",    [43]  = "Wailing Caverns",  [36]  = "The Deadmines",
+    [33]  = "Shadowfang Keep",   [48]  = "Blackfathom Deeps", [34]  = "The Stockade",
+    [90]  = "Gnomeregan",        [47]  = "Razorfen Kraul",   [189] = "Scarlet Monastery",
+    [129] = "Razorfen Downs",    [70]  = "Uldaman",          [209] = "Zul'Farrak",
+    [349] = "Maraudon",          [109] = "Sunken Temple",    [230] = "Blackrock Depths",
+    [229] = "Blackrock Spire",   [429] = "Dire Maul",        [329] = "Stratholme",
+    [289] = "Scholomance",
+}
 
 -- The instance a dungeon key is part of: "Scarlet Monastery" for
 -- "Scarlet Monastery: Library", its `instance` for Blackrock Spire's halves.
@@ -242,13 +265,23 @@ end
 
 local _missed = setmetatable({}, { __mode = "k" })   -- run -> what it was last searched with
 
+-- The run's dungeon as DUNGEONS names it: its own name, or (another
+-- language) the name its instance ID stands for.
+local _isBase = {}
+for key in pairs(DUNGEONS) do _isBase[InstanceOf(key)] = true end
+local function RunName(run)
+    local name = Canonical(run and run.dungeonName)
+    if DUNGEONS[name] or _isBase[name] then return name end
+    return INSTANCE_IDS[run and run.instanceID or 0] or name
+end
+
 -- Finds the dungeon for a run: by name, then by wing name ("Scarlet
 -- Monastery" -> "Scarlet Monastery: Library"), then by which dungeon
 -- contains the bosses the group has fought.
 function MS:ForeverDungeon(run)
     if not run then return nil end
     if run._fdjKey and DUNGEONS[run._fdjKey] then return DUNGEONS[run._fdjKey], run._fdjKey end
-    local name = Canonical(run.dungeonName)
+    local name = RunName(run)
     if DUNGEONS[name] then run._fdjKey = name; return DUNGEONS[name], name end
     -- Not found before with these bosses: don't search again until one is added.
     local sig = name .. "#" .. #(run.bosses or {})
@@ -288,7 +321,7 @@ function MS:DungeonHasWings(name) return _wings[Canonical(name)] == true end
 function MS:ForeverDefsFor(run)
     local def = self:ForeverDungeon(run)
     if def then return { def } end
-    local out, name = {}, Canonical(run and run.dungeonName)
+    local out, name = {}, RunName(run)
     for key, d in pairs(DUNGEONS) do
         if key == name or IsWingOf(key, name) then out[#out + 1] = d end
     end
@@ -300,7 +333,7 @@ end
 function MS:ForeverCanDetectClear(run)
     local def = self:ForeverDungeon(run)
     if def then return #def.bosses > 0 end
-    local name = Canonical(run and run.dungeonName)
+    local name = RunName(run)
     if name == "" then return false end
     for key, d in pairs(DUNGEONS) do
         if IsWingOf(key, name) and #d.bosses > 0 then return true end   -- a wing
@@ -323,6 +356,21 @@ local function Killed(run, entry)
     return false
 end
 
+-- In another language the bosses' names don't match the English ones, so
+-- bosses are counted instead: nil when names match (English), else how many
+-- different bosses have died.
+local function KillsByCount(run, def)
+    if (MS.ClientLocale or "enUS") == "enUS" then return nil end   -- the game's language names the bosses
+    local kills, seen = 0, {}
+    for _, b in ipairs(run.bosses or {}) do
+        for _, e in ipairs(def.bosses) do
+            if EntryMatches(e, b.name) then return nil end
+        end
+        if b.killTime and b.name and not seen[b.name] then seen[b.name] = true; kills = kills + 1 end
+    end
+    return kills
+end
+
 -- The clear rule (Settings.lua) applied after each boss kill.
 local function CheckRunCleared(self, run, killedBoss)
     local rule = self:GetClearRule()
@@ -330,6 +378,14 @@ local function CheckRunCleared(self, run, killedBoss)
     if rule == "leave" then return false end
 
     local def = self:ForeverDungeon(run)
+    -- Names that don't match: cleared once as many bosses as the dungeon
+    -- requires have died (both rules; the final boss can't be told apart).
+    local counted = def and #def.bosses > 0 and KillsByCount(run, def)
+    if counted then
+        local req = #RequiredBosses(def)
+        if req > 0 and counted >= req then run.finalDown = true; return true end
+        return false
+    end
     if rule == "all" and def then
         local req = RequiredBosses(def)
         if #req == 0 then return false end
@@ -378,6 +434,8 @@ function MS:ForeverBossProgress(run)
     if not def then return nil end
     local req = RequiredBosses(def)
     if #req == 0 then return nil end
+    local counted = KillsByCount(run, def)
+    if counted then return math.min(counted, #req), #req end
     local n = 0
     for _, e in ipairs(req) do if Killed(run, e) then n = n + 1 end end
     return n, #req

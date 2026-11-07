@@ -1,8 +1,10 @@
 local _ceil   = math.ceil
 local _slower = string.lower
 local _smatch = string.match
+local _fmt    = string.format
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Art, Box, Btn, BuildTimelineChrome, COLS, COL_HDR_H = UI.Art, UI.Box, UI.Btn, UI.BuildTimelineChrome, UI.COLS, UI.COL_HDR_H
@@ -140,7 +142,7 @@ function MS:BuildUI()
             local run = sbFrame.SublineRun
             if not (run and run.progress) then return end
             GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-            GameTooltip:SetText("This run", P.ivory[1], P.ivory[2], P.ivory[3])
+            GameTooltip:SetText(L["This run"], P.ivory[1], P.ivory[2], P.ivory[3])
             UI.AddProgressLines(run.progress)
             GameTooltip:Show()
         end)
@@ -149,7 +151,7 @@ function MS:BuildUI()
 
     local pbLabel = Text(hdr, "medium", 13, P.bronzeHi, "RIGHT")
     pbLabel:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", -16, -58)
-    pbLabel:SetText("New personal best")
+    pbLabel:SetText(L["New personal best"])
     pbLabel:Hide()
     sbFrame.PBLabel = pbLabel
 
@@ -228,7 +230,7 @@ function MS:BuildUI()
     end)
     settBtn:HookScript("OnEnter", function(b)
         if UI.IsHistOpen() or sbFrame.SettingsPopup:IsShown() then return end
-        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText("Settings"); GameTooltip:Show()
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(L["Settings"]); GameTooltip:Show()
     end)
     settBtn:HookScript("OnLeave", GameTooltip_Hide)
     sbFrame.SettingsBtn = settBtn
@@ -253,7 +255,7 @@ function MS:BuildUI()
     hbDungeon:SetPoint("RIGHT", hbLevel, "LEFT", -6, 0)
     local hbEmpty = Text(histBtn, "medium", 13, P.ash, "LEFT")
     hbEmpty:SetPoint("LEFT", 12, 0)
-    hbEmpty:SetText("No saved runs yet")
+    hbEmpty:SetText(L["No saved runs yet"])
 
     local function RefreshHistBtn()
         local runs = MythicScoreboardDB and MythicScoreboardDB.runs
@@ -261,7 +263,7 @@ function MS:BuildUI()
         if r and runs then
             for i, v in ipairs(runs) do if v == r then idx = i; break end end
         elseif MS.currentRun then
-            r, idx = MS.currentRun, "Now"            -- the live run
+            r, idx = MS.currentRun, L["Now"]            -- the live run
         else
             r = runs and runs[1]
         end
@@ -270,6 +272,10 @@ function MS:BuildUI()
         for _, fs in ipairs({ hbIndex, hbDungeon, hbLevel, hbTime, hbResult }) do fs:SetShown(has) end
         if not has then return end
         local isMPlus = (r.keystoneLevel or 0) > 0
+        -- Cleared before each set: a text set while its font file is first
+        -- loading can come out blank, and setting the same text again
+        -- doesn't redraw it (the index is "1" nearly every time).
+        for _, fs in ipairs({ hbIndex, hbDungeon, hbLevel, hbTime, hbResult }) do fs:SetText("") end
         hbIndex:SetText(idx)
         hbDungeon:SetText(MS:RunTitle(r))
         hbLevel:SetText(isMPlus and ("+" .. r.keystoneLevel) or DiffShort(r))
@@ -288,8 +294,8 @@ function MS:BuildUI()
         local menuOpen = UI.IsHistOpen() or (sbFrame.SettingsPopup and sbFrame.SettingsPopup:IsShown())
         if runs and #runs > 0 and not menuOpen then
             GameTooltip:SetOwner(histBtn, "ANCHOR_BOTTOM")
-            GameTooltip:SetText("Run history")
-            GameTooltip:AddLine("Pick one of " .. #runs .. " saved run" .. (#runs == 1 and "" or "s") .. " to view.", 0.8, 0.8, 0.8)
+            GameTooltip:SetText(L["Run history"])
+            GameTooltip:AddLine(MS.Plural(#runs, "Pick one of %d saved run to view.", "Pick one of %d saved runs to view."), 0.8, 0.8, 0.8)
             GameTooltip:Show()
         end
     end)
@@ -323,7 +329,7 @@ function MS:BuildUI()
         if not b._active then TintBars(P.ivory) end
         if UI.IsHistOpen() or sbFrame.SettingsPopup:IsShown() then return end
         GameTooltip:SetOwner(b, "ANCHOR_BOTTOM")
-        GameTooltip:SetText(b._active and "Back to the scoreboard" or "Your stats")
+        GameTooltip:SetText(b._active and L["Back to the scoreboard"] or L["Your stats"])
         GameTooltip:Show()
     end)
     statsBtn:HookScript("OnLeave", function(b)
@@ -375,7 +381,7 @@ function MS:BuildUI()
         local hov = Solid(cell, "HIGHLIGHT", 0, 1, 0.94, 0.86, 0.04); hov:SetAllPoints()
 
         local lbl = Text(cell, "medium", 13, P.ash, col.left and "LEFT" or "CENTER")
-        lbl:SetText(col.label)
+        lbl:SetText(L[col.label])
         local arrow = Art(cell, "Chevron", "OVERLAY")
         arrow:SetSize(12, 12); Tint(arrow, P.bronzeHi); arrow:Hide()
         if col.left then
@@ -423,31 +429,65 @@ function MS:BuildUI()
 
 end
 
+-- Each language by its own name (/sb lang).
+local LANG_NAMES = {
+    enUS = "English", deDE = "Deutsch", frFR = "Français", esES = "Español (EU)", esMX = "Español (AL)",
+    ptBR = "Português", itIT = "Italiano", ruRU = "Русский", koKR = "한국어", zhCN = "简体中文", zhTW = "繁體中文",
+}
+
+-- /sb lang [code]: shows the addon in another language from the next
+-- /reload, to check a translation without changing the game's language.
+local function LangCommand(arg)
+    local say = function(s) print("|cff00ccff[MythicScoreboard]|r " .. s) end
+    local acc = rawget(_G, "MythicScoreboardAccountDB")
+    if arg == "" then
+        say(_fmt(L["Language: %s"], LANG_NAMES[MS.Locale] or MS.Locale)
+            .. ((MS.Locale ~= MS.ClientLocale) and ("  |cff888888(" .. L["preview"] .. ")|r") or ""))
+        say(_fmt(L["Preview another with /sb lang <code>: %s"], table.concat(MS.LOCALES, " ")))
+        if acc and acc.previewLocale then say(L["Back to the game's language: /sb lang off"]) end
+        return
+    end
+    local pick
+    if arg == "off" or arg == "reset" then pick = MS.ClientLocale
+    else
+        for _, code in ipairs(MS.LOCALES) do
+            if code:lower() == arg then pick = code end
+        end
+    end
+    if not pick then say(_fmt(L["Unknown language: %s"], arg)); return end
+    if type(acc) ~= "table" then MythicScoreboardAccountDB = {}; acc = MythicScoreboardAccountDB end
+    acc.previewLocale = (pick ~= MS.ClientLocale) and pick or nil
+    say(_fmt(L["Type /reload to see the addon in %s."], LANG_NAMES[pick] or pick))
+end
+
 -- Slash commands work before the window is first opened (it is built then).
 SLASH_MYTHICSCOREBOARD1 = "/sb"
 SLASH_MYTHICSCOREBOARD2 = "/mscoreboard"
 SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
     local cmd = _slower(_smatch(msg or "", "^%s*(.-)%s*$"))
-    if cmd == "" then
+    local langArg = _smatch(cmd, "^lang%s*(.*)$")
+    if langArg then
+        LangCommand(langArg)
+    elseif cmd == "" then
         MS:ShowScoreboard()
     elseif cmd == "stats" then
         MS:ShowScoreboard()
         UI.OpenStats()
     elseif cmd == "abandon" then
         if not MS:AbandonRun() then
-            print("|cff00ccff[MythicScoreboard]|r No run in progress to abandon.")
+            print("|cff00ccff[MythicScoreboard]|r " .. L["No run in progress to abandon."])
         end
     elseif cmd == "help" then
         print("|cff00ccff[MythicScoreboard]|r v" .. MS.version
-            .. "  Commands: /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)
-        print("|cff00ccff[MythicScoreboard]|r Reset meter on zone-in: "
-            .. (newVal and "|cff00ff00on|r" or "|cffff4444off|r"))
+        print("|cff00ccff[MythicScoreboard]|r " .. L["Reset meter on zone-in:"] .. " "
+            .. (newVal and ("|cff00ff00" .. L["on"] .. "|r") or ("|cffff4444" .. L["off"] .. "|r")))
     elseif cmd == "clear" then
         DoClearHistory()
     else
-        print("|cff00ccff[MythicScoreboard]|r Unknown command. Type /sb help for a list.")
+        print("|cff00ccff[MythicScoreboard]|r " .. L["Unknown command. Type /sb help for a list."])
     end
 end

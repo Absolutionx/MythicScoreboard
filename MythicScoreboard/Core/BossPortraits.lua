@@ -2,7 +2,7 @@
 -- Loaded only by MythicScoreboard_Forever.toc.
 --
 -- Data from ForeverDungeonJournal by Exehn (Data/Dungeons.lua npcIDs and
--- Data/Bosses.lua STATIC_DISPLAY_IDS, v1.6.6), so medallions have portraits
+-- Data/Bosses.lua STATIC_DISPLAY_IDS; v1.6.6, checked against v1.7.2), so medallions have portraits
 -- without that addon installed. The game draws each portrait from its own
 -- model files; nothing here is artwork.
 --

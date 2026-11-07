@@ -30,5 +30,5 @@ chat: [MythicScoreboard] No saved runs yet.
 chat: [MythicScoreboard] Run paused. Return to Ragefire Chasm within 30 minutes to continue it.
 chat: [MythicScoreboard] Run resumed: Ragefire Chasm
 chat: [MythicScoreboard] Run paused. Return to Ragefire Chasm within 30 minutes to continue it.
-chat: [MythicScoreboard] vtest  Commands: /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb help
+chat: [MythicScoreboard] vtest  Commands: /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb help
 chat: [MythicScoreboard] No saved runs yet.

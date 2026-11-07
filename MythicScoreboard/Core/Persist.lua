@@ -7,6 +7,7 @@
 -- the run as changed, so the scoreboard redraws its rows.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 local OFFLINE_AFTER = 60     -- a gap longer than this between saving and loading was a logout
 
@@ -31,7 +32,7 @@ function MS:FlushSave()
         MythicScoreboardDB.petGUIDCache = pets
     end)
     if not ok then
-        print("|cffff4444[MythicScoreboard]|r Saving the run in progress failed: " .. tostring(err))
+        print("|cffff4444[MythicScoreboard]|r " .. L["Saving the run in progress failed:"] .. " " .. tostring(err))
     end
 end
 
@@ -79,5 +80,5 @@ function MS:RestoreCurrentRun()
     end
     self.itemLevelCache = {}
     self:SetRunState(run._suspended and "paused" or "active", run)
-    print("|cff00ccff[MythicScoreboard]|r Run restored after UI reload.")
+    print("|cff00ccff[MythicScoreboard]|r " .. L["Run restored after UI reload."])
 end

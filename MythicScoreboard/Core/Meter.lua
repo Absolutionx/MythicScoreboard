@@ -12,6 +12,7 @@
 --   5. deaths the meter knows about that the death poll missed
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local _issecret = issecretvalue
 local _ins = table.insert
 local Readable = MS.Readable
@@ -235,7 +236,7 @@ local function ApplyDeaths(self, run)
     for _, src in ipairs(s.combatSources) do
         local meterDeaths = Num(src.totalAmount) or 0
         local p = meterDeaths > 0 and self:PlayerForMeterSource(src, run)
-        if p then
+        if p and not self:AfterClear(run) then
             local now = self:GetRunDuration(run)
             local base = run._deathBase and run._deathBase[p.name] or 0
             for _ = 1, meterDeaths + base - p.deaths do

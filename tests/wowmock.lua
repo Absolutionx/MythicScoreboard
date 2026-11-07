@@ -180,7 +180,7 @@ GetAddOnMetadata = function() return "test" end
 C_AddOns = { GetAddOnMetadata = function() return "test" end }
 
 M.instance = { "Ragefire Chasm", "party", 1 }
-GetInstanceInfo = function() return M.instance[1], M.instance[2], M.instance[3], "Normal", 5, 0, false, 389 end
+GetInstanceInfo = function() return M.instance[1], M.instance[2], M.instance[3], "Normal", 5, 0, false, M.instance[4] or 389 end
 IsInInstance = function() return M.instance[2] ~= "none", M.instance[2] end
 GetRealZoneText = function() return M.instance[1] end
 GetDifficultyInfo = function(id) return id == 8 and "Mythic Keystone" or "Normal" end

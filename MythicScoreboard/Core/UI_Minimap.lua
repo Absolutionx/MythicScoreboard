@@ -2,6 +2,7 @@ local _rad, _deg, _cos, _sin = math.rad, math.deg, math.cos, math.sin
 local _atan2 = math.atan2 or math.atan
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 local MEDIA = UI.MEDIA
 
@@ -35,10 +36,11 @@ end
 
 local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-    GameTooltip:SetText("Mythic Scoreboard")
-    GameTooltip:AddLine("Left-click: " .. (ScoreboardShown() and not UI.statsOpen and "close" or "open") .. " the scoreboard", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("Right-click: " .. (ScoreboardShown() and UI.statsOpen and "close" or "open") .. " your stats", 0.8, 0.8, 0.8)
-    GameTooltip:AddLine("Drag to move. Hide it in settings.", 0.55, 0.55, 0.55)
+    GameTooltip:SetText(L["Mythic Scoreboard"])
+    local board, stats = ScoreboardShown() and not UI.statsOpen, ScoreboardShown() and UI.statsOpen
+    GameTooltip:AddLine(board and L["Left-click: close the scoreboard"] or L["Left-click: open the scoreboard"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(stats and L["Right-click: close your stats"] or L["Right-click: open your stats"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["Drag to move. Hide it in settings."], 0.55, 0.55, 0.55)
     GameTooltip:Show()
 end
 
