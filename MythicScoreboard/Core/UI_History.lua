@@ -28,15 +28,14 @@ local function CloseHistDropdown()
 end
 
 local function DoClearHistory()
-    if MythicScoreboardDB then MythicScoreboardDB.runs = {} end
-    if not MS.inDungeon then MS:SetRunState("none") end
-    MS.displayRun = nil
-    MS:RefreshOverview()
+    MS:ClearHistory()                       -- History.lua (a run in progress carries on)
     if UI.frame and UI.frame.RefreshHistBtn then UI.frame.RefreshHistBtn() end
-    print("|cff00ccff[MythicScoreboard]|r History cleared.")
+    print("|cff00ccff[MythicScoreboard]|r History cleared. Your stats still have these runs.")
 end
 
 local DROP_ROW_H = 28
+local VISIBLE    = 12
+local scroll     = 0         -- rows scrolled past at the top
 local Fill            -- fills the dropdown (below)
 
 local function MakeRow()
@@ -74,7 +73,7 @@ local function MakeRow()
         hov:Show(); Tint(delIcon, P.bloodHi)
         GameTooltip:SetOwner(delBtn, "ANCHOR_RIGHT")
         GameTooltip:SetText("Delete run", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
-        GameTooltip:AddLine("Removes this run from history.", 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Removes this run from history and from your stats.", 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     delBtn:SetScript("OnLeave", function()
@@ -93,8 +92,8 @@ local function MakeRow()
                     break
                 end
             end
-            if MS.currentRun == run then MS:SetRunState("none") end
             if MS.displayRun == run then MS.displayRun = nil end
+            if MS._lastCommittedRun == run then MS._lastCommittedRun = nil end   -- no late loot for it
         end
         if not runs or #runs == 0 then CloseHistDropdown() else Fill() end
         MS:RefreshOverview()
@@ -135,7 +134,7 @@ local function MakeClearRow()
             cr.Disarm(); CloseHistDropdown(); DoClearHistory()
         else
             armed = true
-            caTxt:SetText("Click again to delete every saved run")
+            caTxt:SetText("Click again: history only, stats are kept")
             caHov:SetColorTexture(P.blood[1], P.blood[2], P.blood[3], 0.35)
             armTimer = C_Timer.NewTimer(3, cr.Disarm)
         end
@@ -153,13 +152,15 @@ function Fill()
     if MS.currentRun then _ins(entries, { run = MS.currentRun, live = true }) end
     for i, r in ipairs(runs) do _ins(entries, { run = r, idx = i }) end
 
-    local visRows = _min(#entries, 12)
+    -- Twelve rows at a time; the mouse wheel scrolls through the rest.
+    local visRows = _min(#entries, VISIBLE)
+    scroll = math.max(0, math.min(scroll, #entries - visRows))
     local dropW   = drop.anchor:GetWidth() + 60
     drop:SetSize(dropW, visRows * DROP_ROW_H + DROP_ROW_H + 10)
 
     local yOff = -4
     for n = 1, visRows do
-        local entry = entries[n]
+        local entry = entries[n + scroll]
         local run, idx = entry.run, entry.idx
         local row = dropRows[n] or MakeRow()
         dropRows[n] = row
@@ -183,7 +184,7 @@ function Fill()
         row.fTime:SetText(MS:FormatTime(MS:GetRunDuration(run)))
         Colour(row.fLvl, isMPlus and P.bronzeHi or P.ash)
         row.fLvl:SetText(isMPlus and ("+" .. run.keystoneLevel) or DiffShort(run))
-        row.fName:SetText(run.dungeonName or "?")
+        row.fName:SetText(MS:RunTitle(run))
         row.delBtn:SetShown(not entry.live)
         yOff = yOff - DROP_ROW_H
     end
@@ -209,8 +210,14 @@ local function OpenHistDropdown(anchorBtn)
         drop:EnableMouse(true)
         Box(drop)
         drop:SetScript("OnHide", function() if histDropdown then CloseHistDropdown() end end)
+        drop:EnableMouseWheel(true)
+        drop:SetScript("OnMouseWheel", function(_, delta)
+            scroll = scroll - delta
+            Fill()
+        end)
     end
     drop.anchor = anchorBtn
+    scroll = 0
     drop:ClearAllPoints()
     drop:SetPoint("TOPRIGHT", anchorBtn, "BOTTOMRIGHT", 0, -4)
     Fill()

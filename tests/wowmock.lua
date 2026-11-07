@@ -203,7 +203,7 @@ UnitName = function(u) local r = R(u); if r then return r.name, Forever() and r.
 GetUnitName = function(u) local r = R(u); if r then return (Forever() and r.surname) and (r.name .. " " .. r.surname) or r.name end end
 UnitGUID = function(u) local r = R(u); return r and r.guid end
 UnitClass = function(u) local r = R(u); if r and r.class then return r.class:lower(), r.class end end
-UnitLevel = function(u) local r = R(u); return r and r.level or 0 end
+UnitLevel = function(u) if u == "player" and M.level then return M.level end local r = R(u); return r and r.level or 0 end
 UnitIsPlayer = function(u) local r = R(u); return r ~= nil and not r.npc end
 UnitIsDeadOrGhost = function(u) return M.dead[u] == true end
 UnitIsFriend = function() return true end
@@ -242,6 +242,19 @@ Enum = { DamageMeterSessionType = { Overall = 0, Current = 1 }, TooltipDataType 
 ScenarioChallengeModeAffixMixin = {}
 TooltipDataProcessor = { AddTooltipPostCall = noop }
 DeathRecap_GetEvents = function() return nil end
+
+-- Your character's progress (RunStats.lua): tests move these.
+M.xp, M.xpMax, M.level, M.money = 1000, 5000, 14, 12345
+UnitXP = function() return M.xp end
+UnitXPMax = function() return M.xpMax end
+GetMoney = function() return M.money end
+M.quests = {}   -- { { title, id, done } }
+GetNumQuestLogEntries = function() return #M.quests end
+GetQuestLogTitle = function(i) local q = M.quests[i]; if q then return q.title, 20, nil, false, false, q.done and 1 or nil, nil, q.id end end
+COMBATLOG_XPGAIN_FIRSTPERSON = "%s dies, you gain %d experience."
+COMBATLOG_XPGAIN_FIRSTPERSON_GROUP = "%s dies, you gain %d experience. (+%d group bonus)"
+COMBATLOG_XPGAIN_EXHAUSTION1 = "%s dies, you gain %d experience. (%s exp %s bonus)"
+FACTION_STANDING_INCREASED = "Your %s reputation has increased by %d."
 
 C_Map = { GetBestMapForUnit = function() return 1 end }
 C_NamePlate = { GetNamePlates = function() return {} end }

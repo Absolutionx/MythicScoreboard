@@ -80,7 +80,8 @@ local function Follows(aStart, aDur, bStart)
 end
 
 local function IsSplit(a, b)
-    return a.dungeon == b.dungeon and not a.cleared and not a.onLeave and Follows(a.at, a.dur, b.at)
+    return a.dungeon == b.dungeon and not a.cleared and not a.onLeave and not a.quit
+        and Follows(a.at, a.dur, b.at)
 end
 
 -- Joins neighbours in a list. older(i) / newer(i) say which of list[i] and
@@ -111,7 +112,7 @@ local function RunDur(run) return (run.endTime or 0) - (run.startTime or 0) end
 
 local function IsSplitRun(a, b)   -- a older, b newer
     local da = RunDur(a)
-    return a.dungeonName == b.dungeonName and not a.completed and not a.finishedOnLeave
+    return a.dungeonName == b.dungeonName and not a.completed and not a.finishedOnLeave and not a.abandoned
         and (a.keystoneLevel or 0) == 0 and (b.keystoneLevel or 0) == 0
         and da > 0 and RunDur(b) > 0 and Follows(a._wallClockStart, da, b._wallClockStart)
 end
@@ -234,15 +235,64 @@ local CHAR_STEPS = {
             MS:StripLive(r)
         end
     end,
+    -- 4 (2.7): interrupt times filled in once, when a run is saved, instead
+    -- of each time its timeline is drawn; death recap IDs (which only meant
+    -- something in the session they came from) dropped.
+    function(db)
+        for _, r in ipairs(db.runs) do
+            MS:_BackfillSyntheticInterrupts(r)
+            for _, p in pairs(r.players or {}) do p.deathRecapID = nil end
+        end
+    end,
 }
 MS.DATA_VERSION = #CHAR_STEPS
 
 -- ── Steps: the archive ─────────────────────────────────────────────────────
 -- (Entries written by this version are already in the latest form, so a new
 -- archive starts at ARCHIVE_VERSION.)
+-- What steps 3 and 4 need from a run still in history: each kill's fight
+-- length and your DPS in it, and your loot. Worked out here as 2.5 did, so
+-- a later change to MS:SummarizeRun can't change what these steps do.
+local function Summary25(run)
+    if type(run) ~= "table" or not run.dungeonName or run.dungeonName == "" then return nil end
+    local me
+    local myGUID = MS.UnitGUIDReadable and MS.UnitGUIDReadable("player")
+    for _, p in pairs(run.players or {}) do
+        if myGUID and MS.Readable(p.guid) == myGUID then me = p end
+    end
+    if not me then
+        local myName = MS:UnitPlayerName("player")
+        me = myName and MS:PlayerByName(myName, run) or nil
+    end
+    local e = { at = run._wallClockStart, dungeon = run.dungeonName, bosses = {} }
+    for _, b in ipairs(run.bosses or {}) do
+        if b.killTime then
+            local d = b.pullTime and b.killTime > b.pullTime and _floor(b.killTime - b.pullTime) or nil
+            local mine = me and b.stats and b.stats[me.name]
+            e.bosses[#e.bosses + 1] = { n = b.name, d = d,
+                m = (mine and d and d > 0) and Int((mine.dmg or 0) / d) or nil }
+        end
+    end
+    if me and me.loot and #me.loot > 0 then
+        e.loot = {}
+        for _, l in ipairs(me.loot) do
+            local boss, at = nil, -1
+            local t = l.t or 0
+            for _, b in ipairs(run.bosses or {}) do
+                if b.killTime and b.killTime <= t + 2 and b.killTime >= t - 120 and b.killTime > at then
+                    boss, at = b.name, b.killTime
+                end
+            end
+            e.loot[#e.loot + 1] = { i = (not l.link) and MS.LootItemString(l) or nil, l = l.link,
+                                    q = l.quality, t = Int(l.t), b = boss }
+        end
+    end
+    return e
+end
+
 local function FromHistory(a, fn)
     for _, run in ipairs(MythicScoreboardDB and MythicScoreboardDB.runs or {}) do
-        local e = MS:SummarizeRun(run)
+        local e = Summary25(run)
         if e then
             for _, x in ipairs(a.runs) do
                 if x.at == e.at and x.dungeon == e.dungeon then fn(x, e) end

@@ -149,7 +149,8 @@ churn(); churn()
 check("at most one label per plate in a key", objects() - before <= 5, objects() - before)
 M.roster["nameplate1"] = { name = "Mob", guid = "Creature-0-1", npc = true }
 M.Fire("NAME_PLATE_UNIT_ADDED", "nameplate1")
-check("label shows the forces", plates[1].MythicScoreboardForces ~= nil)
+-- (Forever has no Mythic+, so no enemy forces labels at all.)
+if MS.Flavor.mythicPlus then check("label shows the forces", plates[1].MythicScoreboardForces ~= nil) end
 zone(WORLD)
 
 for _, p in ipairs(M.printed) do if p:lower():find("error") then check("no errors", false, p) end end

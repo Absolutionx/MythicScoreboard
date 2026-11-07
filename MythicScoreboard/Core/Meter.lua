@@ -172,10 +172,12 @@ local function UpdateCarry(run, duration)
     if duration <= 0 then return end
     if run._lastDur and duration + 2 < run._lastDur then
         run._carry = run._carry or {}
+        run._deathBase = run._deathBase or {}
         for key, p in pairs(run.players) do
             local c = {}
             for _, f in ipairs(CARRY_FIELDS) do c[f] = p[f] or 0 end
             run._carry[key] = c
+            run._deathBase[key] = p.deaths or 0     -- the meter counts deaths from 0 again too
         end
         run._carryDur = (run._carryDur or 0) + run._lastDur
     end
@@ -235,18 +237,52 @@ local function ApplyDeaths(self, run)
         local p = meterDeaths > 0 and self:PlayerForMeterSource(src, run)
         if p then
             local now = self:GetRunDuration(run)
-            for _ = 1, meterDeaths - p.deaths do
+            local base = run._deathBase and run._deathBase[p.name] or 0
+            for _ = 1, meterDeaths + base - p.deaths do
                 if not self:IsDupDeath(p, now) then
                     _ins(p.deathEvents, { time = now })
                     p.deaths = p.deaths + 1
                 end
             end
-            if src.isLocalPlayer then
+            local isLocal = src.isLocalPlayer
+            if isLocal ~= nil and issecretvalue and issecretvalue(isLocal) then isLocal = nil end
+            if isLocal then
                 local ok, id = pcall(rawget, src, "deathRecapID")
-                if ok and Num(id) and id ~= 0 then p.deathRecapID = id end
+                if ok and Num(id) and id ~= 0 then self:NoteDeathRecap(p, id) end
             end
         end
     end
+end
+
+-- The meter wasn't reset when the run started ("Reset meter on zone-in" is
+-- off), so its totals include whatever came before. The first reading of
+-- the run becomes its zero point: kept as a negative carry-over, so every
+-- later reading counts only what happened since, and rates use the run's
+-- own time.
+local function TakeBaseline(self, run, damage, duration)
+    run._carry, run._carryDur = nil, nil
+    ApplyRate(self, run, damage, "damageDone", "dps", duration)
+    ApplyRate(self, run, Session(TYPE.healing), "healingDone", "hps", duration)
+    ApplyTotal(self, run, TYPE.damageTaken, "damageTaken")
+    ApplyTotal(self, run, TYPE.avoidable,   "avoidableDamageTaken")
+    ApplyTotal(self, run, TYPE.interrupts,  "interrupts")
+    ApplyTotal(self, run, TYPE.dispels,     "dispels")
+    run._carry = {}
+    for key, p in pairs(run.players) do
+        local c = {}
+        for _, f in ipairs(CARRY_FIELDS) do c[f] = -(p[f] or 0); p[f] = 0 end
+        p.dps, p.hps = 0, 0
+        run._carry[key] = c
+    end
+    run._carryDur = -duration
+    run._lastDur  = duration
+    run._deathBase = {}
+    local s = Session(TYPE.deaths)
+    for _, src in ipairs(s and s.combatSources or {}) do
+        local p = self:PlayerForMeterSource(src, run)
+        if p then run._deathBase[p.name] = (p.deaths or 0) - (Num(src.totalAmount) or 0) end
+    end
+    run._baselinePending = nil
 end
 
 -- One read of each stat type. Returns true when the numbers were read.
@@ -260,6 +296,7 @@ function MS:SnapshotFromDamageMeter()
     if not (damage and damage.combatSources) then return end
     if self:IsMeterHidden(damage) then return end
     local duration = Num(damage.duration) or 0
+    if run._baselinePending then TakeBaseline(self, run, damage, duration) end
     UpdateCarry(run, duration)
 
     ApplyRate(self, run, damage, "damageDone", "dps", duration)

@@ -10,8 +10,10 @@ local MS = _G["MythicScoreboard"]
 -- (How Forever differs from retail is in Flavor_Forever.lua.)
 
 -- ── Dungeon data ────────────────────────────────────────────────────────
--- levels : recommended level range
--- final  : the boss whose death means the dungeon is done
+-- levels   : recommended level range
+-- final    : the boss whose death means the dungeon is done
+-- instance : the instance's own name, when it holds several wings and the
+--            key isn't "<instance>: <wing>" (Blackrock Spire's two halves)
 -- bosses : in rough kill order. A plain string is a regular boss. A table can
 --          mark  rare = true    (rare spawn, never required)
 --                summon = true  (summoned / optional event, never required)
@@ -115,14 +117,14 @@ local DUNGEONS = {
         { "The Seven", aka = { "Doom'rel", "Hate'rel", "Anger'rel", "Vile'rel", "Gloom'rel", "Seeth'rel", "Dope'rel" } },
         "Magmus", "Princess Moira Bronzebeard", "Emperor Dagran Thaurissan",
     }},
-    ["Lower Blackrock Spire"] = { levels = {55, 60}, final = "Overlord Wyrmthalak", bosses = {
+    ["Lower Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "Overlord Wyrmthalak", bosses = {
         { "Spirestone Butcher", rare = true }, { "Spirestone Battle Lord", rare = true },
         { "Spirestone Lord Magus", rare = true }, "Highlord Omokk", "Shadow Hunter Vosh'gajin",
         "War Master Voone", "Mother Smolderweb", { "Crystal Fang", rare = true }, "Urok Doomhowl",
         { "Bannok Grimaxe", rare = true }, "Quartermaster Zigris", "Halycon", "Gizrul the Slavener",
         { "Ghok Bashguud", rare = true }, "Overlord Wyrmthalak",
     }},
-    ["Upper Blackrock Spire"] = { levels = {55, 60}, final = "General Drakkisath", bosses = {
+    ["Upper Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "General Drakkisath", bosses = {
         "Pyroguard Emberseer", "Solakar Flamewreath", { "Jed Runewatcher", rare = true },
         "Goraluk Anvilcrack", "Gyth", "Warchief Rend Blackhand", "The Beast",
         { "Lord Valthalak", summon = true }, "General Drakkisath",
@@ -171,6 +173,27 @@ for _, def in pairs(DUNGEONS) do
     end
 end
 MS.FOREVER_DUNGEONS = DUNGEONS
+
+-- Other names the game may give an instance than the key above.
+local INSTANCE_ALIASES = {
+    ["Deadmines"]                 = "The Deadmines",
+    ["Stormwind Stockade"]        = "The Stockade",
+    ["The Stockades"]             = "The Stockade",
+    ["The Temple of Atal'Hakkar"] = "Sunken Temple",
+    ["Temple of Atal'Hakkar"]     = "Sunken Temple",
+}
+local function Canonical(name)
+    name = (name or ""):gsub("\226\128\153", "'")
+    return INSTANCE_ALIASES[name] or name
+end
+
+-- The instance a dungeon key is part of: "Scarlet Monastery" for
+-- "Scarlet Monastery: Library", its `instance` for Blackrock Spire's halves.
+local function InstanceOf(key)
+    local def = DUNGEONS[key]
+    return (def and def.instance) or key:match("^(.-): ") or key
+end
+local function IsWingOf(key, name) return key ~= name and InstanceOf(key) == name end
 
 -- ── Lookups ─────────────────────────────────────────────────────────────
 
@@ -225,7 +248,7 @@ local _missed = setmetatable({}, { __mode = "k" })   -- run -> what it was last 
 function MS:ForeverDungeon(run)
     if not run then return nil end
     if run._fdjKey and DUNGEONS[run._fdjKey] then return DUNGEONS[run._fdjKey], run._fdjKey end
-    local name = run.dungeonName or ""
+    local name = Canonical(run.dungeonName)
     if DUNGEONS[name] then run._fdjKey = name; return DUNGEONS[name], name end
     -- Not found before with these bosses: don't search again until one is added.
     local sig = name .. "#" .. #(run.bosses or {})
@@ -239,12 +262,37 @@ function MS:ForeverDungeon(run)
                 if EntryMatches(e, b.name) then score = score + 1; break end
             end
         end
-        if score > 0 and key:find(name, 1, true) == 1 then score = score + 0.5 end
+        if score > 0 and IsWingOf(key, name) then score = score + 0.5 end
         if score > 0 and (not bestScore or score > bestScore) then best, bestScore = key, score end
     end
-    if best then run._fdjKey = best; return DUNGEONS[best], best end
+    if best then
+        run._fdjKey = best
+        if IsWingOf(best, name) then run.wingName = best end
+        return DUNGEONS[best], best
+    end
     _missed[run] = sig
     return nil
+end
+
+-- Whether a dungeon's instance holds several wings ("Scarlet Monastery" for
+-- its Graveyard, Library, Armory and Cathedral).
+local _wings = {}
+for key in pairs(DUNGEONS) do
+    local base = InstanceOf(key)
+    if base ~= key then _wings[base] = true end
+end
+function MS:DungeonHasWings(name) return _wings[Canonical(name)] == true end
+
+-- The dungeon entries a run may be in: the one it's known to be, else every
+-- wing of its instance.
+function MS:ForeverDefsFor(run)
+    local def = self:ForeverDungeon(run)
+    if def then return { def } end
+    local out, name = {}, Canonical(run and run.dungeonName)
+    for key, d in pairs(DUNGEONS) do
+        if key == name or IsWingOf(key, name) then out[#out + 1] = d end
+    end
+    return out
 end
 
 -- Can this run ever be marked cleared? False for undocumented dungeons and
@@ -252,10 +300,10 @@ end
 function MS:ForeverCanDetectClear(run)
     local def = self:ForeverDungeon(run)
     if def then return #def.bosses > 0 end
-    local name = run and run.dungeonName or ""
+    local name = Canonical(run and run.dungeonName)
     if name == "" then return false end
     for key, d in pairs(DUNGEONS) do
-        if key:find(name, 1, true) == 1 and #d.bosses > 0 then return true end   -- a wing
+        if IsWingOf(key, name) and #d.bosses > 0 then return true end   -- a wing
     end
     return false
 end
@@ -275,23 +323,8 @@ local function Killed(run, entry)
     return false
 end
 
-function MS:GetClearRule()
-    local s = MythicScoreboardDB and MythicScoreboardDB.settings
-    local r = s and s.clearRule
-    if r == "final" or r == "all" or r == "leave" then return r end
-    return "final"
-end
-
-function MS:SetClearRule(rule)
-    if MythicScoreboardDB and MythicScoreboardDB.settings then
-        MythicScoreboardDB.settings.clearRule = rule
-    end
-end
-
--- Called after each boss kill. Returns true when the run counts as cleared.
-function MS:CheckRunCleared(run, killedBoss)
-    run = run or self.currentRun
-    if not run then return false end
+-- The clear rule (Settings.lua) applied after each boss kill.
+local function CheckRunCleared(self, run, killedBoss)
     local rule = self:GetClearRule()
     run.clearRule = rule
     if rule == "leave" then return false end
@@ -332,6 +365,12 @@ function MS:CheckRunCleared(run, killedBoss)
     if not killedBoss or not killedBoss.killTime then return false end
     return FINAL_NAMES[Norm(killedBoss.name) or ""] == true
 end
+
+-- How Completion.lua decides a Forever run is cleared.
+MS:SetClearStrategy({
+    isCleared = CheckRunCleared,
+    canDetect = function(self, run) return self:ForeverCanDetectClear(run) end,
+})
 
 -- "6 of 9": required bosses killed / required bosses.
 function MS:ForeverBossProgress(run)

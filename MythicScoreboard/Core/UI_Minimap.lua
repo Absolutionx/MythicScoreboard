@@ -13,11 +13,8 @@ local ICON = "Interface\\AddOns\\MythicScoreboard\\Icons\\Icon"
 local DEFAULT_ANGLE = 215
 local btn
 
-local function Settings() return MythicScoreboardDB and MythicScoreboardDB.settings end
-
 local function Place()
-    local s = Settings()
-    local a = _rad((s and s.minimapAngle) or DEFAULT_ANGLE)
+    local a = _rad(MS:GetMinimapAngle() or DEFAULT_ANGLE)
     local r = Minimap:GetWidth() / 2 + 5
     btn:ClearAllPoints()
     btn:SetPoint("CENTER", Minimap, "CENTER", _cos(a) * r, _sin(a) * r)
@@ -28,8 +25,7 @@ local function FollowCursor()
     local cx, cy = GetCursorPosition()
     local scale = Minimap:GetEffectiveScale()
     if not (mx and cx and scale and scale > 0) then return end
-    local s = Settings()
-    if s then s.minimapAngle = _deg(_atan2(cy / scale - my, cx / scale - mx)) % 360 end
+    MS:SetMinimapAngle(_deg(_atan2(cy / scale - my, cx / scale - mx)) % 360)
     Place()
 end
 
@@ -99,17 +95,6 @@ local function Build()
     return btn
 end
 
-function MS:GetMinimapButton()
-    local s = Settings()
-    return not s or s.minimapButton ~= false
-end
-
-function MS:SetMinimapButton(on)
-    local s = Settings()
-    if s then s.minimapButton = on and true or false end
-    self:UpdateMinimapButton()
-end
-
 function MS:UpdateMinimapButton()
     if self:GetMinimapButton() then
         if Build() then btn:Show(); Place() end
@@ -117,3 +102,6 @@ function MS:UpdateMinimapButton()
         btn:Hide()
     end
 end
+
+-- Turned on or off in settings (Settings.lua).
+MS:OnSettingChanged("minimapButton", function() MS:UpdateMinimapButton() end)

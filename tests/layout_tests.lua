@@ -17,7 +17,7 @@ local function place(spots)        -- spots: { {mx, lblW}, ... }, first = last k
         info[i] = { mx = s[1], lblW = s[2] or 120, compW = math.min(s[2] or 120, UI.TL.COMPACT_W) }
         order[i] = i
     end
-    UI._medPlanCache = nil
+    UI._medPlanLRU = nil
     return UI.PlaceMedallions(info, order, "run" .. n), info
 end
 local function rulesHold(plan, count)
@@ -75,7 +75,7 @@ check("right edge: on screen", p[1].x2 <= UI.FRAME_W - 6 and p[1].x1 >= 4, p[1].
 
 -- 6. The same layout twice comes from the cache.
 local info = { { mx = 300, lblW = 100, compW = 88 } }
-UI._medPlanCache = nil
+UI._medPlanLRU = nil
 local a1 = UI.PlaceMedallions(info, { 1 }, "same")
 local a2 = UI.PlaceMedallions(info, { 1 }, "same")
 check("cached", a1 == a2)

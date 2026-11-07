@@ -21,6 +21,9 @@ MS.Flavor = {
     dungeonLevels = false,
     -- The addon knows each dungeon's bosses: the header shows "3 of 6 bosses".
     bossProgress  = false,
+    -- Runs record what they did for your character: experience and levels,
+    -- mobs killed, quests, gold and reputation (Core/RunStats.lua).
+    progressStats = false,
 }
 MS.FLAVOR = MS.Flavor.name
 

@@ -17,7 +17,7 @@ local _ins = table.insert
 local PREFIX         = "MSBLoot"
 local LATE_WINDOW    = 300     -- seconds after a run ends that loot still counts
 local DEDUPE_WINDOW  = 15
-local MAX_PER_PLAYER = 12
+local MAX_PER_PLAYER = 40      -- a full Blackrock Depths can drop a lot of greens
 
 local function Secret(v) return _issecret and v ~= nil and _issecret(v) end
 
@@ -103,14 +103,19 @@ function MS:RecordLoot(playerName, link, source)
     if #p.loot >= MAX_PER_PLAYER then return end
 
     local fullLink = link:find("|H") and link or nil
-    _ins(p.loot, {
+    local entry = {
         item    = istr,          -- "item:..." string: tooltips, icons, ilvl
         link    = fullLink,      -- coloured chat link when we have one
         quality = q,
         at      = now,
         t       = self.GetRunDuration and self:GetRunDuration(run) or 0,
         src     = source,
-    })
+    }
+    _ins(p.loot, entry)
+    -- After the run was saved: its Stats summary gets your piece too.
+    if run ~= self.currentRun and p == self:PlayerForUnit("player", run) and self.ArchiveLateLoot then
+        self:ArchiveLateLoot(run, entry)
+    end
     run._seq = (run._seq or 0) + 1
     self._lootRev = self._lootRev + 1
     if run == self.currentRun then self:SaveCurrentRun() end
@@ -190,11 +195,10 @@ end
 -- ── Events ──────────────────────────────────────────────────────────────
 
 local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_LOGIN")
-frame:RegisterEvent("ENCOUNTER_LOOT_RECEIVED")
-frame:RegisterEvent("CHAT_MSG_LOOT")
-frame:RegisterEvent("CHAT_MSG_ADDON")
-frame:RegisterEvent("GET_ITEM_INFO_RECEIVED")
+for _, ev in ipairs({ "PLAYER_LOGIN", "ENCOUNTER_LOOT_RECEIVED", "CHAT_MSG_LOOT",
+                     "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED" }) do
+    pcall(frame.RegisterEvent, frame, ev)      -- (not every client has every event)
+end
 
 local _infoRefreshPending = false
 

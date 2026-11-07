@@ -41,6 +41,12 @@ local DCOLS = {   -- overview: one row per dungeon
     { key = "deaths",  label = "Deaths/run",   w = 70 },
     { key = "dps",     label = "Your DPS",     w = 76 },
 }
+-- Forever: what runs gave you, in place of your DPS.
+if MS.Flavor.progressStats then
+    for i, c in ipairs(DCOLS) do
+        if c.key == "dps" then DCOLS[i] = { key = "xp", label = "XP a run", w = c.w } end
+    end
+end
 local LCOLS = {   -- loot: one row per item
     { key = "item",    label = "Item",      w = 370, left = true },
     { key = "dungeon", label = "Dungeon",   w = 220, left = true },
@@ -59,14 +65,14 @@ local RCOLS = {   -- detail: one row per run
     { key = "dps",    label = "Your DPS", w = 80 },
     { key = "bosses", label = "Bosses",   w = 242, left = true },
 }
+if MS.Flavor.progressStats then
+    for i, c in ipairs(RCOLS) do
+        if c.key == "dps" then RCOLS[i] = { key = "xp", label = "XP", w = c.w } end
+    end
+end
 
 -- ── Formatting ─────────────────────────────────────────────────────────────
-local function Dur(s)
-    if not s then return "-" end
-    s = _floor(s + 0.5)
-    if s >= 3600 then return _fmt("%d:%02d:%02d", _floor(s / 3600), _floor(s % 3600 / 60), s % 60) end
-    return _fmt("%d:%02d", _floor(s / 60), s % 60)
-end
+local function Dur(s) return MS:FormatLongTime(s) end
 local function Hours(s)
     local m = _floor((s or 0) / 60 + 0.5)
     if m < 60 then return m .. "m" end
@@ -77,9 +83,8 @@ local function Day(at)
     return date("%b ", at) .. tonumber(date("%d", at))
 end
 local function Result(e)
-    if e.cleared then return CT(P.verd, "Cleared") end
-    if e.onLeave then return CT(P.ash, "Finished") end
-    return CT(P.ash, "Abandoned")
+    local text, col = UI.ArchiveResult(e)
+    return CT(col, text)
 end
 local function Pct(a, b) return b > 0 and _floor(a / b * 100 + 0.5) .. "%" or "-" end
 
@@ -359,7 +364,11 @@ local function FillOverview(o, stats)
         c.deaths:SetText(_fmt("%.1f", d.deathsPerRun))
         c.deaths:SetTextColor((d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[1],
             (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[2], (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[3])
-        c.dps:SetText(d.lastDps and (Abbrev(d.lastDps) .. (d.lastLvl and CT(P.ash, "  L" .. d.lastLvl) or "")) or CT(P.ash2, "-"))
+        if c.xp then
+            c.xp:SetText(d.xpPerRun and Abbrev(d.xpPerRun) or CT(P.ash2, "-"))
+        else
+            c.dps:SetText(d.lastDps and (Abbrev(d.lastDps) .. (d.lastLvl and CT(P.ash, "  L" .. d.lastLvl) or "")) or CT(P.ash2, "-"))
+        end
         FillRecent(row.bars, d, row.recentX)
         y = y + ROW
     end
@@ -395,6 +404,7 @@ local function RunTooltip(owner, e)
     if e.me and e.me.lvl then GameTooltip:AddDoubleLine("Your level", e.me.lvl, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
     if e.me then GameTooltip:AddDoubleLine("Your DPS", Abbrev(e.me.dps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
     GameTooltip:AddDoubleLine("Group deaths", e.deaths or 0, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+    if e.prog then UI.AddProgressLines(e.prog, true) end
     for _, b in ipairs(e.bosses or {}) do
         GameTooltip:AddDoubleLine(b.n, Dur(b.t), P.ash[1], P.ash[2], P.ash[3], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
     end
@@ -643,7 +653,11 @@ local function FillDetail(d, s, stats)
         c.time:SetText(e.cleared and e.dur == s.best and CT(P.bronzeHi, Dur(e.dur)) or Dur(e.dur))
         c.result:SetText(Result(e))
         c.deaths:SetText((e.deaths or 0) > 0 and CT(P.bloodHi, e.deaths) or CT(P.ash, "0"))
-        c.dps:SetText(e.me and Abbrev(e.me.dps) or CT(P.ash2, "-"))
+        if c.xp then
+            c.xp:SetText(e.prog and MS.FormatThousands(e.prog.xp) or CT(P.ash2, "-"))
+        else
+            c.dps:SetText(e.me and Abbrev(e.me.dps) or CT(P.ash2, "-"))
+        end
         local names = {}
         for _, b in ipairs(e.bosses or {}) do names[#names + 1] = b.n end
         c.bosses:SetText(#names > 0 and CT(P.ash, table.concat(names, ", ")) or CT(P.ash2, "None"))
@@ -895,13 +909,8 @@ local function ItemIcon(l)
 end
 
 local function QualityColor(q)
-    if q and C_Item and C_Item.GetItemQualityColor then
-        local ok, r, g, b = pcall(C_Item.GetItemQualityColor, q)
-        if ok and r then return { r, g, b } end
-    end
-    local c = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
-    if c then return { c.r, c.g, c.b } end
-    return P.ivory
+    if not q then return P.ivory end
+    return { UI.QualityColor(q) }
 end
 
 -- Item names can arrive a moment after they're asked for.
@@ -991,53 +1000,69 @@ local function FillLoot(lv, items)
 end
 
 -- ── Header controls: tabs and the character filter ─────────────────────────
-local charMenu
+-- Built once and refilled each time it opens: the game never frees a frame.
+local charMenu            -- the menu while it's open
+local menuFrame, menuRows = nil, {}
 local function CloseCharMenu()
-    local m = charMenu
     charMenu = nil
-    if m then m:Hide(); m:SetParent(nil) end
+    if menuFrame then menuFrame:Hide() end
+end
+
+local MENU_ROW = 26
+local function MenuRow(i)
+    local row = menuRows[i]
+    if row then return row end
+    row = Btn(menuFrame)
+    row.hov = Solid(row, "BACKGROUND", 1, P.bronze[1], P.bronze[2], P.bronze[3], 0.14)
+    row.hov:SetAllPoints()
+    row.mark = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 1)
+    row.mark:SetPoint("TOPLEFT"); row.mark:SetPoint("BOTTOMLEFT"); row.mark:SetWidth(2)
+    row.lbl = Text(row, "medium", 13, P.ivory, "LEFT")
+    row.lbl:SetPoint("LEFT", 10, 0)
+    row.cnt = Text(row, "medium", 12, P.ash, "RIGHT")
+    row.cnt:SetPoint("RIGHT", -8, 0)
+    row:SetScript("OnEnter", function(self) self.hov:Show() end)
+    row:SetScript("OnLeave", function(self) if not self.on then self.hov:Hide() end end)
+    row:SetScript("OnClick", function(self)
+        MS:SetStatsChar(self.key)
+        CloseCharMenu()
+        selected = nil; compareA, compareB = nil, nil
+        UI.RefreshStats(true)
+    end)
+    menuRows[i] = row
+    return row
 end
 
 local function OpenCharMenu(anchor)
     if charMenu then CloseCharMenu(); return end
-    local chars = MS:StatsCharacters()
+    if not menuFrame then
+        menuFrame = CreateFrame("Frame", nil, UIParent)
+        menuFrame:SetFrameStrata("TOOLTIP"); menuFrame:EnableMouse(true)
+        Box(menuFrame)
+        menuFrame:SetScript("OnHide", function() charMenu = nil end)
+    end
+    local m = menuFrame
     local entries = { { key = "all", label = "All characters" } }
-    for _, c in ipairs(chars) do
+    for _, c in ipairs(MS:StatsCharacters()) do
         entries[#entries + 1] = { key = c.key, label = CharName(c.key), runs = c.runs, me = c.me }
     end
-    local ROWH = 26
-    local m = CreateFrame("Frame", nil, UIParent)
-    m:SetFrameStrata("TOOLTIP"); m:EnableMouse(true)
-    m:SetSize(anchor:GetWidth() + 40, #entries * ROWH + 8)
+    m:SetSize(anchor:GetWidth() + 40, #entries * MENU_ROW + 8)
+    m:ClearAllPoints()
     m:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
-    Box(m)
     local current = MS:GetStatsChar()
     for i, en in ipairs(entries) do
-        local row = Btn(m)
-        row:SetSize(m:GetWidth() - 8, ROWH)
-        row:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * ROWH)
-        local on = en.key == current
-        local hov = Solid(row, "BACKGROUND", 1, P.bronze[1], P.bronze[2], P.bronze[3], 0.14)
-        hov:SetAllPoints(); hov:SetShown(on)
-        if on then
-            local mark = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 1)
-            mark:SetPoint("TOPLEFT"); mark:SetPoint("BOTTOMLEFT"); mark:SetWidth(2)
-        end
-        local lbl = Text(row, "medium", 13, P.ivory, "LEFT")
-        lbl:SetPoint("LEFT", 10, 0); lbl:SetText(en.label .. (en.me and CT(P.ash2, "  (you)") or ""))
-        local cnt = Text(row, "medium", 12, P.ash, "RIGHT")
-        cnt:SetPoint("RIGHT", -8, 0)
-        cnt:SetText(en.runs and (en.runs .. (en.runs == 1 and " run" or " runs")) or "")
-        row:SetScript("OnEnter", function() hov:Show() end)
-        row:SetScript("OnLeave", function() if not on then hov:Hide() end end)
-        row:SetScript("OnClick", function()
-            MS:SetStatsChar(en.key)
-            CloseCharMenu()
-            selected = nil; compareA, compareB = nil, nil
-            UI.RefreshStats(true)
-        end)
+        local row = MenuRow(i)
+        row:SetSize(m:GetWidth() - 8, MENU_ROW)
+        row:ClearAllPoints()
+        row:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * MENU_ROW)
+        row.key, row.on = en.key, en.key == current
+        row.hov:SetShown(row.on); row.mark:SetShown(row.on)
+        row.lbl:SetText(en.label .. (en.me and CT(P.ash2, "  (you)") or ""))
+        row.cnt:SetText(en.runs and (en.runs .. (en.runs == 1 and " run" or " runs")) or "")
+        row:Show()
     end
-    m:SetScript("OnHide", function() if charMenu == m then charMenu = nil end end)
+    for i = #entries + 1, #menuRows do menuRows[i]:Hide() end
+    m:Show()
     charMenu = m
 end
 
@@ -1133,7 +1158,7 @@ function UI.RefreshStats(force)
     local runs = MS:StatsRuns()
     local chars = MS:StatsCharacters()
     local who = MS:GetStatsChar()
-    local sig = #runs .. "|" .. tostring(selected) .. "|" .. tab .. "|" .. who .. "|" .. #chars
+    local sig = #runs .. "|" .. MS:StatsRevision() .. "|" .. tostring(selected) .. "|" .. tab .. "|" .. who .. "|" .. #chars
         .. "|" .. tostring(compareA) .. "|" .. tostring(compareB)
     if sig == drawnSig and not force then return end
     if overview and overview.reset then overview.reset.Disarm() end
@@ -1164,6 +1189,13 @@ function UI.RefreshStats(force)
         CT(P.ivory, Hours(stats.time)) .. " in dungeons",
         CT(P.ivory, _fmt("%.1f", stats.deathsPerRun)) .. " deaths a run",
     }
+    if MS.Flavor.progressStats and (stats.progRuns or 0) > 0 then
+        parts[#parts + 1] = CT(P.ivory, MS.FormatThousands(stats.xp)) .. " XP"
+        parts[#parts + 1] = CT(P.ivory, MS.FormatThousands(stats.kills)) .. " kills"
+        parts[#parts + 1] = CT(P.ivory, stats.quests) .. " quests"
+        parts[#parts + 1] = CT(P.bronzeHi, MS.FormatGold(stats.gold))
+    end
+    f.SublineRun = nil
     f.Subline:SetText(table.concat(parts, "      "))
 
     if selected then

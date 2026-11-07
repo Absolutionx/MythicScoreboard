@@ -131,6 +131,22 @@ function MS:BuildUI()
     subline:SetPoint("TOPLEFT", hdr, "TOPLEFT", PAD_X + 1, -55)
     sbFrame.Subline = subline
 
+    -- Forever: hovering the line lists what the run did for you.
+    if MS.Flavor.progressStats then
+        local hov = CreateFrame("Frame", nil, hdr)
+        hov:SetAllPoints(subline)
+        hov:EnableMouse(true)
+        hov:SetScript("OnEnter", function(self)
+            local run = sbFrame.SublineRun
+            if not (run and run.progress) then return end
+            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:SetText("This run", P.ivory[1], P.ivory[2], P.ivory[3])
+            UI.AddProgressLines(run.progress)
+            GameTooltip:Show()
+        end)
+        hov:SetScript("OnLeave", GameTooltip_Hide)
+    end
+
     local pbLabel = Text(hdr, "medium", 13, P.bronzeHi, "RIGHT")
     pbLabel:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", -16, -58)
     pbLabel:SetText("New personal best")
@@ -255,7 +271,7 @@ function MS:BuildUI()
         if not has then return end
         local isMPlus = (r.keystoneLevel or 0) > 0
         hbIndex:SetText(idx)
-        hbDungeon:SetText(r.dungeonName or "?")
+        hbDungeon:SetText(MS:RunTitle(r))
         hbLevel:SetText(isMPlus and ("+" .. r.keystoneLevel) or DiffShort(r))
         local lc = isMPlus and P.bronzeHi or P.ash
         hbLevel:SetTextColor(lc[1], lc[2], lc[3])

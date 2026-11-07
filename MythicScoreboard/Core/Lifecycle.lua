@@ -1,6 +1,6 @@
 -- When a run starts, pauses, resumes and ends.
 --
--- A run is in one of three states:
+-- A run is in one of four states:
 --
 --   none       no run in progress
 --   active     in the dungeon, recording          (MS.inDungeon == true)
@@ -16,7 +16,8 @@
 -- where the player is. Zone and loading-screen events call it a few times
 -- while the game's instance info settles (see MS:ScheduleLocationChecks).
 -- Mythic+ start/finish come from the CHALLENGE_MODE_* events in Events.lua,
--- which use the same Begin/Finish functions.
+-- which use the same Begin/Finish functions. Whether a run is cleared, and
+-- saving it, is Completion.lua.
 
 local _max = math.max
 local MS = _G["MythicScoreboard"]
@@ -48,20 +49,18 @@ end
 function MS:CurrentDifficulty() return select(3, GetInstanceInfo()) or 0 end
 
 function MS:IsTrackedDifficulty(diff)
-    local td = MythicScoreboardDB and MythicScoreboardDB.settings
-                and MythicScoreboardDB.settings.trackedDifficulties
     local catchAll
     for _, grp in ipairs(MS.DIFF_GROUPS) do
         if grp.catchAll then catchAll = grp end
         for _, id in ipairs(grp.ids) do
             if id == diff then
-                return (not td) or (td[grp.key] == true)
+                return self:IsDifficultyGroupOn(grp.key)
             end
         end
     end
     if catchAll and diff then
         if catchAll.alwaysOn then return true end
-        return (not td) or (td[catchAll.key] == true)
+        return self:IsDifficultyGroupOn(catchAll.key)
     end
     return false
 end
@@ -85,6 +84,24 @@ end
 function MS:CurrentKeystoneLevel()
     return (C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo
         and select(1, C_ChallengeMode.GetActiveKeystoneInfo())) or 0
+end
+
+-- The player's map (a wing or floor of the dungeon), when the game says.
+local function CurrentUiMap()
+    if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
+    local ok, map = pcall(C_Map.GetBestMapForUnit, "player")
+    if ok and type(map) == "number" and not (issecretvalue and issecretvalue(map)) then return map end
+end
+
+-- Whether a paused run can carry on here: the same dungeon, and for an
+-- instance with several wings, the same wing (the map you started in).
+local function SamePlace(self, run)
+    if self:CurrentDungeonName() ~= run.dungeonName then return false end
+    if self.DungeonHasWings and self:DungeonHasWings(run.dungeonName) and run.uiMapID then
+        local here = CurrentUiMap()
+        if here and here ~= run.uiMapID then return false end
+    end
+    return true
 end
 
 local function ActiveChallengeMap()
@@ -127,7 +144,8 @@ function MS:SetRunState(state, run)
         if cur then cur._suspended = nil end
         self.inDungeon = cur ~= nil
     elseif state == "paused" then
-        if cur then cur._suspended = cur._suspended or { at = time() } end
+        -- (time logged out so far is noted: it doesn't count toward the run)
+        if cur then cur._suspended = cur._suspended or { at = time(), offline = cur._offline } end
         self.inDungeon = false
     elseif state == "finishing" then
         if cur then cur._suspended = nil end
@@ -153,8 +171,7 @@ function MS:StateTicker(every, states, fn)
 end
 
 function MS:AutoResetMeter()
-    if not (MythicScoreboardDB and MythicScoreboardDB.settings
-            and MythicScoreboardDB.settings.autoResetMeter) then return end
+    if not self:GetAutoResetMeter() then return end
     if C_DamageMeter and C_DamageMeter.ResetAllCombatSessions then
         C_DamageMeter.ResetAllCombatSessions()
     end
@@ -169,6 +186,93 @@ function MS:WarmPetCache(...)
 end
 
 -- ── Transitions ────────────────────────────────────────────────────────────
+-- ── Starting a run ─────────────────────────────────────────────────────────
+-- The key's affixes: the keystone's own list, else the week's.
+local function CurrentAffixes()
+    local out = {}
+    if C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
+        local _, ids = C_ChallengeMode.GetActiveKeystoneInfo()
+        for _, id in ipairs(ids or {}) do out[#out + 1] = { id = id } end
+    end
+    if #out == 0 and C_MythicPlus and C_MythicPlus.GetCurrentAffixes then
+        for _, af in ipairs(C_MythicPlus.GetCurrentAffixes() or {}) do
+            local id = af.affixID or af.id
+            if id then out[#out + 1] = { id = id } end
+        end
+    end
+    return out
+end
+
+-- A new run, recording from now.
+function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
+    self.itemLevelCache = {}
+    self.displayRun     = nil
+    local run = MS.NewRunData()
+    self:SetRunState("active", run)
+    run.dungeonName     = dungeonName or "Unknown Dungeon"
+    run.keystoneLevel   = keystoneLevel or 0
+    run.difficultyID    = difficultyID or 0
+    run.difficultyLabel = difficultyLabel or ""
+    run.startTime       = GetTime()
+    run.challengeMapID  = ActiveChallengeMap()
+    local instanceID    = select(8, GetInstanceInfo())
+    if type(instanceID) == "number" and not (issecretvalue and issecretvalue(instanceID)) then
+        run.instanceID = instanceID
+    end
+    run.affixes = CurrentAffixes()
+    run.uiMapID = CurrentUiMap()
+    -- Meter not reset for this run: its first reading is the zero point (Meter.lua).
+    if not self:GetAutoResetMeter() then run._baselinePending = true end
+
+    if difficultyID == MYTHIC_PLUS then
+        run.keystoneTimeLimit = self:KnownTimeLimit(run)
+        if not run.keystoneTimeLimit then
+            -- The map's info can take a moment after the key starts.
+            local function TryFetchTimeLimit()
+                if self.currentRun ~= run or run.keystoneTimeLimit then return end
+                run.challengeMapID = run.challengeMapID or ActiveChallengeMap()
+                local tl = self:KnownTimeLimit(run)
+                if tl then
+                    run.keystoneTimeLimit = tl
+                    self:SaveCurrentRun()
+                    if self.RefreshOverview then self:RefreshOverview() end
+                end
+            end
+            C_Timer.After(1.0, TryFetchTimeLimit)
+            C_Timer.After(4.0, TryFetchTimeLimit)
+        end
+        run.currentPct = 0
+    end
+
+    local function SeedPlayers()
+        if self.currentRun ~= run then return end
+        for _, unit in ipairs(self:GroupUnits()) do self:EnsurePlayer(unit) end
+    end
+    SeedPlayers()
+    -- Solo, or the group not loaded yet: look again in a moment.
+    if GetNumGroupMembers() == 0 then
+        C_Timer.After(2.0, function()
+            SeedPlayers()
+            self:PopulateAll()
+            self:PopulateRolesAndScores()
+            if self.RefreshOverview then self:RefreshOverview() end
+        end)
+    end
+    self:PopulateAll()
+    self:PopulateRolesAndScores()
+    run._wallClockStart = time()
+    self:SaveCurrentRun()
+    if self.RefreshOverview then self:RefreshOverview() end
+    -- Short delay lets roster seeding settle before first snapshot.
+    C_Timer.After(0.5, function()
+        if self.currentRun and not InCombatLockdown() then
+            self:SnapshotFromDamageMeter()
+            self:SaveCurrentRun()
+            if self.RefreshOverview then self:RefreshOverview() end
+        end
+    end)
+end
+
 -- none -> active: a new run in the dungeon we're standing in.
 function MS:BeginRun()
     if self.inDungeon then return end
@@ -178,6 +282,8 @@ function MS:BeginRun()
     -- Abandoned by hand while still inside: no new run until you've left.
     if self._abandonedIn and self._abandonedIn == name and level == 0 then return end
     self._abandonedIn = nil
+    -- A paused run elsewhere is saved first (a key started while it waited).
+    if self:RunState() == "paused" then self:ClosePausedRun() end
     self:StartRun(name, level, diff, self:DifficultyLabel(diff))
     Say("Run started: " .. (level > 0 and (name .. " +" .. level)
                                       or (name .. " [" .. self:DifficultyLabel(diff) .. "]")))
@@ -187,23 +293,8 @@ end
 function MS:FinishRun(completed, inTime)
     local state = self:RunState()
     if state ~= "active" and state ~= "paused" then return end
-    local run = self.currentRun
-    -- Final boss down with optional bosses left: leaving finishes it, cleared.
-    if run and not run.completed and run.finalDown then
-        run.completed = true
-        local last = 0
-        for _, b in ipairs(run.bosses or {}) do last = _max(last, b.killTime or 0) end
-        if last > 0 then run.clearedAt = last end
-    end
-    local leaveMode = self.GetClearRule and self:GetClearRule() == "leave"
-    -- Dungeons the addon has no boss data for can never be marked cleared,
-    -- so leaving them counts as finishing rather than abandoning.
-    local undocumented = self.ForeverCanDetectClear and run and not self:ForeverCanDetectClear(run)
-    if (leaveMode or undocumented) and run and not run.completed then
-        run.finishedOnLeave = true
-        if leaveMode then run.clearRule = "leave" end
-    end
-    self:EndRun(completed, inTime or false)
+    local leaveMode = self:ApplyLeaveRules(self.currentRun)
+    self:CommitRun({ completed = completed, inTime = inTime or false })
     if leaveMode and self:GetAutoOpenOnComplete() then
         C_Timer.After(2, function() MS:ShowScoreboard() end)
     end
@@ -248,7 +339,7 @@ function MS:AbandonRun()
     run.finalDown, run.finishedOnLeave, run.clearedAt = nil, nil, nil
     run.abandoned = true
     if self.inDungeon then self._abandonedIn = run.dungeonName end
-    self:EndRun(false, false)
+    self:CommitRun({ completed = false, inTime = false })
     Say("Run abandoned: " .. (run.dungeonName or ""))
     return true
 end
@@ -259,7 +350,7 @@ end
 --
 -- `confirmedOutside` must be true before an active run is ended or paused,
 -- so a single odd reading during a loading screen can't close it.
-function MS:CheckLocation(confirmedOutside)
+local function CheckLocation(self, confirmedOutside)
     local _, itype, diff = GetInstanceInfo()
     local inTracked = itype == "party" and self:IsTrackedDifficulty(diff)
     local state, run = self:RunState(), self.currentRun
@@ -272,9 +363,13 @@ function MS:CheckLocation(confirmedOutside)
         end
         if not confirmedOutside then return "outside" end
         -- Unfinished: pause, so a corpse run or a repair trip doesn't end it.
-        -- Cleared runs, and the "leaving the dungeon" clear rule, end here.
-        local leaveRule = self.GetClearRule and self:GetClearRule() == "leave"
-        if (run.keystoneLevel or 0) == 0 and not run.completed and not run.finalDown and not leaveRule then
+        -- Cleared runs, and the "leaving the dungeon" clear rule, end here;
+        -- but a ghost outside is on a corpse run, whatever the rule.
+        local leaveRule = self:LeaveEndsRuns()
+        local ghost = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
+        if issecretvalue and issecretvalue(ghost) then ghost = false end
+        if (run.keystoneLevel or 0) == 0 and not run.completed and not run.finalDown
+                and (not leaveRule or ghost) then
             self:PauseRun()
         else
             self:FinishRun(false, false)
@@ -283,7 +378,7 @@ function MS:CheckLocation(confirmedOutside)
 
     elseif state == "paused" then
         if not (inTracked and diff ~= MYTHIC_PLUS) then return "outside" end
-        if self:CurrentDungeonName() == run.dungeonName then
+        if SamePlace(self, run) then
             self:ResumeRun()
             return "inside"
         end
@@ -302,9 +397,8 @@ function MS:CheckLocation(confirmedOutside)
 end
 
 -- Every location check ends by updating the watchers.
-local _check = MS.CheckLocation
-function MS:CheckLocation(...)
-    local where = _check(self, ...)
+function MS:CheckLocation(confirmedOutside)
+    local where = CheckLocation(self, confirmedOutside)
     self:UpdateRunWatchers()
     return where
 end

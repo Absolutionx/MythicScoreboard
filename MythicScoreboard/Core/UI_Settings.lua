@@ -9,11 +9,9 @@ local Text, Tint = UI.Text, UI.Tint
 -- Settings popup: built once by MS:BuildUI, anchored under the gear button.
 function UI.BuildSettingsPopup(sbFrame, settBtn)
     local SETT_W, SROW = 236, 26
-    local NUM_GROUPS = #MS.DIFF_GROUPS
-    local SETT_H = 12 + SROW * 5 + 14 + 22 + NUM_GROUPS * SROW + 10
 
     local settPop = CreateFrame("Frame", nil, sbFrame)
-    settPop:SetSize(SETT_W, SETT_H)
+    settPop:SetSize(SETT_W, 100)          -- height set once the rows are placed
     settPop:SetFrameStrata("TOOLTIP")
     settPop:EnableMouse(true)
     settPop:SetPoint("TOPRIGHT", settBtn, "BOTTOMRIGHT", 0, -4)
@@ -65,35 +63,32 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
         return { refresh = Refresh }
     end
 
+    -- On/off settings, top to bottom (getters and setters: Settings.lua).
+    local TOGGLES = {
+        { "Reset meter on zone-in", "AutoResetMeter",
+          "Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers." },
+        -- Enemy forces only exist in Mythic+.
+        { "Forces % on nameplates", "MobForcesNameplate",
+          "Shows each mob's enemy forces % above its nameplate in Mythic+.", MS.Flavor.mythicPlus },
+        { "Forces % in tooltips", "MobForcesTooltip",
+          "Adds enemy forces % to the unit tooltip in Mythic+.", MS.Flavor.mythicPlus },
+        { "Open after a run", "AutoOpenOnComplete",
+          "Opens the scoreboard when you finish a dungeon." },
+        { "Minimap button", "MinimapButton",
+          "Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap." },
+    }
+
     local yOff = -6
     local rows = {}
-    _ins(rows, MakeToggleRow(yOff, "Reset meter on zone-in",
-        function() return MS:GetAutoResetMeter() end,
-        function(v) MS:SetAutoResetMeter(v) end,
-        "Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers."))
-    yOff = yOff - SROW
-    if MS.Flavor.mythicPlus then   -- enemy forces only exist in Mythic+
-        _ins(rows, MakeToggleRow(yOff, "Forces % on nameplates",
-            function() return MS:GetMobForcesNameplate() end,
-            function(v) MS:SetMobForcesNameplate(v) end,
-            "Shows each mob's enemy forces % above its nameplate in Mythic+."))
-        yOff = yOff - SROW
-        _ins(rows, MakeToggleRow(yOff, "Forces % in tooltips",
-            function() return MS:GetMobForcesTooltip() end,
-            function(v) MS:SetMobForcesTooltip(v) end,
-            "Adds enemy forces % to the unit tooltip in Mythic+."))
-        yOff = yOff - SROW
+    for _, t in ipairs(TOGGLES) do
+        local label, name, tip, shown = t[1], t[2], t[3], t[4]
+        if shown ~= false then
+            _ins(rows, MakeToggleRow(yOff, label,
+                function() return MS["Get" .. name](MS) end,
+                function(v) MS["Set" .. name](MS, v) end, tip))
+            yOff = yOff - SROW
+        end
     end
-    _ins(rows, MakeToggleRow(yOff, "Open after a run",
-        function() return MS:GetAutoOpenOnComplete() end,
-        function(v) MS:SetAutoOpenOnComplete(v) end,
-        "Opens the scoreboard when you finish a dungeon."))
-    yOff = yOff - SROW
-    _ins(rows, MakeToggleRow(yOff, "Minimap button",
-        function() return MS:GetMinimapButton() end,
-        function(v) MS:SetMinimapButton(v) end,
-        "Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap."))
-    yOff = yOff - SROW
 
     -- History limit stepper
     local hl = CreateFrame("Frame", nil, settPop)
@@ -139,16 +134,9 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
 
         for _, grp in ipairs(MS.DIFF_GROUPS) do
             local key = grp.key
-            local function IsOn()
-                local td = MythicScoreboardDB and MythicScoreboardDB.settings
-                    and MythicScoreboardDB.settings.trackedDifficulties
-                return (not td) or (td[key] == true)
-            end
-            _ins(rows, MakeToggleRow(yOff, grp.label, IsOn, function(v)
-                local td = MythicScoreboardDB and MythicScoreboardDB.settings
-                    and MythicScoreboardDB.settings.trackedDifficulties
-                if td then td[key] = v end
-            end))
+            _ins(rows, MakeToggleRow(yOff, grp.label,
+                function() return MS:IsDifficultyGroupOn(key) end,
+                function(v) MS:SetDifficultyGroupOn(key, v) end))
             yOff = yOff - SROW
         end
     end

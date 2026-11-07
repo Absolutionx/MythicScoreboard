@@ -13,6 +13,12 @@
 -- leave the same space free for what's still to come are merged, keeping the
 -- cheapest. A quick search runs first, the thorough one only when a name
 -- would otherwise lose its "Killed at" line.
+--
+-- The thorough search can take a while on a crowded run (a long dungeon with
+-- many bosses close together). It gets a few milliseconds a frame: if it
+-- isn't done in the first slice, the quick layout is drawn and the timeline
+-- is redrawn once the thorough one is ready (only if it's better). Plans for
+-- the last few runs are kept, so each is worked out once.
 
 local MS = _G["MythicScoreboard"]
 local UI = MS.UI
@@ -37,6 +43,18 @@ local TRACK_Y, TRACK_H, MED_R, MED_ROWS = TL.TRACK_Y, TL.TRACK_H, TL.MED_R, TL.M
 -- order       = ids by priority (the run's last kill first)
 -- runKey      = identifies the run, for the cache
 -- Returns plan[id] = { row, cx, elbow, mode = { left, compact, bare }, x1, x2, ... }.
+local PLAN_CACHE = 12     -- runs whose medallion plans are kept
+local SLICE_MS   = 4      -- thorough search time per frame
+-- Cheapest first; equal costs in the order they were found, so the result
+-- never depends on how the sort happened to shuffle ties.
+local function ByScore(a, b)
+    if a.score ~= b.score then return a.score < b.score end
+    return a.ord < b.ord
+end
+local _profile = rawget(_G, "debugprofilestop")
+local function NowMs() return _profile and _profile() or GetTime() * 1000 end
+local _slice = 0          -- when the current slice of thorough search began
+
 function UI.PlaceMedallions(medInfo, order, runKey)
     local CIRCLE = MED_R * 2 + 6
     local SHIFTS = { 0, CIRCLE, -CIRCLE, 2 * CIRCLE, -2 * CIRCLE }
@@ -53,10 +71,14 @@ function UI.PlaceMedallions(medInfo, order, runKey)
     -- different elbow heights so two of them can pass without touching.
     local TOP = TRACK_Y + TRACK_H
     local ELBOWS = { TOP + 4, TOP + 8, TOP + 12 }
+    -- lo/hi: the x range the stem covers, padded past every margin Crosses
+    -- uses, so two stems whose ranges don't meet can't cross.
     local function Segments(mx, cx, row, elbow)
         local bottom = MED_ROWS[row] - MED_R
-        if math.abs(cx - mx) < 1 then return { v = { { mx, TOP, bottom } }, h = {} } end
-        return { v = { { mx, TOP, elbow }, { cx, elbow, bottom } }, h = { { elbow, _min(mx, cx), _max(mx, cx) } } }
+        local lo, hi = _min(mx, cx) - 5, _max(mx, cx) + 5
+        if math.abs(cx - mx) < 1 then return { v = { { mx, TOP, bottom } }, h = {}, lo = lo, hi = hi } end
+        return { v = { { mx, TOP, elbow }, { cx, elbow, bottom } }, h = { { elbow, _min(mx, cx), _max(mx, cx) } },
+                 lo = lo, hi = hi }
     end
     local function Crosses(a, b)
         for _, h in ipairs(a.h) do
@@ -91,9 +113,10 @@ function UI.PlaceMedallions(medInfo, order, runKey)
                                 if not mode.bare then
                                     if mode.left then l1, l2 = x1, cx - MED_R - 2 else l1, l2 = cx + MED_R + 2, x2 end
                                 end
+                                local key = row .. tostring(mode.left) .. tostring(mode.compact) .. tostring(mode.bare)
                                 out[#out + 1] = {
                                     full = (pass == 1), shift = shift, ei = ei,
-                                    key = row .. tostring(mode.left) .. tostring(mode.compact) .. tostring(mode.bare),
+                                    key = key, keyShift = key .. shift,
                                     row = row, mode = mode, x1 = x1, x2 = x2, l1 = l1, l2 = l2, cx = cx, mx = mx,
                                     elbow = elbow, segs = Segments(mx, cx, row, elbow), far = _max(x2, cx, mx),
                                     cost = (mode.bare and 300 or mode.compact and 150 or 0)
@@ -105,6 +128,17 @@ function UI.PlaceMedallions(medInfo, order, runKey)
                     end
                 end
             end
+        end
+        -- For stopping early: the cheapest spot from here to the end, and the
+        -- spots the boss could take without moving.
+        local low = math.huge
+        for i = #out, 1, -1 do
+            low = _min(low, out[i].cost)
+            out[i].restMin = low
+        end
+        out.own = {}
+        for _, c in ipairs(out) do
+            if c.shift == 0 and c.full then out.own[#out.own + 1] = c end
         end
         return out
     end
@@ -126,8 +160,11 @@ function UI.PlaceMedallions(medInfo, order, runKey)
                 if HIDE_RULE and math.abs(o.cx - cx) < MED_R + 4 then return false, false end
             end
         end
+        local cs = c.segs
         for _, o in ipairs(near) do
-            if Crosses(c.segs, o.segs) or Crosses(o.segs, c.segs) then return false, true end
+            local os_ = o.segs
+            if cs.hi >= os_.lo and os_.hi >= cs.lo
+                    and (Crosses(cs, os_) or Crosses(os_, cs)) then return false, true end
         end
         return true
     end
@@ -136,7 +173,7 @@ function UI.PlaceMedallions(medInfo, order, runKey)
     for _, bi in ipairs(order) do seq[#seq + 1] = bi end
     table.sort(seq, function(a, b) return medInfo[a].mx < medInfo[b].mx end)
     local shapeCache = {}
-    local function Search(BEAM, bound)
+    local function Search(BEAM, bound, sliced)
         local states = { { near = {}, plan = {}, score = 0 } }
         for si, bi in ipairs(seq) do
             local info = medInfo[bi]
@@ -152,27 +189,34 @@ function UI.PlaceMedallions(medInfo, order, runKey)
             local nextStates = {}
             local nextGap = nextBi and (medInfo[nextBi].mx - info.mx) or math.huge
             for _, st in ipairs(states) do
+                if sliced and NowMs() - _slice > SLICE_MS then coroutine.yield() end
                 local fullFits = false
                 local lastKey
+                -- With a bound, a spot that already costs it can't be part of a
+                -- better answer: it isn't tried. (Exact: any spot it would rule
+                -- out costs at least as much.)
+                local room = bound and (bound - st.score) or math.huge
                 -- Which spots fit without moving: moving only helps when it
                 -- makes room for a boss coming up close behind (a move left), or
                 -- when the boss's own spot is taken.
                 local ownFits = {}
-                for _, c in ipairs(shapes) do
-                    if c.shift == 0 and c.full and Fits(st.near, c) then ownFits[c.key] = true end
+                for _, c in ipairs(shapes.own) do
+                    if c.cost < room and Fits(st.near, c) then ownFits[c.key] = true end
                 end
                 for _, c in ipairs(shapes) do
-                    local useful = true
-                    if c.shift ~= 0 and ownFits[c.key] then
+                    if c.restMin >= room then break end       -- nothing left is cheap enough
+                    local useful = c.cost < room
+                    if useful and c.shift ~= 0 and ownFits[c.key] then
                         useful = c.shift < 0 and nextGap < 260
                     end
                     if useful and (c.full or not fullFits) then
                         -- a bend takes the lowest elbow that fits
-                        local key = c.key .. c.shift
+                        local key = c.keyShift
                         if key ~= lastKey or c.ei == 1 then
                             local ok, bendOnly = Fits(st.near, c)
                             if ok then
-                                nextStates[#nextStates + 1] = { parent = st, bi = bi, c = c, score = st.score + c.cost }
+                                nextStates[#nextStates + 1] = { parent = st, bi = bi, c = c, score = st.score + c.cost,
+                                                                ord = #nextStates + 1 }
                                 if c.full then fullFits = true end
                                 lastKey = key
                             elseif not bendOnly then
@@ -196,12 +240,22 @@ function UI.PlaceMedallions(medInfo, order, runKey)
                                 if o.row == row and _min(c.x2, o.x2 + 6) - _max(c.x1, o.x1 - 6) > 0 then clashes = clashes + 1 end
                                 if row == 1 and o.row == 2 and o.l1 and cx > o.l1 - 2 and cx < o.l2 + 2 then clashes = clashes + 1 end
                             end
-                            nextStates[#nextStates + 1] = { parent = st, bi = bi, c = c, score = st.score + c.cost + clashes * CLASH }
+                            nextStates[#nextStates + 1] = { parent = st, bi = bi, c = c, score = st.score + c.cost + clashes * CLASH,
+                                                            ord = #nextStates + 1 }
                         end
                     end
                 end
             end
-            table.sort(nextStates, function(a, b) return a.score < b.score end)
+            -- Anything at or over the bound can't win: dropped before sorting.
+            if bound then
+                local n = 0
+                for i = 1, #nextStates do
+                    local ns = nextStates[i]
+                    if ns.score < bound then n = n + 1; nextStates[n] = ns end
+                end
+                for i = #nextStates, n + 1, -1 do nextStates[i] = nil end
+            end
+            table.sort(nextStates, ByScore)
             -- States that agree on everything near the edge are the same choice.
             local seen, kept = {}, {}
             local function Sig(o)
@@ -245,11 +299,40 @@ function UI.PlaceMedallions(medInfo, order, runKey)
     for _, bi in ipairs(seq) do
         cacheKey = cacheKey .. ":" .. _floor(medInfo[bi].mx) .. ":" .. _floor(medInfo[bi].lblW)
     end
-    local cache = UI._medPlanCache
-    if cache and cache.key == cacheKey then return cache.plan end
+    -- The last few runs' plans are kept, so going back and forth through
+    -- history doesn't work them out again each time.
+    local lru = UI._medPlanLRU
+    if not lru then lru = {}; UI._medPlanLRU = lru end
+    for i, hit in ipairs(lru) do
+        if hit.key == cacheKey then
+            if i > 1 then table.remove(lru, i); table.insert(lru, 1, hit) end
+            return hit.plan
+        end
+    end
     local plan, score = Search(10)
+    local entry = { key = cacheKey, plan = plan }
+    table.insert(lru, 1, entry)
+    if #lru > PLAN_CACHE then table.remove(lru) end
+    if score < 150 then return plan end
+
     -- Thorough: everything cheaper than the quick answer stays in play.
-    if score >= 150 then plan = Search(400, score) or plan end
-    UI._medPlanCache = { key = cacheKey, plan = plan }
+    local co = coroutine.create(function() return Search(400, score, true) end)
+    local function Step()
+        _slice = NowMs()
+        local ok, better = coroutine.resume(co)
+        if not ok then entry.pending = nil; return true end        -- (keep the quick plan)
+        if coroutine.status(co) ~= "dead" then return false end
+        entry.pending = nil
+        if better then entry.plan = better end
+        return true
+    end
+    if Step() then return entry.plan end
+    -- Not done in one slice: the quick layout now, the better one shortly.
+    entry.pending = true
+    local function Continue()
+        if not Step() then C_Timer.After(0, Continue); return end
+        if entry.plan ~= plan and UI.RebuildTimeline then UI.RebuildTimeline(true) end
+    end
+    C_Timer.After(0, Continue)
     return plan
 end
