@@ -7,6 +7,7 @@ local _floor, _min = math.floor, math.min
 local _ins = table.insert
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local _issecret = issecretvalue
 
 local function Now(run) return MS:GetRunDuration(run) end
@@ -79,6 +80,11 @@ function MS:BossPull(bossName, dungeonEncounterId)
     local run = self.currentRun
     if not run then return end
     local now = Now(run)
+    -- Another boss's fight still open (the game never ended it): over now.
+    local ab = run.activeBoss
+    if ab and ab.name ~= bossName and not ab.killTime and not ab.wipeTime then
+        self:CloseOpenFight(run, run._combatEndedAt or now)
+    end
     -- Re-use existing entry on double-fire; stamp as wipe if > 10s have passed.
     for i = #run.bosses, 1, -1 do
         local b = run.bosses[i]
@@ -113,12 +119,12 @@ local function OpenFight(run, bossName)
     end
 end
 
-local function EndFight(self, bossName, dungeonEncounterId, field)
+local function EndFight(self, bossName, dungeonEncounterId, field, at)
     local run = self.currentRun
     if not run then return nil end
     local boss = OpenFight(run, bossName)
     if not boss then return nil end
-    boss[field] = Now(run)
+    boss[field] = at or Now(run)
     NoteEncounter(boss, dungeonEncounterId)
     if run.activeBoss == boss then run.activeBoss = nil end
     if self.NoteFightEnd then self:NoteFightEnd(boss) end
@@ -129,7 +135,71 @@ end
 function MS:BossKill(bossName, dungeonEncounterId) return EndFight(self, bossName, dungeonEncounterId, "killTime") end
 function MS:BossWipe(bossName, dungeonEncounterId) return EndFight(self, bossName, dungeonEncounterId, "wipeTime") end
 
+-- A boss fight the game started but never ended (no ENCOUNTER_END: the boss
+-- reset, or some encounters on Forever simply don't send one). Ended at `at`:
+-- killed if the experience line said the boss died, else reset (a wipe, with
+-- `reset` set so it reads as one).
+function MS:CloseOpenFight(run, at)
+    run = run or self.currentRun
+    local boss = run and run.activeBoss
+    if not boss or boss.killTime or boss.wipeTime then return nil end
+    at = math.max(boss.pullTime or 0, at or Now(run))
+    if boss._diedAt then
+        local killed = EndFight(self, boss.name, nil, "killTime", boss._diedAt)
+        if killed and self.CheckClearedAfterKill then self:CheckClearedAfterKill(killed) end
+        return killed
+    end
+    boss.reset = true
+    return EndFight(self, boss.name, nil, "wipeTime", at)
+end
+
+-- A mob the experience line said died: a boss whose fight is open is killed
+-- (kept until the fight ends, in case ENCOUNTER_END follows as it should).
+function MS:NoteMobDied(name)
+    local run = self.currentRun
+    local boss = run and run.activeBoss
+    if not boss or boss.killTime or boss.wipeTime or type(name) ~= "string" then return end
+    local function norm(s) return (s:lower():gsub("[%s%p]", "")) end
+    if norm(boss.name or "") == norm(name) then boss._diedAt = Now(run) end
+end
+
+-- Out of combat with a fight still open: once nobody in the group has been
+-- fighting for a few seconds, the fight is over whatever the game says.
+local QUIET_SECONDS = 6
+local function AnyoneFighting()
+    if UnitAffectingCombat and UnitAffectingCombat("player") then return true end
+    if UnitIsDeadOrGhost and UnitIsDeadOrGhost("player") then return true end   -- the group may fight on
+    for i = 1, 4 do
+        local u = "party" .. i
+        if UnitExists and UnitExists(u) and UnitAffectingCombat and UnitAffectingCombat(u) then return true end
+    end
+    return false
+end
+function MS:OnCombatEnded()
+    local run = self.currentRun
+    if not run or not run.activeBoss then return end
+    local endedAt = Now(run)
+    run._combatEndedAt = endedAt
+    local function check(tries)
+        local r = self.currentRun
+        if r ~= run or not r.activeBoss or r.activeBoss.killTime or r.activeBoss.wipeTime then return end
+        if AnyoneFighting() then
+            if tries < 20 then C_Timer.After(QUIET_SECONDS, function() check(tries + 1) end) end
+            return
+        end
+        self:CloseOpenFight(r, r._combatEndedAt or endedAt)
+    end
+    C_Timer.After(QUIET_SECONDS, function() check(0) end)
+end
+
 -- ── Deaths ─────────────────────────────────────────────────────────────────
+-- A cleared run stays open until you leave, but it ended at the clear: deaths
+-- after it (a few seconds' grace for the poll) aren't the run's.
+-- (The run's clock stops at the clear, so this goes by the game clock.)
+function MS:AfterClear(run)
+    return run and run.completed and run._clearedClock and GetTime() > run._clearedClock + 3 or false
+end
+
 -- who: a player from the run, or any form of their name.
 function MS:RecordDeathEvent(who)
     local run = self.currentRun
@@ -137,6 +207,7 @@ function MS:RecordDeathEvent(who)
     local p = type(who) == "table" and who or self:PlayerByName(who)
     if not p then return end
     local t = Now(run)
+    if self:AfterClear(run) then return end
     p.deaths = p.deaths + 1
     p._lastDeathTime = t
     _ins(p.deathEvents, { time = t })

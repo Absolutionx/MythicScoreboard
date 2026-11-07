@@ -8,6 +8,16 @@
 ## SavedVariables: MythicScoreboardPortraitsDB, MythicScoreboardAccountDB
 
 MythicScoreboard.lua
+Locales\Locales.lua
+Locales\deDE.lua
+Locales\frFR.lua
+Locales\esES.lua
+Locales\ptBR.lua
+Locales\itIT.lua
+Locales\ruRU.lua
+Locales\koKR.lua
+Locales\zhCN.lua
+Locales\zhTW.lua
 Core\Seasons.lua
 Core\Flavor.lua
 Core\Settings.lua

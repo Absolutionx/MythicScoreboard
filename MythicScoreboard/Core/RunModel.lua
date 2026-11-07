@@ -18,6 +18,7 @@ local _abs, _floor, _min, _max = math.abs, math.floor, math.min, math.max
 local _fmt, _ins = string.format, table.insert
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 MS.currentRun = nil
 MS.inDungeon  = false
@@ -231,10 +232,10 @@ end
 -- What a saved run doesn't keep: state that only means something while the
 -- run is live (meter bookkeeping, the fight being read, the game clock).
 local LIVE = {
-    run    = { "_carry", "_carryDur", "_lastDur", "_seq", "_pendingFinalize", "activeBoss",
+    run    = { "_carry", "_carryDur", "_lastDur", "_seq", "_pendingFinalize", "_combatEndedAt", "_clearedClock", "activeBoss",
                "_active", "_suspended", "startTime", "endTime", "_bossTotal",
                "_baselinePending", "_deathBase", "_offline", "_savedAt" },
-    boss   = { "_before", "_session", "_tries", "_named" },
+    boss   = { "_before", "_session", "_tries", "_named", "_diedAt" },
     player = { "_lastDeathTime", "_lastRecapID" },
 }
 function MS:StripLive(run)

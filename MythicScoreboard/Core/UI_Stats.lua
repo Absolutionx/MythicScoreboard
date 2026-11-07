@@ -2,6 +2,8 @@ local _floor, _max, _min = math.floor, math.max, math.min
 local _fmt = string.format
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
+local LK = MS.LK      -- a label kept in English, translated where it is shown
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local P, PAD_X, HDR_H, COL_HDR_H, FRAME_W = UI.P, UI.PAD_X, UI.HDR_H, UI.COL_HDR_H, UI.FRAME_W
@@ -32,42 +34,42 @@ local CHART_H = 150
 local LIST_ROW = 26
 
 local DCOLS = {   -- overview: one row per dungeon
-    { key = "name",    label = "Dungeon",      w = 180, left = true },
-    { key = "runs",    label = "Runs",         w = 48 },
-    { key = "cleared", label = "Cleared",      w = 62 },
-    { key = "best",    label = "Best",         w = 60 },
-    { key = "typical", label = "Typical",      w = 64 },
-    { key = "recent",  label = "Recent runs",  w = 140, left = true },
-    { key = "deaths",  label = "Deaths/run",   w = 70 },
-    { key = "dps",     label = "Your DPS",     w = 76 },
+    { key = "name",    label = LK("Dungeon"),      w = 180, left = true },
+    { key = "runs",    label = LK("Runs"),         w = 48 },
+    { key = "cleared", label = LK("Cleared"),      w = 62 },
+    { key = "best",    label = LK("Best"),         w = 60 },
+    { key = "typical", label = LK("Typical"),      w = 64 },
+    { key = "recent",  label = LK("Recent runs"),  w = 140, left = true },
+    { key = "deaths",  label = LK("Deaths/run"),   w = 70 },
+    { key = "dps",     label = LK("Your DPS"),     w = 76 },
 }
 -- Forever: what runs gave you, in place of your DPS.
 if MS.Flavor.progressStats then
     for i, c in ipairs(DCOLS) do
-        if c.key == "dps" then DCOLS[i] = { key = "xp", label = "XP a run", w = c.w } end
+        if c.key == "dps" then DCOLS[i] = { key = "xp", label = LK("XP a run"), w = c.w } end
     end
 end
 local LCOLS = {   -- loot: one row per item
-    { key = "item",    label = "Item",      w = 370, left = true },
-    { key = "dungeon", label = "Dungeon",   w = 220, left = true },
-    { key = "boss",    label = "Boss",      w = 210, left = true },
-    { key = "date",    label = "Date",      w = 80,  left = true },
-    { key = "char",    label = "Character", w = 130, left = true },
+    { key = "item",    label = LK("Item"),      w = 370, left = true },
+    { key = "dungeon", label = LK("Dungeon"),   w = 220, left = true },
+    { key = "boss",    label = LK("Boss"),      w = 210, left = true },
+    { key = "date",    label = LK("Date"),      w = 80,  left = true },
+    { key = "char",    label = LK("Character"), w = 130, left = true },
 }
 local LOOT_ROW = 30
 local MAX_LOOT = 500
 local RCOLS = {   -- detail: one row per run
-    { key = "date",   label = "Date",     w = 92,  left = true },
-    { key = "level",  label = "Level",    w = 56 },
-    { key = "time",   label = "Time",     w = 70 },
-    { key = "result", label = "Result",   w = 96,  left = true },
-    { key = "deaths", label = "Deaths",   w = 64 },
-    { key = "dps",    label = "Your DPS", w = 80 },
-    { key = "bosses", label = "Bosses",   w = 242, left = true },
+    { key = "date",   label = LK("Date"),     w = 92,  left = true },
+    { key = "level",  label = LK("Level"),    w = 56 },
+    { key = "time",   label = LK("Time"),     w = 70 },
+    { key = "result", label = LK("Result"),   w = 96,  left = true },
+    { key = "deaths", label = LK("Deaths"),   w = 64 },
+    { key = "dps",    label = LK("Your DPS"), w = 80 },
+    { key = "bosses", label = LK("Bosses"),   w = 242, left = true },
 }
 if MS.Flavor.progressStats then
     for i, c in ipairs(RCOLS) do
-        if c.key == "dps" then RCOLS[i] = { key = "xp", label = "XP", w = c.w } end
+        if c.key == "dps" then RCOLS[i] = { key = "xp", label = LK("XP"), w = c.w } end
     end
 end
 
@@ -75,8 +77,8 @@ end
 local function Dur(s) return MS:FormatLongTime(s) end
 local function Hours(s)
     local m = _floor((s or 0) / 60 + 0.5)
-    if m < 60 then return m .. "m" end
-    return _floor(m / 60) .. "h " .. _fmt("%02dm", m % 60)
+    if m < 60 then return _fmt(L["%dm"], m) end
+    return _fmt(L["%dh %02dm"], _floor(m / 60), m % 60)
 end
 local function Day(at)
     if not at then return "-" end
@@ -115,7 +117,7 @@ local function Band(parent, cols, x)
         lbl:SetWidth(c.w - 6)
         if c.left then lbl:SetPoint("LEFT", band, "LEFT", lx, 0)
         else lbl:SetPoint("CENTER", band, "LEFT", lx + c.w / 2, 0) end
-        lbl:SetText(c.label)
+        lbl:SetText(L[c.label])
         band.labels[c.key] = lbl
         lx = lx + c.w
     end
@@ -225,10 +227,10 @@ local function MakeDungeonRow(parent)
         local d = self.data
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(d.name, P.ivory[1], P.ivory[2], P.ivory[3])
-        GameTooltip:AddLine(_fmt("%d runs, %d cleared", d.runs, d.cleared), P.ash[1], P.ash[2], P.ash[3])
-        GameTooltip:AddLine("Recent runs, oldest to newest. Shorter bars are faster; the brightest is your best clear.",
+        GameTooltip:AddLine(MS.Plural(d.runs, "%d run", "%d runs") .. ", " .. _fmt(L["%d cleared"], d.cleared), P.ash[1], P.ash[2], P.ash[3])
+        GameTooltip:AddLine(L["Recent runs, oldest to newest. Shorter bars are faster; the brightest is your best clear."],
             P.ash[1], P.ash[2], P.ash[3], true)
-        GameTooltip:AddLine("Click for every run in this dungeon.", P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:AddLine(L["Click for every run in this dungeon."], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -248,7 +250,7 @@ local function MakeMateRow(parent)
         local m = self.data
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText(DN(m.name), P.ivory[1], P.ivory[2], P.ivory[3])
-        GameTooltip:AddLine(_fmt("%d runs together, %d cleared", m.runs, m.cleared), P.ash[1], P.ash[2], P.ash[3])
+        GameTooltip:AddLine(MS.Plural(m.runs, "%d run together", "%d runs together") .. ", " .. _fmt(L["%d cleared"], m.cleared), P.ash[1], P.ash[2], P.ash[3])
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -272,16 +274,16 @@ local function MakeBossRow(parent)
         local b = self.data
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText(b.name, P.ivory[1], P.ivory[2], P.ivory[3])
-        GameTooltip:AddDoubleLine("Kills", b.kills, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Kills"], b.kills, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
         if b.best then
-            GameTooltip:AddDoubleLine("Fastest fight", Dur(b.best), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
-            GameTooltip:AddDoubleLine("Typical fight", Dur(b.typical), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Fastest fight"], Dur(b.best), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Typical fight"], Dur(b.typical), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
         end
         if b.bestDps then
-            GameTooltip:AddDoubleLine("Your best DPS", Abbrev(b.bestDps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+            GameTooltip:AddDoubleLine(L["Your best DPS"], Abbrev(b.bestDps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
         end
         if not b.best then
-            GameTooltip:AddLine("Fight lengths are recorded from version 2.5 on.", P.ash[1], P.ash[2], P.ash[3], true)
+            GameTooltip:AddLine(L["Fight lengths are recorded from version 2.5 on."], P.ash[1], P.ash[2], P.ash[3], true)
         end
         GameTooltip:Show()
     end)
@@ -295,17 +297,17 @@ local function BuildOverview(parent)
     local band = Band(o, DCOLS, X0)
     band:SetPoint("TOPLEFT", o, "TOPLEFT", 0, 0); band:SetPoint("TOPRIGHT", o, "TOPRIGHT", 0, 0)
     local mates = Text(band, "medium", 13, P.ash, "LEFT")
-    mates:SetPoint("LEFT", band, "LEFT", RIGHT_X, 0); mates:SetText("Played with")
+    mates:SetPoint("LEFT", band, "LEFT", RIGHT_X, 0); mates:SetText(L["Played with"])
 
     -- Reset stats: empties the archive (history is kept).
     local reset = Btn(band)
     reset:SetSize(140, COL_HDR_H - 6)
     reset:SetPoint("RIGHT", band, "LEFT", RIGHT_X + RIGHT_W, 0)
     local resetTxt = Text(reset, "medium", 13, P.ash2, "RIGHT")
-    resetTxt:SetPoint("RIGHT", reset, "RIGHT", 0, 0); resetTxt:SetText("Reset stats")
+    resetTxt:SetPoint("RIGHT", reset, "RIGHT", 0, 0); resetTxt:SetText(L["Reset stats"])
     local function ResetLook(armed)
         local c = armed and P.bloodHi or P.ash2
-        resetTxt:SetText(armed and "Click again to reset" or "Reset stats")
+        resetTxt:SetText(armed and L["Click again to reset"] or L["Reset stats"])
         resetTxt:SetTextColor(c[1], c[2], c[3])
     end
     TwoClick(reset, ResetLook, function()
@@ -315,10 +317,10 @@ local function BuildOverview(parent)
     reset:SetScript("OnEnter", function(self)
         if not self.IsArmed() then resetTxt:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
-        GameTooltip:SetText("Reset stats", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:SetText(L["Reset stats"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
         GameTooltip:AddLine(multiChar
-            and "Removes every run of this character from your stats. Other characters keep theirs, and your run history in the dropdown is kept."
-            or "Removes every run from your stats. Your run history in the dropdown is kept.", 0.8, 0.8, 0.8, true)
+            and L["Removes every run of this character from your stats. Other characters keep theirs, and your run history in the dropdown is kept."]
+            or L["Removes every run from your stats. Your run history in the dropdown is kept."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     reset:SetScript("OnLeave", function(self)
@@ -342,10 +344,10 @@ local function BuildOverview(parent)
     o.empty = Text(o, "regular", 15, P.ash, "CENTER")
     o.empty:SetPoint("CENTER", o, "LEFT", X0 + LEFT_W / 2, -20)
     o.empty:SetWidth(LEFT_W - 80); o.empty:SetWordWrap(true)
-    o.empty:SetText("No finished runs yet. Every run you finish or leave from now on is added here.")
+    o.empty:SetText(L["No finished runs yet. Every run you finish or leave from now on is added here."])
     o.noMates = Text(o, "regular", 14, P.ash, "LEFT")
     o.noMates:SetPoint("TOPLEFT", o, "TOPLEFT", RIGHT_X + 2, -COL_HDR_H - 10)
-    o.noMates:SetText("Nobody yet.")
+    o.noMates:SetText(L["Nobody yet."])
     return o
 end
 
@@ -382,8 +384,8 @@ local function FillOverview(o, stats)
         local row = o.mateAt(i)
         row:SetPoint("TOPLEFT", o.msf.scrollContent, "TOPLEFT", 0, -my)
         row.data = m
-        row.name:SetText("|cff" .. ClassHex(m.class or "UNKNOWN") .. DN(m.name) .. "|r")
-        row.count:SetText(m.runs .. (m.runs == 1 and " run" or " runs"))
+        UI.SetNameText(row.name, "|cff" .. ClassHex(m.class or "UNKNOWN") .. DN(m.name) .. "|r")
+        row.count:SetText(MS.Plural(m.runs, "%d run", "%d runs"))
         my = my + MATE_ROW
     end
     o.matesHideFrom(#stats.mates + 1)
@@ -396,14 +398,14 @@ end
 local function RunTooltip(owner, e)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     GameTooltip:SetText(Day(e.at) .. (e.at and date("  %H:%M", e.at) or ""), P.ivory[1], P.ivory[2], P.ivory[3])
-    GameTooltip:AddDoubleLine("Time", Dur(e.dur), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
-    GameTooltip:AddDoubleLine("Result", Result(e), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Time"], Dur(e.dur), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+    GameTooltip:AddDoubleLine(L["Result"], Result(e), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
     if multiChar and MS:RunOwner(e) then
-        GameTooltip:AddDoubleLine("Character", CharName(MS:RunOwner(e)), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Character"], CharName(MS:RunOwner(e)), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
     end
-    if e.me and e.me.lvl then GameTooltip:AddDoubleLine("Your level", e.me.lvl, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
-    if e.me then GameTooltip:AddDoubleLine("Your DPS", Abbrev(e.me.dps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
-    GameTooltip:AddDoubleLine("Group deaths", e.deaths or 0, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+    if e.me and e.me.lvl then GameTooltip:AddDoubleLine(L["Your level"], e.me.lvl, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
+    if e.me then GameTooltip:AddDoubleLine(L["Your DPS"], Abbrev(e.me.dps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
+    GameTooltip:AddDoubleLine(L["Group deaths"], e.deaths or 0, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
     if e.prog then UI.AddProgressLines(e.prog, true) end
     for _, b in ipairs(e.bosses or {}) do
         GameTooltip:AddDoubleLine(b.n, Dur(b.t), P.ash[1], P.ash[2], P.ash[3], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
@@ -437,7 +439,7 @@ local function MakeRunRow(parent)
     del:SetSize(22, LIST_ROW)
     del:SetPoint("RIGHT", row, "RIGHT", -2, 0)
     del:SetFrameLevel(row:GetFrameLevel() + 2)
-    local icon = Art(del, "Close", "OVERLAY")
+    local icon = Art(del, L["Close"], "OVERLAY")
     icon:SetSize(11, 11); icon:SetPoint("CENTER"); Tint(icon, P.ash2)
     TwoClick(del, function(armed) Tint(icon, armed and P.bloodHi or P.ash2) end, function()
         GameTooltip:Hide()
@@ -447,9 +449,9 @@ local function MakeRunRow(parent)
     del:SetScript("OnEnter", function(self)
         Tint(icon, P.bloodHi)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-        GameTooltip:SetText("Remove from stats", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
-        GameTooltip:AddLine(self.IsArmed() and "Click again to remove this run."
-            or "Leaves your run history untouched.", 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Remove from stats"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddLine(self.IsArmed() and L["Click again to remove this run."]
+            or L["Leaves your run history untouched."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     del:SetScript("OnLeave", function(self)
@@ -477,20 +479,20 @@ local function MakeRunRow(parent)
         self.text:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         if compareA == row.entry then
-            GameTooltip:SetText("Picked for comparison")
-            GameTooltip:AddLine("Click again to cancel.", 0.8, 0.8, 0.8, true)
+            GameTooltip:SetText(L["Picked for comparison"])
+            GameTooltip:AddLine(L["Click again to cancel."], 0.8, 0.8, 0.8, true)
         elseif compareA then
-            GameTooltip:SetText("Compare with the picked run")
+            GameTooltip:SetText(L["Compare with the picked run"])
         else
-            GameTooltip:SetText("Compare")
-            GameTooltip:AddLine("Pick this run, then another one, to see them side by side.", 0.8, 0.8, 0.8, true)
+            GameTooltip:SetText(L["Compare"])
+            GameTooltip:AddLine(L["Pick this run, then another one, to see them side by side."], 0.8, 0.8, 0.8, true)
         end
         GameTooltip:Show()
     end)
     cmp:SetScript("OnLeave", function(self) self.Look(); GameTooltip:Hide() end)
     cmp.Look = function()
         local picked = compareA ~= nil and compareA == row.entry
-        cmp.text:SetText(picked and "Picked" or compareA and "Compare" or "Compare")
+        cmp.text:SetText(picked and L["Picked"] or L["Compare"])
         local c = picked and P.bronzeHi or compareA and P.ivory or P.ash2
         cmp.text:SetTextColor(c[1], c[2], c[3])
     end
@@ -504,11 +506,11 @@ local function BuildDetail(parent)
     local band = Band(d)
     band:SetPoint("TOPLEFT", d, "TOPLEFT", 0, 0); band:SetPoint("TOPRIGHT", d, "TOPRIGHT", 0, 0)
     local bossLbl = Text(band, "medium", 13, P.ash, "LEFT")
-    bossLbl:SetPoint("LEFT", band, "LEFT", RIGHT_X, 0); bossLbl:SetText("Bosses")
+    bossLbl:SetPoint("LEFT", band, "LEFT", RIGHT_X, 0); bossLbl:SetText(L["Bosses"])
     local typLbl = Text(band, "medium", 13, P.ash, "CENTER")
-    typLbl:SetPoint("CENTER", band, "LEFT", RIGHT_X + RIGHT_W - BOSS_COL / 2, 0); typLbl:SetText("Typical")
+    typLbl:SetPoint("CENTER", band, "LEFT", RIGHT_X + RIGHT_W - BOSS_COL / 2, 0); typLbl:SetText(L["Typical"])
     local bestLbl = Text(band, "medium", 13, P.ash, "CENTER")
-    bestLbl:SetPoint("CENTER", band, "LEFT", RIGHT_X + RIGHT_W - BOSS_COL * 1.5, 0); bestLbl:SetText("Best")
+    bestLbl:SetPoint("CENTER", band, "LEFT", RIGHT_X + RIGHT_W - BOSS_COL * 1.5, 0); bestLbl:SetText(L["Best"])
 
     local back = Btn(band)
     back:SetPoint("LEFT", band, "LEFT", X0 - 4, 0); back:SetSize(128, COL_HDR_H - 6)
@@ -516,7 +518,7 @@ local function BuildDetail(parent)
     arrow:SetSize(12, 12); arrow:SetPoint("LEFT", back, "LEFT", 4, 0)
     arrow:SetRotation(-math.pi / 2); Tint(arrow, P.ash)
     local backTxt = Text(back, "medium", 13, P.ash, "LEFT")
-    backTxt:SetPoint("LEFT", arrow, "RIGHT", 4, 0); backTxt:SetText("All dungeons")
+    backTxt:SetPoint("LEFT", arrow, "RIGHT", 4, 0); backTxt:SetText(L["All dungeons"])
     back:SetScript("OnEnter", function() Tint(arrow, P.ivory); backTxt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3]) end)
     back:SetScript("OnLeave", function() Tint(arrow, P.ash); backTxt:SetTextColor(P.ash[1], P.ash[2], P.ash[3]) end)
     back:SetScript("OnClick", function() selected = nil; compareA, compareB = nil, nil; UI.RefreshStats() end)
@@ -564,7 +566,7 @@ local function BuildDetail(parent)
     d.bossAt, d.bossesHideFrom = Pool(function() return MakeBossRow(d.bsf.scrollContent) end)
     d.noBosses = Text(d, "regular", 13, P.ash2, "LEFT")
     d.noBosses:SetPoint("TOPLEFT", d, "TOPLEFT", RIGHT_X + 2, -(COL_HDR_H + 10))
-    d.noBosses:SetText("No bosses killed here yet.")
+    d.noBosses:SetText(L["No bosses killed here yet."])
     return d
 end
 
@@ -573,9 +575,9 @@ local MAX_BARS = 40
 local function FillDetail(d, s, stats)
     d.title:SetText(s.name)
     if compareA then
-        d.summary:SetText(CT(P.bronzeHi, "Pick a second run to compare with ") .. CT(P.ivory, Day(compareA.at) .. "  " .. Dur(compareA.dur)))
+        d.summary:SetText(CT(P.bronzeHi, _fmt(L["Pick a second run to compare with %s"], CT(P.ivory, Day(compareA.at) .. "  " .. Dur(compareA.dur)))))
     else
-        d.summary:SetText(_fmt("Best %s      Typical %s      %s cleared",
+        d.summary:SetText(_fmt(L["Best %s      Typical %s      %s cleared"],
             CT(P.ivory, Dur(s.best)), CT(P.ivory, Dur(s.typical)), CT(P.ivory, Pct(s.cleared, #s.runs))))
     end
 
@@ -612,7 +614,7 @@ local function FillDetail(d, s, stats)
         if e.cleared and e.dur == s.best then
             d.bestLbl:ClearAllPoints()
             d.bestLbl:SetPoint("BOTTOM", b, "TOP", 0, 3)
-            d.bestLbl:SetText("Best")
+            d.bestLbl:SetText(L["Best"])
         end
     end
     d.barsHideFrom(n + 1)
@@ -631,7 +633,7 @@ local function FillDetail(d, s, stats)
         d.typLine:SetPoint("BOTTOMRIGHT", d.chart, "BOTTOMRIGHT", 0, y)
         d.typLbl:ClearAllPoints()
         d.typLbl:SetPoint("BOTTOMRIGHT", d.typLine, "TOPRIGHT", 0, 2)
-        d.typLbl:SetText("Typical " .. Dur(s.typical))
+        d.typLbl:SetText(_fmt(L["Typical %s"], Dur(s.typical)))
     end
     d.typLine:SetShown(s.typical ~= nil)
     d.typLbl:SetShown(s.typical ~= nil)
@@ -660,7 +662,7 @@ local function FillDetail(d, s, stats)
         end
         local names = {}
         for _, b in ipairs(e.bosses or {}) do names[#names + 1] = b.n end
-        c.bosses:SetText(#names > 0 and CT(P.ash, table.concat(names, ", ")) or CT(P.ash2, "None"))
+        c.bosses:SetText(#names > 0 and CT(P.ash, table.concat(names, ", ")) or CT(P.ash2, L["None"]))
         y = y + LIST_ROW
     end
     d.rowsHideFrom(k + 1)
@@ -688,18 +690,18 @@ end
 -- line joining each boss's kill in the earlier run to the same kill in the
 -- later one. Below: boss by boss, the later run against the earlier one.
 local CCOLS = {
-    { key = "boss",  label = "Boss",           w = 200, left = true },
-    { key = "k1",    label = "Killed 1",       w = 84 },
-    { key = "k2",    label = "Killed 2",       w = 84 },
-    { key = "split", label = "Run 2 was",      w = 112 },
-    { key = "f1",    label = "Fight 1",        w = 76 },
-    { key = "f2",    label = "Fight 2",        w = 76 },
+    { key = "boss",  label = LK("Boss"),           w = 200, left = true },
+    { key = "k1",    label = LK("Killed 1"),       w = 84 },
+    { key = "k2",    label = LK("Killed 2"),       w = 84 },
+    { key = "split", label = LK("Run 2 was"),      w = 112 },
+    { key = "f1",    label = LK("Fight 1"),        w = 76 },
+    { key = "f2",    label = LK("Fight 2"),        w = 76 },
     { key = "fd",    label = "",               w = 64 },
-    { key = "t1",    label = "Trash 1",        w = 76 },
-    { key = "t2",    label = "Trash 2",        w = 76 },
+    { key = "t1",    label = LK("Trash 1"),        w = 76 },
+    { key = "t2",    label = LK("Trash 2"),        w = 76 },
     { key = "td",    label = "",               w = 64 },
-    { key = "m1",    label = "Your DPS 1",     w = 92 },
-    { key = "m2",    label = "Your DPS 2",     w = 92 },
+    { key = "m1",    label = LK("Your DPS 1"),     w = 92 },
+    { key = "m2",    label = LK("Your DPS 2"),     w = 92 },
 }
 local LANE_X = X0 + 250                       -- where the bars start
 local LANE_W = FRAME_W - 2 - LANE_X - X0 - 10
@@ -714,8 +716,8 @@ end
 
 local function Split(d)
     if not d then return CT(P.ash2, "-") end
-    if math.abs(d) < 1 then return CT(P.ash, "level") end
-    return d < 0 and CT(P.verd, Dur(-d) .. " ahead") or CT(P.bloodHi, Dur(d) .. " behind")
+    if math.abs(d) < 1 then return CT(P.ash, L["level"]) end
+    return d < 0 and CT(P.verd, _fmt(L["%s ahead"], Dur(-d))) or CT(P.bloodHi, _fmt(L["%s behind"], Dur(d)))
 end
 
 local function OrDash(v, f) return v and (f and f(v) or v) or CT(P.ash2, "-") end
@@ -737,7 +739,7 @@ local function BuildCompare(parent)
     back:SetScript("OnClick", function() compareA, compareB = nil, nil; UI.RefreshStats(true) end)
     c.title = Text(band, "semibold", 15, P.ivory, "LEFT")
     c.title:SetPoint("LEFT", band, "LEFT", LANE_X, 0)
-    c.title:SetText("Run comparison")
+    c.title:SetText(L["Run comparison"])
 
     -- Lanes
     c.lanes = {}
@@ -790,7 +792,7 @@ end
 
 local function FillCompare(c, cmp)
     local A, B = cmp.first, cmp.second
-    c.backTxt:SetText(A.dungeon or "Back")
+    c.backTxt:SetText(A.dungeon or L["Back"])
     local scale = _max(A.dur or 1, B.dur or 1, 1)
     local function LX(t) return LANE_X + (t or 0) / scale * LANE_W end
     for i, e in ipairs({ A, B }) do
@@ -799,7 +801,7 @@ local function FillCompare(c, cmp)
             .. (multiChar and MS:RunOwner(e) and ("   " .. CharName(MS:RunOwner(e))) or ""))
         lane.sub:SetText(table.concat({
             CT(P.ivory, Dur(e.dur)), Result(e),
-            ((e.deaths or 0) > 0 and CT(P.bloodHi, e.deaths .. (e.deaths == 1 and " death" or " deaths")) or "No deaths"),
+            ((e.deaths or 0) > 0 and CT(P.bloodHi, MS.Plural(e.deaths, "%d death", "%d deaths")) or L["No deaths"]),
         }, "    "))
         local k = 0
         for _, b in ipairs(e.bosses or {}) do
@@ -838,15 +840,15 @@ local function FillCompare(c, cmp)
     -- Verdict
     local T = cmp.total
     local d = T.diff
-    local head = math.abs(d) < 1 and "Both runs took the same time."
-        or (d < 0 and CT(P.verd, "Run 2 was " .. Dur(-d) .. " faster.") or CT(P.bloodHi, "Run 2 was " .. Dur(d) .. " slower."))
+    local head = math.abs(d) < 1 and L["Both runs took the same time."]
+        or (d < 0 and CT(P.verd, _fmt(L["Run 2 was %s faster."], Dur(-d))) or CT(P.bloodHi, _fmt(L["Run 2 was %s slower."], Dur(d))))
     local extra = {}
     if T.fightA and T.fightB and T.trashA and T.trashB and math.abs(d) >= 1 then
         local fd, td = T.fightB - T.fightA, T.trashB - T.trashA
-        extra[#extra + 1] = "Boss fights " .. Signed(fd) .. ", trash " .. Signed(td)
+        extra[#extra + 1] = _fmt(L["Boss fights %s, trash %s"], Signed(fd), Signed(td))
     end
-    if T.dpsA and T.dpsB then extra[#extra + 1] = "Your DPS " .. Abbrev(T.dpsA) .. " vs " .. Abbrev(T.dpsB) end
-    extra[#extra + 1] = "Deaths " .. T.deathsA .. " vs " .. T.deathsB
+    if T.dpsA and T.dpsB then extra[#extra + 1] = _fmt(L["Your DPS %s vs %s"], Abbrev(T.dpsA), Abbrev(T.dpsB)) end
+    extra[#extra + 1] = _fmt(L["Deaths %s vs %s"], T.deathsA, T.deathsB)
     c.verdict:SetText(head .. "      " .. CT(P.ash, table.concat(extra, "      ")))
 
     -- Table
@@ -870,11 +872,11 @@ local function FillCompare(c, cmp)
     end
     -- After the last kill, then the whole run.
     local cl = Row()
-    cl.boss:SetText(CT(P.ash, "After the last boss"))
+    cl.boss:SetText(CT(P.ash, L["After the last boss"]))
     for _, key in ipairs({ "k1", "k2", "split", "f1", "f2", "fd", "m1", "m2" }) do cl[key]:SetText("") end
     cl.t1:SetText(Dur(T.endA)); cl.t2:SetText(Dur(T.endB)); cl.td:SetText(Signed(T.endB - T.endA))
     cl = Row()
-    cl.boss:SetText(CT(P.ivory, "Whole run"))
+    cl.boss:SetText(CT(P.ivory, L["Whole run"]))
     cl.k1:SetText(CT(P.ivory, Dur(T.a))); cl.k2:SetText(CT(P.ivory, Dur(T.b)))
     cl.split:SetText(Split(T.diff))
     cl.f1:SetText(OrDash(T.fightA, Dur)); cl.f2:SetText(OrDash(T.fightB, Dur))
@@ -941,7 +943,7 @@ local function MakeLootRow(parent)
         GameTooltip:SetOwner(self, "ANCHOR_NONE")
         GameTooltip:SetPoint("BOTTOMLEFT", self.icon, "TOPRIGHT", 4, 2)
         if not pcall(GameTooltip.SetHyperlink, GameTooltip, l.l or MS.LootItemString(l)) then
-            GameTooltip:SetText(ItemName(l) or "Item")
+            GameTooltip:SetText(ItemName(l) or L["Item"])
         end
         GameTooltip:Show()
     end)
@@ -968,7 +970,7 @@ local function BuildLoot(parent)
     lv.empty = Text(lv, "regular", 15, P.ash, "CENTER")
     lv.empty:SetPoint("CENTER", lv, "CENTER", 0, -10)
     lv.empty:SetWidth(560); lv.empty:SetWordWrap(true)
-    lv.empty:SetText("No loot yet. Gear that drops for you in a dungeon is listed here.")
+    lv.empty:SetText(L["No loot yet. Gear that drops for you in a dungeon is listed here."])
     return lv
 end
 
@@ -985,12 +987,12 @@ local function FillLoot(lv, items)
         local name = ItemName(l)
         if not name then waitingForItems = true end
         local qc = QualityColor(l.q)
-        row.cells.item:SetText(name or "Loading...")
+        row.cells.item:SetText(name or L["Loading..."])
         row.cells.item:SetTextColor(qc[1], qc[2], qc[3])
         row.cells.dungeon:SetText(e.dungeon or "?")
-        row.cells.boss:SetText(l.b and CT(P.ash, l.b) or CT(P.ash2, "Trash"))
+        row.cells.boss:SetText(l.b and CT(P.ash, l.b) or CT(P.ash2, L["Trash"]))
         row.cells.date:SetText(CT(P.ash, Day(e.at)))
-        row.cells.char:SetText(multiChar and CharName(MS:RunOwner(e)) or "")
+        UI.SetNameText(row.cells.char, multiChar and CharName(MS:RunOwner(e)) or "")
         y = y + LOOT_ROW
     end
     lv.rowsHideFrom(n + 1)
@@ -1042,7 +1044,7 @@ local function OpenCharMenu(anchor)
         menuFrame:SetScript("OnHide", function() charMenu = nil end)
     end
     local m = menuFrame
-    local entries = { { key = "all", label = "All characters" } }
+    local entries = { { key = "all", label = L["All characters"] } }
     for _, c in ipairs(MS:StatsCharacters()) do
         entries[#entries + 1] = { key = c.key, label = CharName(c.key), runs = c.runs, me = c.me }
     end
@@ -1057,8 +1059,8 @@ local function OpenCharMenu(anchor)
         row:SetPoint("TOPLEFT", m, "TOPLEFT", 4, -4 - (i - 1) * MENU_ROW)
         row.key, row.on = en.key, en.key == current
         row.hov:SetShown(row.on); row.mark:SetShown(row.on)
-        row.lbl:SetText(en.label .. (en.me and CT(P.ash2, "  (you)") or ""))
-        row.cnt:SetText(en.runs and (en.runs .. (en.runs == 1 and " run" or " runs")) or "")
+        row.lbl:SetText(en.label .. (en.me and CT(P.ash2, "  " .. L["(you)"]) or ""))
+        row.cnt:SetText(en.runs and MS.Plural(en.runs, "%d run", "%d runs") or "")
         row:Show()
     end
     for i = #entries + 1, #menuRows do menuRows[i]:Hide() end
@@ -1112,16 +1114,16 @@ local function BuildControls(sbFrame)
         Tint(chev, P.ivory)
         if charMenu then return end
         GameTooltip:SetOwner(cb, "ANCHOR_BOTTOM")
-        GameTooltip:SetText("Characters")
-        GameTooltip:AddLine("Show stats for all your characters, or one of them.", 0.8, 0.8, 0.8, true)
+        GameTooltip:SetText(L["Characters"])
+        GameTooltip:AddLine(L["Show stats for all your characters, or one of them."], 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
     cb:HookScript("OnLeave", function() Tint(chev, P.ash); GameTooltip:Hide() end)
     cb:SetScript("OnClick", function() GameTooltip:Hide(); OpenCharMenu(cb) end)
     c.charBtn = cb
 
-    c.lootTab = TabButton(c, "Loot", "loot")
-    c.dunTab = TabButton(c, "Dungeons", "dungeons")
+    c.lootTab = TabButton(c, L["Loot"], "loot")
+    c.dunTab = TabButton(c, L["Dungeons"], "dungeons")
     c.dunTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
     c.Layout = function()
         c.lootTab:ClearAllPoints()
@@ -1169,30 +1171,30 @@ function UI.RefreshStats(force)
     -- Header controls
     controls:Show()
     controls.charBtn:SetShown(multiChar)
-    controls.charBtn.text:SetText(who == "all" and "All characters" or CharName(who))
+    UI.SetNameText(controls.charBtn.text, who == "all" and L["All characters"] or CharName(who))
     local items = MS:LootHistory()
-    controls.lootTab.SetLabel(#items > 0 and ("Loot  " .. CT(P.ash2, #items)) or "Loot")
+    controls.lootTab.SetLabel(#items > 0 and (L["Loot"] .. "  " .. CT(P.ash2, #items)) or L["Loot"])
     controls.dunTab.Refresh(); controls.lootTab.Refresh()
     controls.Layout()
     -- Only the character you're on can reset its own stats.
     overview.reset:SetShown(who == "all" or who == MS._charKey)
     local f = UI.frame
-    f.DungeonName:SetText("Your stats")
+    f.DungeonName:SetText(L["Your stats"])
     f.SetBadge(nil)
     f.PBLabel:Hide()
     if f.WholeRunBtn then f.WholeRunBtn:Hide() end
     if f.AbandonBtn then f.AbandonBtn:Hide() end
     f.LayoutAffixIcons(0)
     local parts = {
-        CT(P.ivory, stats.runs) .. (stats.runs == 1 and " run" or " runs"),
-        CT(P.ivory, stats.cleared) .. " cleared",
-        CT(P.ivory, Hours(stats.time)) .. " in dungeons",
-        CT(P.ivory, _fmt("%.1f", stats.deathsPerRun)) .. " deaths a run",
+        MS.Plural(stats.runs, "%d run", "%d runs", CT(P.ivory, stats.runs)),
+        _fmt(L["%s cleared"], CT(P.ivory, stats.cleared)),
+        _fmt(L["%s in dungeons"], CT(P.ivory, Hours(stats.time))),
+        _fmt(L["%s deaths a run"], CT(P.ivory, _fmt("%.1f", stats.deathsPerRun))),
     }
     if MS.Flavor.progressStats and (stats.progRuns or 0) > 0 then
-        parts[#parts + 1] = CT(P.ivory, MS.FormatThousands(stats.xp)) .. " XP"
-        parts[#parts + 1] = CT(P.ivory, MS.FormatThousands(stats.kills)) .. " kills"
-        parts[#parts + 1] = CT(P.ivory, stats.quests) .. " quests"
+        parts[#parts + 1] = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(stats.xp)))
+        parts[#parts + 1] = MS.Plural(stats.kills, "%d kill", "%d kills", CT(P.ivory, MS.FormatThousands(stats.kills)))
+        parts[#parts + 1] = MS.Plural(stats.quests, "%d quest", "%d quests", CT(P.ivory, stats.quests))
         parts[#parts + 1] = CT(P.bronzeHi, MS.FormatGold(stats.gold))
     end
     f.SublineRun = nil

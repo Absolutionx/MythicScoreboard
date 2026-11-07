@@ -10,6 +10,7 @@ local _rem    = table.remove
 local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Abbrev, Art, Btn, ClassColor, ClassHex, DN = UI.Abbrev, UI.Art, UI.Btn, UI.ClassColor, UI.ClassHex, UI.DN
@@ -38,6 +39,20 @@ local DEATH_Y   = TL.DEATH_Y
 local INT_BASE  = TL.INT_BASE
 local INT_MAXH  = TL.INT_MAXH
 local COMPACT_W = TL.COMPACT_W
+
+-- The completion line: 2px wide, with the same gap either side of it, between
+-- the last boss's block and the line, and between the line and the track's end.
+local END_LINE_W = 2
+local END_GAP    = 5
+
+-- Whether a finished run ends on a boss kill (the line then stands just past
+-- that boss's block instead of on its edge).
+local function EndsOnKill(r, t)
+    for _, b in ipairs(r.bosses or {}) do
+        if b.killTime and math.abs(b.killTime - t) < 2 then return true end
+    end
+    return false
+end
 
 local function GetTimelineDuration(r)
     if not r then return 1 end
@@ -71,25 +86,33 @@ local function GetTimelineDuration(r)
     if isMPlus and r.completed and MS:KnownTimeLimit(r) then
         dur = _max(dur, MS:KnownTimeLimit(r))
     end
-    -- A finished run that ends at the window's edge gets a little empty
-    -- track after it, so the completion line doesn't sit on the last boss.
+    -- A finished run that ends at the window's edge gets just enough empty
+    -- track after it for the completion line and its gaps, to the pixel.
     if r.completed then
-        local finish = 0
-        for _, b in ipairs(r.bosses or {}) do finish = _max(finish, b.killTime or 0) end
-        finish = _max(finish, MS:GetRunDuration(r))
-        local room = _max(10, finish * 0.012)
-        if dur - finish < room then dur = finish + room end
+        local lastKill = 0
+        for _, b in ipairs(r.bosses or {}) do lastKill = _max(lastKill, b.killTime or 0) end
+        local finish = _max(lastKill, MS:GetRunDuration(r))
+        if lastKill > 0 and finish - lastKill < 2 then finish = lastKill end   -- ended on the kill
+        local roomPx = EndsOnKill(r, finish) and (END_GAP + END_LINE_W + END_GAP)
+                                             or (END_LINE_W / 2 + END_GAP)
+        local W = TL_TRACKW
+        if finish > 0 and (dur - finish) / dur * W < roomPx + 1 then
+            dur = finish * W / (W - roomPx)
+        end
     end
     return dur
 end
 
 local function SegmentLabelFor(run, t)
     if not run.bosses then return nil end
+    local live = run == MS.currentRun and not run.completed
     for _, boss in ipairs(run.bosses) do
         local pullT = boss.pullTime or 0
-        local killT = boss.killTime or boss.wipeTime or (t + 1)
+        -- A fight with no end only runs on while the run does.
+        local killT = boss.killTime or boss.wipeTime or (live and (t + 1) or pullT)
         if t >= pullT and t <= killT then
-            return (boss.name or "Boss") .. ((boss.wipeTime and not boss.killTime) and " (wipe)" or "")
+            local tag = (boss.wipeTime and not boss.killTime) and (boss.reset and L["(reset)"] or L["(wipe)"])
+            return (boss.name or L["Boss"]) .. (tag and (" " .. tag) or "")
         end
     end
     return nil
@@ -99,21 +122,21 @@ local function ShowBossTooltip(owner, boss, run)
     local isWipe = boss.wipeTime and not boss.killTime
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     local tc = isWipe and P.bloodHi or P.bronzeHi
-    GameTooltip:SetText((boss.name or "Boss") .. (isWipe and "  (wipe)" or ""), tc[1], tc[2], tc[3])
+    GameTooltip:SetText((boss.name or L["Boss"]) .. (isWipe and ("  " .. (boss.reset and L["(reset)"] or L["(wipe)"])) or ""), tc[1], tc[2], tc[3])
 
     local pullT = boss.pullTime or 0
     local endT  = boss.killTime or boss.wipeTime
     GameTooltip:AddLine(" ")
     if endT then
-        GameTooltip:AddDoubleLine("Pulled", MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
-        GameTooltip:AddDoubleLine(isWipe and "Wiped" or "Killed", MS:FormatTime(endT), 0.8, 0.8, 0.8, 1, 1, 1)
-        GameTooltip:AddDoubleLine("Fight length", MS:FormatTime(endT - pullT), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Pulled"], MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(isWipe and (boss.reset and L["Reset"] or L["Wiped"]) or L["Killed"], MS:FormatTime(endT), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Fight length"], MS:FormatTime(endT - pullT), 0.8, 0.8, 0.8, 1, 1, 1)
     else
-        GameTooltip:AddDoubleLine("Pulled", MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(L["Pulled"], MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
         endT = MS:GetRunDuration(run)
     end
     if boss.pullProgressPct then
-        GameTooltip:AddDoubleLine("Enemy forces at pull", _fmt("%d%%", boss.pullProgressPct),
+        GameTooltip:AddDoubleLine(L["Enemy forces at pull"], _fmt("%d%%", boss.pullProgressPct),
             0.8, 0.8, 0.8, 1, 1, 1)
     end
 
@@ -130,12 +153,12 @@ local function ShowBossTooltip(owner, boss, run)
         _sort(deaths, function(a, b) return a.time < b.time end)
         GameTooltip:AddLine(" ")
         if #deaths == 0 then
-            GameTooltip:AddLine("No deaths", P.verdHi[1], P.verdHi[2], P.verdHi[3])
+            GameTooltip:AddLine(L["No deaths"], P.verdHi[1], P.verdHi[2], P.verdHi[3])
         else
-            GameTooltip:AddLine("Deaths: " .. #deaths, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+            GameTooltip:AddLine(_fmt(L["Deaths: %d"], #deaths), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
             for _, d in ipairs(deaths) do
                 local line = "  |cff" .. ClassHex(d.class) .. d.name .. "|r  " .. MS:FormatTime(d.time)
-                    .. "  |cff999999(" .. MS:FormatTime(d.time - pullT) .. " into the fight)|r"
+                    .. "  |cff999999(" .. _fmt(L["%s into the fight"], MS:FormatTime(d.time - pullT)) .. ")|r"
                 if d.spell ~= "Unknown" then line = line .. "  |cffff9944" .. d.spell .. "|r" end
                 GameTooltip:AddLine(line, 1, 1, 1)
             end
@@ -156,7 +179,7 @@ local function ShowBossTooltip(owner, boss, run)
         if total > 0 then
             _sort(byPlayer, function(a, b) return a.count > b.count end)
             GameTooltip:AddLine(" ")
-            GameTooltip:AddLine("Interrupts: " .. total, P.kick[1], P.kick[2], P.kick[3])
+            GameTooltip:AddLine(_fmt(L["Interrupts: %d"], total), P.kick[1], P.kick[2], P.kick[3])
             for _, ip in ipairs(byPlayer) do
                 GameTooltip:AddLine("  |cff" .. ClassHex(ip.class) .. ip.name .. "|r  " .. ip.count, 1, 1, 1)
             end
@@ -165,7 +188,7 @@ local function ShowBossTooltip(owner, boss, run)
     if boss.killTime or boss.wipeTime then
         local shown = UI.focus and UI.focus.boss == boss
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(shown and "Click to see the whole run again" or "Click to see this fight in the table",
+        GameTooltip:AddLine(shown and L["Click to see the whole run again"] or L["Click to see this fight in the table"],
             P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
     end
     GameTooltip:Show()
@@ -190,33 +213,33 @@ local function BuildTimelineChrome(strip)
 
     local title = Text(strip, "medium", 13, P.ivory)
     title:SetPoint("TOPLEFT", strip, "TOPLEFT", PAD_X, -10)
-    title:SetText("Run timeline")
+    title:SetText(L["Run timeline"])
     local live = Text(strip, "medium", 13, P.verd)
     live:SetPoint("LEFT", title, "RIGHT", 10, 0)
-    live:SetText("Live")
+    live:SetText(L["Live"])
     live:Hide()
     strip._liveTag = live
 
     -- Legend, laid out right to left.
     local items = {
-        { "Interrupts", function(f)
+        { L["Interrupts"], function(f)
             local hold = Solid(f, "ARTWORK", 0, 0, 0, 0, 0); hold:SetSize(14, 9)
             for i, h in ipairs({ 4, 9, 6 }) do
                 local b = Solid(f, "ARTWORK", 1, P.kick[1], P.kick[2], P.kick[3], 0.5 + h / 18)
                 b:SetSize(3, h); b:SetPoint("BOTTOMLEFT", hold, "BOTTOMLEFT", (i - 1) * 5, 0)
             end
             return hold end },
-        { "Death", function(f)
+        { L["Death"], function(f)
             local r = Art(f, "Diamond", "ARTWORK", 0); r:SetSize(12, 12); Tint(r, P.bronzeHi)
             local d = Art(f, "Diamond", "ARTWORK", 1); d:SetSize(8, 8); d:SetPoint("CENTER", r)
             Tint(d, { 0.62, 0.15, 0.13 })
             return r end },
-        { "Wipe", function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, WIPE_BOT, WIPE_TOP); return t end },
-        { "Trash", function(f)
+        { L["Wipe"], function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, WIPE_BOT, WIPE_TOP); return t end },
+        { L["Trash"], function(f)
             local b = Solid(f, "ARTWORK", 0, 0.16, 0.14, 0.12, 1); b:SetSize(16, 8)
             local h = Art(f, "Hatch", "ARTWORK", 1, true); h:SetAllPoints(b); h:SetVertexColor(0.225, 0.195, 0.165, 1)
             return b end },
-        { "Boss", function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, FIGHT_BOT, FIGHT_TOP); return t end },
+        { L["Boss"], function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, FIGHT_BOT, FIGHT_TOP); return t end },
     }
     local anchor, anchorPt, gap = strip, "TOPRIGHT", -20
     for _, it in ipairs(items) do
@@ -404,7 +427,9 @@ local function NewContext(strip, run, totalDur)
     -- wasn't cleared is finished too: drawn still, to where it ended.
     local live = not run.completed and run == MS.currentRun
 
-    local function X(t) return TL_L + _max(0, _min(1, t / totalDur)) * W end
+    -- Whole pixels, so block edges are crisp and gaps come out exact.
+    local function X(t) return _floor(TL_L + _max(0, _min(1, t / totalDur)) * W + 0.5) end
+    local endLineL          -- left edge of the completion line, once known
 
     local function At(region, point, x, y)
         region:SetPoint(point, cv, "BOTTOMLEFT", x, y)
@@ -480,6 +505,8 @@ local function NewContext(strip, run, totalDur)
         local small = Text(cv, "semibold", 10, belowCol, "CENTER")
         small:SetText(text)
         local cx, half = (X(t1) + X(t2)) / 2, small:GetStringWidth() / 2
+        -- Kept clear of the completion line just past the last boss.
+        if endLineL and cx + half > endLineL - 3 and X(t2) <= endLineL then cx = endLineL - 3 - half end
         if cx - half < belowRight + 4 then small:Hide(); return end
         belowRight = cx + half
         At(small, "CENTER", cx, TRACK_Y - 8)
@@ -515,10 +542,17 @@ local function NewContext(strip, run, totalDur)
                 if b.killTime and b.killTime > (compSec or 0) then compSec = b.killTime end
             end
             visualEnd = _max(runEnd or 0, compSec or 0)
+            -- Saved a moment after the last kill: the run ends on the kill.
+            if compSec and visualEnd - compSec < 2 then visualEnd = compSec end
             compSec = compSec or runEnd
         end
         if compSec and compSec <= 0 then compSec = nil end
         if visualEnd and visualEnd <= 0 then visualEnd = nil end
+        if compSec then
+            endLineL = EndsOnKill(run, compSec) and (X(compSec) + END_GAP)
+                                                 or (X(compSec) - END_LINE_W / 2)
+            endLineL = _min(endLineL, TL_L + W - END_LINE_W)
+        end
     elseif not live then
         local runEnd = MS:GetRunDuration(run)
         if runEnd and runEnd > 0 then visualEnd = runEnd end
@@ -528,7 +562,7 @@ local function NewContext(strip, run, totalDur)
         cv = cv, run = run, totalDur = totalDur, W = W, isMPlus = isMPlus, live = live, X = X, At = At,
         Solid = Solid, Art = Art, Tex = Tex, Mask = Mask, Text = Text, Btn = Btn,
         Seg = Seg, SegButton = SegButton, InBarText = InBarText, CountDeaths = CountDeaths, Weather = Weather,
-        keyLimit = keyLimit, compSec = compSec, visualEnd = visualEnd, clampT = clampT,
+        keyLimit = keyLimit, compSec = compSec, visualEnd = visualEnd, clampT = clampT, endLineL = endLineL,
     }
 end
 
@@ -622,14 +656,15 @@ local function PlaceMedallions(c)
             if clampT then pullT = _min(pullT, clampT); endT = _min(endT, clampT) end
             local isWipe = boss.wipeTime and not boss.killTime
             local name = Text(cv, "game", 13, isWipe and P.bloodHi or P.ivory)
-            name:SetText(boss.name or "Boss")
+            name:SetText(boss.name or L["Boss"])
             local sub = Text(cv, "regular", 12, P.ash)
-            if isWipe then sub:SetText("Wipe at " .. MS:FormatTime(endT))
+            if isWipe then sub:SetText(_fmt(boss.reset and L["Reset at %s"] or L["Wipe at %s"], MS:FormatTime(endT)))
             elseif boss.killTime then
                 local w = wipesBefore[bi]
-                sub:SetText("Killed at " .. MS:FormatTime(endT)
-                    .. (w and (" after " .. w .. (w == 1 and " wipe" or " wipes")) or ""))
-            else sub:SetText("In combat") end
+                sub:SetText(w and _fmt(L["Killed at %s after %s"], MS:FormatTime(endT), MS.Plural(w, "%d wipe", "%d wipes"))
+                    or _fmt(L["Killed at %s"], MS:FormatTime(endT)))
+            elseif c.live then sub:SetText(L["In combat"])
+            else sub:SetText(L["No result"]) end                   -- saved before fights were closed
             medInfo[bi] = { mx = (X(pullT) + X(endT)) / 2, name = name, sub = sub,
                             lblW = _max(name:GetStringWidth(), sub:GetStringWidth()) }
             if boss.killTime and boss.killTime > lastKillT then lastKillBi, lastKillT = bi, boss.killTime end
@@ -797,11 +832,11 @@ local function DrawBosses(c)
             local pct = boss.pullProgressPct
             SegButton(tStart, pullT, function(self2)
                 GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-                GameTooltip:SetText("Trash", P.ivory[1], P.ivory[2], P.ivory[3])
-                GameTooltip:AddDoubleLine("Duration", MS:FormatTime(pullT - tStart), 0.8, 0.8, 0.8, 1, 1, 1)
-                if pct then GameTooltip:AddDoubleLine("Enemy forces at pull", _fmt("%d%%", pct), 0.8, 0.8, 0.8, 1, 1, 1) end
+                GameTooltip:SetText(L["Trash"], P.ivory[1], P.ivory[2], P.ivory[3])
+                GameTooltip:AddDoubleLine(L["Duration"], MS:FormatTime(pullT - tStart), 0.8, 0.8, 0.8, 1, 1, 1)
+                if pct then GameTooltip:AddDoubleLine(L["Enemy forces at pull"], _fmt("%d%%", pct), 0.8, 0.8, 0.8, 1, 1, 1) end
                 local d = CountDeaths(tStart, pullT)
-                if d > 0 then GameTooltip:AddDoubleLine("Deaths", d, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
+                if d > 0 then GameTooltip:AddDoubleLine(L["Deaths"], d, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
                 GameTooltip:Show()
             end)
             local trashTxt = MS:FormatTime(pullT - tStart)
@@ -867,15 +902,15 @@ local function DrawTail(c, prevT, liveKind)
             InBarText(tStart, visualEnd, txt, {0.62, 0.57, 0.50})
             SegButton(tStart, visualEnd, function(self2)
                 GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-                GameTooltip:SetText("Trash", P.ivory[1], P.ivory[2], P.ivory[3])
-                GameTooltip:AddDoubleLine("Duration", MS:FormatTime(visualEnd - tStart), 0.8, 0.8, 0.8, 1, 1, 1)
+                GameTooltip:SetText(L["Trash"], P.ivory[1], P.ivory[2], P.ivory[3])
+                GameTooltip:AddDoubleLine(L["Duration"], MS:FormatTime(visualEnd - tStart), 0.8, 0.8, 0.8, 1, 1, 1)
                 GameTooltip:Show()
             end)
         end
         if isMPlus and keyLimit then
             if run.inTime and keyLimit > visualEnd then
                 Seg(visualEnd, keyLimit, "spare")
-                InBarText(visualEnd, keyLimit, MS:FormatTime(keyLimit - visualEnd) .. " spare", P.verdHi)
+                InBarText(visualEnd, keyLimit, _fmt(L["%s spare"], MS:FormatTime(keyLimit - visualEnd)), P.verdHi)
             elseif not run.inTime and visualEnd > keyLimit then
                 Seg(keyLimit, visualEnd, "over")
             end
@@ -920,21 +955,21 @@ local function DrawKeyTimer(c)
         kb:SetFrameLevel(cv:GetFrameLevel() + 5)
         kb:SetScript("OnEnter", function(self2)
             GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-            GameTooltip:SetText("Key timer", P.ivory[1], P.ivory[2], P.ivory[3])
+            GameTooltip:SetText(L["Key timer"], P.ivory[1], P.ivory[2], P.ivory[3])
             GameTooltip:AddLine(MS:FormatTime(keyLimit), 1, 1, 1)
             local penalty = run.deathPenaltySeconds or 0
             if penalty > 0 then
                 local deaths = 0
                 for _, p in pairs(run.players or {}) do deaths = deaths + (p.deaths or 0) end
-                GameTooltip:AddLine(_fmt("-%s score penalty (%d death%s)", MS:FormatTime(penalty),
-                    deaths, deaths == 1 and "" or "s"), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                GameTooltip:AddLine(_fmt(L["-%s time penalty (%s)"], MS:FormatTime(penalty),
+                    MS.Plural(deaths, "%d death", "%d deaths")), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
             end
             if runDur > 0 then
                 local diff = _abs(runDur - keyLimit)
                 if inTime then
-                    GameTooltip:AddLine("In time by " .. MS:FormatTime(diff), P.verdHi[1], P.verdHi[2], P.verdHi[3])
+                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(diff)), P.verdHi[1], P.verdHi[2], P.verdHi[3])
                 else
-                    GameTooltip:AddLine("Over by " .. MS:FormatTime(diff), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                    GameTooltip:AddLine(_fmt(L["Over by %s"], MS:FormatTime(diff)), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
                 end
             end
             GameTooltip:Show()
@@ -949,26 +984,17 @@ local function DrawCompletion(c)
     local cv, run, W, isMPlus, X, At = c.cv, c.run, c.W, c.isMPlus, c.X, c.At
     local Solid, Art, Text, Btn, keyLimit, compSec = c.Solid, c.Art, c.Text, c.Btn, c.keyLimit, c.compSec
     if compSec then
-        local fx = X(compSec)
-        -- Finished on a boss kill: stand just clear of that boss's block
-        -- (and the fight length under it) rather than on its edge.
-        for _, b in ipairs(run.bosses or {}) do
-            if b.killTime and math.abs(b.killTime - compSec) < 2 then
-                -- A narrow block's fight length sticks out past it (about
-                -- 13px either side of its middle): clear that too.
-                local half = (X(b.killTime) - X(b.pullTime or b.killTime)) / 2
-                fx = _min(fx + _max(6, 16 - half), TL_L + W - 1)
-                break
-            end
-        end
+        -- Finished on a boss kill: END_GAP past that boss's block (NewContext).
+        local lineL = c.endLineL
+        local fx = lineL + END_LINE_W / 2               -- the line's middle
         local fc = (isMPlus and not run.inTime) and P.avoid or P.verd
 
         local line = Solid(cv, "OVERLAY", 1, fc[1], fc[2], fc[3], 1)
-        line:SetSize(2, TRACK_Y + TRACK_H + 4 - 22)
-        At(line, "BOTTOMLEFT", _floor(fx) - 1, 22)
+        line:SetSize(END_LINE_W, TRACK_Y + TRACK_H + 4 - 22)
+        At(line, "BOTTOMLEFT", lineL, 22)
         local cap = Art(cv, "Diamond", "OVERLAY", 2)
         cap:SetSize(10, 10); Tint(cap, fc)
-        At(cap, "CENTER", _floor(fx), TRACK_Y + TRACK_H + 4)
+        At(cap, "CENTER", fx, TRACK_Y + TRACK_H + 4)
         local glow = Art(cv, "Glow", "BACKGROUND", 6)
         glow:SetBlendMode("ADD"); glow:SetSize(26, 60); Tint(glow, fc, 0.35)
         At(glow, "CENTER", fx, TRACK_Y + TRACK_H / 2)
@@ -985,13 +1011,13 @@ local function DrawCompletion(c)
         fb:SetFrameLevel(cv:GetFrameLevel() + 6)
         fb:SetScript("OnEnter", function(self2)
             GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-            GameTooltip:SetText("Run completed", fc[1], fc[2], fc[3])
+            GameTooltip:SetText(L["Run completed"], fc[1], fc[2], fc[3])
             GameTooltip:AddLine(MS:FormatTime(compSec), 1, 1, 1)
             if keyLimit and keyLimit > compSec then
-                GameTooltip:AddLine("Under the timer by " .. MS:FormatTime(keyLimit - compSec),
+                GameTooltip:AddLine(_fmt(L["Under the timer by %s"], MS:FormatTime(keyLimit - compSec)),
                     P.verdHi[1], P.verdHi[2], P.verdHi[3])
             elseif keyLimit then
-                GameTooltip:AddLine("Over the timer by " .. MS:FormatTime(compSec - keyLimit),
+                GameTooltip:AddLine(_fmt(L["Over the timer by %s"], MS:FormatTime(compSec - keyLimit)),
                     P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
             end
             GameTooltip:Show()
@@ -1034,19 +1060,21 @@ local function DrawDeaths(c)
         local events = d.events
         local kill = MS.KillingBlow(events)
         if kill then
-            local line = "    |cffaaaaaaKilling blow:|r |cffff9944" .. (kill.spellName or "Unknown") .. "|r"
+            local spell = "|cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r"
+            local line = "    |cffaaaaaa" .. L["Killing blow:"] .. "|r " .. spell
             if kill.caster and kill.caster ~= "" then
-                line = line .. " |cff888888by|r |cffffd700" .. kill.caster .. "|r"
+                line = "    |cffaaaaaa" .. L["Killing blow:"] .. "|r "
+                    .. _fmt(L["%s |cff888888by|r %s"], spell, "|cffffd700" .. kill.caster .. "|r")
             end
             GameTooltip:AddLine(line, 1, 1, 1)
             for _, ev in ipairs(events) do
                 local hit = "      |cff777777" .. (ev.spellName or "?") .. "|r"
                 if ev.amount and ev.amount ~= 0 then hit = hit .. "  |cffff6666" .. Abbrev(-(ev.amount)) .. "|r" end
-                if ev.overkill and ev.overkill > 0 then hit = hit .. " |cffff0000(killing blow)|r" end
+                if ev.overkill and ev.overkill > 0 then hit = hit .. " |cffff0000(" .. L["killing blow"] .. ")|r" end
                 GameTooltip:AddLine(hit, 1, 1, 1)
             end
         elseif d.killer ~= "Unknown" then
-            local line = "    |cffaaaaaaKilled by|r |cffff9944" .. d.killer .. "|r"
+            local line = "    |cffaaaaaa" .. L["Killed by"] .. "|r |cffff9944" .. d.killer .. "|r"
             if d.spell ~= "Unknown" then line = line .. " |cff888888(" .. d.spell .. ")|r" end
             GameTooltip:AddLine(line, 1, 1, 1)
         end
@@ -1097,12 +1125,12 @@ local function DrawDeaths(c)
             GameTooltip:SetOwner(self2, "ANCHOR_TOP")
             if #list == 1 then
                 local r, gg, b = ClassColor(list[1].playerClass)
-                GameTooltip:SetText(list[1].playerName .. " died", r, gg, b)
+                GameTooltip:SetText(_fmt(L["%s died"], list[1].playerName), r, gg, b)
             else
-                GameTooltip:SetText(#list .. " deaths", P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                GameTooltip:SetText(MS.Plural(#list, "%d death", "%d deaths"), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
             end
             local seg = SegmentLabelFor(run, list[1].rawTime)
-            if seg then GameTooltip:AddLine("During " .. seg, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
+            if seg then GameTooltip:AddLine(_fmt(L["During %s"], seg), P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
             GameTooltip:AddLine(" ")
             for _, d in ipairs(list) do
                 GameTooltip:AddDoubleLine("|cff" .. ClassHex(d.playerClass) .. d.playerName .. "|r",
@@ -1160,10 +1188,10 @@ local function DrawInterrupts(c)
                 local t2 = (x + BUCKET_PX - TL_L) / W * totalDur
                 hb:SetScript("OnEnter", function(self2)
                     GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-                    GameTooltip:SetText("Interrupts: " .. b.n, P.kick[1], P.kick[2], P.kick[3])
-                    GameTooltip:AddLine(MS:FormatTime(t1) .. " to " .. MS:FormatTime(t2), 0.8, 0.8, 0.8)
+                    GameTooltip:SetText(_fmt(L["Interrupts: %d"], b.n), P.kick[1], P.kick[2], P.kick[3])
+                    GameTooltip:AddLine(_fmt(L["%s to %s"], MS:FormatTime(t1), MS:FormatTime(t2)), 0.8, 0.8, 0.8)
                     local seg = SegmentLabelFor(run, (t1 + t2) / 2)
-                    if seg then GameTooltip:AddLine("During " .. seg, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
+                    if seg then GameTooltip:AddLine(_fmt(L["During %s"], seg), P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
                     GameTooltip:AddLine(" ")
                     local rows = {}
                     for name, w in pairs(b.who) do _ins(rows, { name = name, n = w.n, class = w.class }) end

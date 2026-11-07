@@ -21,6 +21,8 @@
 
 local _max = math.max
 local MS = _G["MythicScoreboard"]
+local L = MS.L
+local _fmt = string.format
 
 local MYTHIC_PLUS = MS.MYTHIC_PLUS
 local PAUSE_LIMIT = 30 * 60      -- a paused run closes after this many seconds
@@ -28,6 +30,7 @@ local PAUSE_LIMIT = 30 * 60      -- a paused run closes after this many seconds
 local function Say(msg) print("|cff00ccff[MythicScoreboard]|r " .. msg) end
 
 -- ── Difficulties ───────────────────────────────────────────────────────────
+-- Stored in English and translated where shown (UI_Theme DiffShort).
 local DIFF_LABEL = {
     [1]="Normal",      [2]="Heroic",    [23]="Mythic",
     [8]="Mythic Keystone",
@@ -285,8 +288,8 @@ function MS:BeginRun()
     -- A paused run elsewhere is saved first (a key started while it waited).
     if self:RunState() == "paused" then self:ClosePausedRun() end
     self:StartRun(name, level, diff, self:DifficultyLabel(diff))
-    Say("Run started: " .. (level > 0 and (name .. " +" .. level)
-                                      or (name .. " [" .. self:DifficultyLabel(diff) .. "]")))
+    if level > 0 then Say(_fmt(L["Run started: %s +%d"], name, level))
+    else Say(_fmt(L["Run started: %s [%s]"], name, L[self:DifficultyLabel(diff)])) end
 end
 
 -- active or paused -> none: save the run to history, applying the clear rules.
@@ -308,8 +311,8 @@ function MS:PauseRun()
     self:SnapshotFromDamageMeter()          -- last numbers from inside
     self:SetRunState("paused")
     self:SaveCurrentRun()
-    Say("Run paused. Return to " .. (run.dungeonName or "the dungeon")
-        .. " within " .. (PAUSE_LIMIT / 60) .. " minutes to continue it.")
+    Say(_fmt(L["Run paused. Return to %s within %d minutes to continue it."],
+        run.dungeonName or L["the dungeon"], PAUSE_LIMIT / 60))
 end
 
 -- paused -> active
@@ -319,7 +322,7 @@ function MS:ResumeRun()
     self:SetRunState("active")
     self:WarmPetCache(1.0)
     self:SaveCurrentRun()
-    Say("Run resumed: " .. (run.dungeonName or ""))
+    Say(_fmt(L["Run resumed: %s"], run.dungeonName or ""))
     if self.RefreshOverview then self:RefreshOverview() end
 end
 
@@ -340,7 +343,7 @@ function MS:AbandonRun()
     run.abandoned = true
     if self.inDungeon then self._abandonedIn = run.dungeonName end
     self:CommitRun({ completed = false, inTime = false })
-    Say("Run abandoned: " .. (run.dungeonName or ""))
+    Say(_fmt(L["Run abandoned: %s"], run.dungeonName or ""))
     return true
 end
 

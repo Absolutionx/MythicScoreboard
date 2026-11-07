@@ -7,6 +7,7 @@
 local _fmt, _ins, _rem = string.format, table.insert, table.remove
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 local function Runs() return MythicScoreboardDB and MythicScoreboardDB.runs end
 
@@ -84,10 +85,10 @@ function MS:_AnnouncePB(run, before)
     local dur = self:GetRunDuration(run)
     local timeStr = self:FormatTime(dur)
     if not before then
-        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** First recorded clear!|r %s +%d -- %s",
+        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** " .. L["First recorded clear!"] .. "|r %s +%d -- %s",
             run.dungeonName, run.keystoneLevel, timeStr))
     elseif dur < before then
-        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** New personal best!|r %s +%d -- %s |cff888888(-%s)|r",
+        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** " .. L["New personal best!"] .. "|r %s +%d -- %s |cff888888(-%s)|r",
             run.dungeonName, run.keystoneLevel, timeStr, self:FormatTime(before - dur)))
     end
 end

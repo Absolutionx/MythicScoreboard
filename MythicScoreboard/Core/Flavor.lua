@@ -5,6 +5,8 @@
 -- about a trait (MS.Flavor.twoPartNames), never which client it's on.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
+local LK = MS.LK      -- a label kept in English, translated where it is shown
 
 MS.Flavor = {
     name          = "retail",
@@ -29,12 +31,12 @@ MS.FLAVOR = MS.Flavor.name
 
 -- Which difficulties can be tracked, grouped as Settings shows them.
 MS.DIFF_GROUPS = {
-    { key="mythicplus",  label="Mythic+",     ids={8},           default=true  },
-    { key="mythic",      label="Mythic",      ids={23},          default=false },
-    { key="heroic",      label="Heroic",      ids={2},           default=false },
-    { key="normal",      label="Normal",      ids={1},           default=false },
-    { key="timewalking", label="Timewalking", ids={24,33},       default=false },
-    { key="follower",    label="Follower",    ids={205,207,208}, default=false },
+    { key="mythicplus",  label=LK("Mythic+"),     ids={8},           default=true  },
+    { key="mythic",      label=LK("Mythic"),      ids={23},          default=false },
+    { key="heroic",      label=LK("Heroic"),      ids={2},           default=false },
+    { key="normal",      label=LK("Normal"),      ids={1},           default=false },
+    { key="timewalking", label=LK("Timewalking"), ids={24,33},       default=false },
+    { key="follower",    label=LK("Follower"),    ids={205,207,208}, default=false },
 }
 
 -- When a dungeon counts as cleared, if there's a choice (nil: the boss count).

@@ -5,6 +5,7 @@
 -- (SetFormattedText, AddDoubleLine); wrap in pcall to swallow nil on bosses.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 -- No Mythic+ (WoW Forever): nothing to show, so no tooltip hook or events.
 if not MS.Flavor.mythicPlus then return end
@@ -35,7 +36,7 @@ local function AddForcesToTooltip(tooltip, tooltipData)
         C_ScenarioInfo.GetUnitCriteriaProgressValues("mouseover")
 
     tooltip:AddLine(" ")
-    tooltip:AddDoubleLine("Enemy Forces", " ", 0.67, 0.67, 0.67, 0.00, 0.78, 1.00)
+    tooltip:AddDoubleLine(L["Enemy Forces"], " ", 0.67, 0.67, 0.67, 0.00, 0.78, 1.00)
 
     local n = tooltip:NumLines()
     local rightFS = _G["GameTooltipTextRight" .. n]

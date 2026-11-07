@@ -18,6 +18,7 @@
 -- reading again from where you are, so time outside never counts.
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 if not MS.Flavor.progressStats then return end
 
 local _issecret = issecretvalue
@@ -134,6 +135,7 @@ local function OnXPLine(text)
     for _, p in ipairs(KILL_PATTERNS) do
         local mob = text:match(p)
         if mob and mob ~= "" then
+            MS:NoteMobDied(mob)
             Progress(run).kills = Progress(run).kills + 1
             Changed(run)
             return
@@ -207,7 +209,7 @@ local function NoteQuest(run, id, title)
     p.questIDs = p.questIDs or {}
     if p.questIDs[id] then return false end
     p.questIDs[id] = true
-    p.quests[#p.quests + 1] = title or ("Quest " .. tostring(id))
+    p.quests[#p.quests + 1] = title or L["Quest %s"]:format(tostring(id))
     return true
 end
 
@@ -277,17 +279,27 @@ end)
 
 -- ── Shown as ───────────────────────────────────────────────────────────────
 -- "4g 12s 30c" (copper), largest parts only.
+-- The coin letters and the thousands separator are the game's own, so they
+-- match the client's language ("g" / "G" / "з" ...; "," / ".").
+local function GameString(name, default)
+    local v = rawget(_G, name)
+    return (type(v) == "string" and v ~= "") and v or default
+end
+
 function MS.FormatGold(copper)
     copper = math.floor(copper or 0)
+    local G, S, C = GameString("GOLD_AMOUNT_SYMBOL", "g"), GameString("SILVER_AMOUNT_SYMBOL", "s"),
+                    GameString("COPPER_AMOUNT_SYMBOL", "c")
     local g, s, c = math.floor(copper / 10000), math.floor(copper % 10000 / 100), copper % 100
-    if g > 0 then return g .. "g" .. (s > 0 and (" " .. s .. "s") or "") end
-    if s > 0 then return s .. "s" .. (c > 0 and (" " .. c .. "c") or "") end
-    return c .. "c"
+    if g > 0 then return MS.FormatThousands(g) .. G .. (s > 0 and (" " .. s .. S) or "") end
+    if s > 0 then return s .. S .. (c > 0 and (" " .. c .. C) or "") end
+    return c .. C
 end
 
 -- 12400 -> "12,400".
 function MS.FormatThousands(n)
     local s = tostring(math.floor(n or 0))
-    local out = s:reverse():gsub("(%d%d%d)", "%1,"):reverse()
-    return (out:gsub("^,", ""))
+    local sep = GameString("LARGE_NUMBER_SEPARATOR", ",")
+    local out = s:reverse():gsub("(%d%d%d)", "%1\1"):reverse()
+    return (out:gsub("^\1", ""):gsub("\1", function() return sep end))
 end
