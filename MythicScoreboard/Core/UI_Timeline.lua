@@ -52,21 +52,8 @@ local function GetTimelineDuration(r)
         dur = _ceil(_max(e + 180, e * 1.2, 600) / 300) * 300
     elseif tonumber(r.keystoneTimeLimit) and r.keystoneTimeLimit > 0 then
         dur = r.keystoneTimeLimit
-    elseif MS.DUNGEON_TIMERS and r.dungeonName and MS.DUNGEON_TIMERS[r.dungeonName] then
-        dur = MS.DUNGEON_TIMERS[r.dungeonName]
-    else
-        if C_ChallengeMode and C_ChallengeMode.GetDeadlineExpiration then
-            local expTime = C_ChallengeMode.GetDeadlineExpiration()
-            if expTime and expTime > 0 then
-                local limit = expTime - r.startTime
-                if limit > 10 and limit < 7200 then dur = limit end
-            end
-        end
-        if dur <= 0 and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
-            local _, _, timeLimit = C_ChallengeMode.GetActiveKeystoneInfo()
-            local tl = tonumber(timeLimit)
-            if tl and tl > 10 and tl < 7200 then dur = tl end
-        end
+    elseif MS:KnownTimeLimit(r) then
+        dur = MS:KnownTimeLimit(r)
     end
     if dur <= 0 then dur = _max(1, MS:GetRunDuration(r)) end
     if isMPlus and not r.completed then
@@ -81,9 +68,8 @@ local function GetTimelineDuration(r)
     if tonumber(r.keystoneTimeLimit) and r.keystoneTimeLimit > 0 then
         dur = _max(dur, r.keystoneTimeLimit)
     end
-    if isMPlus and r.completed and MS.DUNGEON_TIMERS and r.dungeonName
-            and MS.DUNGEON_TIMERS[r.dungeonName] then
-        dur = _max(dur, MS.DUNGEON_TIMERS[r.dungeonName])
+    if isMPlus and r.completed and MS:KnownTimeLimit(r) then
+        dur = _max(dur, MS:KnownTimeLimit(r))
     end
     -- A finished run that ends at the window's edge gets a little empty
     -- track after it, so the completion line doesn't sit on the last boss.
@@ -95,16 +81,6 @@ local function GetTimelineDuration(r)
         if dur - finish < room then dur = finish + room end
     end
     return dur
-end
-
-local function BossIcon(boss)
-    if boss.icon then return boss.icon end
-    local cache = MythicScoreboardDB and MythicScoreboardDB.bossIcons
-    if not cache then return nil end
-    local id = boss.dungeonEncounterId
-    if id and cache[id] then return cache[id] end
-    if boss.name and cache["n:" .. boss.name] then return cache["n:" .. boss.name] end
-    return nil
 end
 
 local function SegmentLabelFor(run, t)
@@ -263,28 +239,64 @@ end
 -- it is (kind, art, layer, font), handed out again on the next redraw with
 -- everything a previous use may have changed put back, and whatever isn't
 -- needed this time is hidden.
+--
+-- A redraw costs one call into the game per change, so the pool does as few
+-- as it can: a piece is hidden only when this redraw didn't use it, and a
+-- texture remembers which of its settings were changed (alpha, colour,
+-- blend, desaturation, tex coords) so only those are put back. Whether a
+-- piece is shown, and its parent, are always set again on reuse: drawing
+-- code changes both directly (a compact label hides its second line).
 local function NewPools() return { byKey = {} } end
 
 local function StartPools(pools)
+    for _, list in pairs(pools.byKey) do list.n = 0 end
+end
+
+-- After the steps: what this redraw didn't use is hidden.
+local function FinishPools(pools)
     for _, list in pairs(pools.byKey) do
-        for i = 1, #list do list[i]:Hide() end
-        list.n = 0
+        for i = list.n + 1, #list do
+            local obj = list[i]
+            if not obj._msOff then obj:Hide(); obj._msOff = true end
+        end
     end
+end
+
+local TRACKED = {
+    SetAlpha       = { 1 },
+    SetVertexColor = { 1, 1, 1, 1 },
+    SetBlendMode   = { "BLEND" },
+    SetDesaturated = { false },
+    SetTexCoord    = { 0, 1, 0, 1 },
+}
+-- Each tracked setter notes that it was used, then does its job.
+local function Track(t)
+    if t._msOrig then return t end
+    t._msOrig, t._msDirty = {}, {}
+    for name in pairs(TRACKED) do
+        local orig = t[name]
+        if orig then
+            t._msOrig[name] = orig
+            t[name] = function(self, ...) self._msDirty[name] = true; return orig(self, ...) end
+        end
+    end
+    return t
 end
 
 local function ResetTexture(t, raw)
     t:ClearAllPoints()
-    t:SetAlpha(1)
-    t:SetVertexColor(1, 1, 1, 1)
-    t:SetBlendMode("BLEND")
-    t:SetDesaturated(false)
+    local dirty, orig = t._msDirty, t._msOrig
+    for name, d in pairs(TRACKED) do
+        -- (a tiled texture keeps its tex coords; they're its tiling)
+        if dirty[name] and not (name == "SetTexCoord" and t._tilePx and not raw) then
+            orig[name](t, unpack(d))
+            dirty[name] = nil
+        end
+    end
     if raw then
         t:SetTexture(nil)
-        t:SetTexCoord(0, 1, 0, 1)
         local n = t.GetNumMaskTextures and t:GetNumMaskTextures() or 0
         for i = n, 1, -1 do t:RemoveMaskTexture(t:GetMaskTexture(i)) end
-    elseif not t._tilePx then
-        t:SetTexCoord(0, 1, 0, 1)
     end
 end
 
@@ -296,14 +308,17 @@ local function Take(pools, key, parent)
     local obj = list[i]
     if not obj then return nil, list end
     list.n = i
+    -- Asked of the game each time, not remembered: the drawing code hides
+    -- labels and moves them onto their medallion itself.
     if obj:GetParent() ~= parent then obj:SetParent(parent) end
-    obj:Show()
+    obj:Show(); obj._msOff = nil
     return obj, list
 end
 
-local function Keep(list, obj)
+local function Keep(list, obj, parent)
     list.n = list.n + 1
     list[list.n] = obj
+    if obj.SetTexCoord and obj.SetVertexColor then Track(obj) end   -- textures
     return obj
 end
 
@@ -332,7 +347,7 @@ local function NewContext(strip, run, totalDur)
     local function Solid(parent, layer, sub, r, g, b, a)
         local key = "S" .. (layer or "") .. (sub or 0)
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, Solid0(parent, layer, sub, r, g, b, a)) end
+        if not t then return Keep(list, Solid0(parent, layer, sub, r, g, b, a), parent) end
         ResetTexture(t)
         t:SetColorTexture(r, g, b, a or 1)
         return t
@@ -340,27 +355,27 @@ local function NewContext(strip, run, totalDur)
     local function Art(parent, file, layer, sub, tile)
         local key = "A" .. file .. (layer or "") .. (sub or 0) .. (tile and "t" or "")
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, Art0(parent, file, layer, sub, tile)) end
+        if not t then return Keep(list, Art0(parent, file, layer, sub, tile), parent) end
         ResetTexture(t)
         return t
     end
     local function Tex(parent, layer, sub)
         local key = "T" .. (layer or "") .. (sub or 0)
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, parent:CreateTexture(nil, layer, nil, sub)) end
+        if not t then return Keep(list, parent:CreateTexture(nil, layer, nil, sub), parent) end
         ResetTexture(t, true)
         return t
     end
     local function Mask(parent)
         local m, list = Take(pools, "M", parent)
-        if not m then return Keep(list, parent:CreateMaskTexture()) end
+        if not m then return Keep(list, parent:CreateMaskTexture(), parent) end
         m:ClearAllPoints()
         return m
     end
     local function Text(parent, kind, size, col, justify)
         local key = "F" .. kind .. size
         local fs, list = Take(pools, key, parent)
-        if not fs then return Keep(list, Text0(parent, kind, size, col, justify)) end
+        if not fs then return Keep(list, Text0(parent, kind, size, col, justify), parent) end
         fs:ClearAllPoints()
         col = col or P.ivory
         fs:SetTextColor(col[1], col[2], col[3], col[4] or 1)
@@ -373,7 +388,7 @@ local function NewContext(strip, run, totalDur)
     end
     local function Btn(parent)
         local b, list = Take(pools, "B", parent)
-        if not b then return Keep(list, Btn0(parent)) end
+        if not b then return Keep(list, Btn0(parent), parent) end
         b:ClearAllPoints()
         b:SetAlpha(1)
         b:SetScript("OnEnter", nil); b:SetScript("OnLeave", nil); b:SetScript("OnClick", nil)
@@ -517,16 +532,11 @@ local function NewContext(strip, run, totalDur)
     }
 end
 
--- Every step starts with the same names, as they were when this was one function.
-local function Unpack(c)
-    return c.cv, c.run, c.totalDur, c.W, c.isMPlus, c.live, c.X, c.At, c.Solid, c.Art, c.Tex, c.Mask, c.Text, c.Btn,
-        c.Seg, c.SegButton, c.InBarText, c.CountDeaths, c.Weather, c.keyLimit, c.compSec, c.visualEnd, c.clampT
-end
+-- Each step takes what it needs from the context.
 
 -- ── Track base ─────────────────────────────────────────────────────────────
 local function DrawTrack(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, W, At, Solid, Art, Tex = c.cv, c.W, c.At, c.Solid, c.Art, c.Tex
     local trackBorder = Solid(cv, "BACKGROUND", 3, 0.04, 0.03, 0.03, 1)
     trackBorder:SetSize(W + 2, TRACK_H + 2); At(trackBorder, "BOTTOMLEFT", TL_L - 1, TRACK_Y - 1)
     local trackFill = Solid(cv, "BACKGROUND", 4, 0.09, 0.075, 0.06, 1)
@@ -547,8 +557,8 @@ end
 -- ── Axis ───────────────────────────────────────────────────────────────────
 -- Labels near the completion time are dropped (it's printed there).
 local function DrawAxis(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, totalDur, W, X, At, Solid = c.cv, c.totalDur, c.W, c.X, c.At, c.Solid
+    local Text, compSec = c.Text, c.compSec
     local skipX = compSec and X(compSec)
     local function clear(x) return not skipX or _abs(x - skipX) > 38 end
     local tickInterval
@@ -582,8 +592,7 @@ end
 -- Returns which bosses get no medallion of their own (wipes before a later
 -- kill) and, for the rest, their labels and placement.
 local function PlaceMedallions(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, X, Text, clampT = c.cv, c.run, c.X, c.Text, c.clampT
     -- A wipe followed later by a kill of the same boss shows only as its red
     -- segment; the kill's label mentions the wipes. Keeps retries from
     -- crowding the medallion rows.
@@ -655,8 +664,8 @@ end
 
 -- One boss's medallion: stem, portrait, ring, label, and its handlers.
 local function DrawMedallion(c, boss, info, pullT, endT, isWipe)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, X, At, Solid, Art = c.cv, c.run, c.X, c.At, c.Solid, c.Art
+    local Tex, Mask, Btn = c.Tex, c.Mask, c.Btn
     local mx    = (X(pullT) + X(endT)) / 2
     local ringC = isWipe and P.blood or P.bronzeHi
 
@@ -705,23 +714,16 @@ local function DrawMedallion(c, boss, info, pullT, endT, isWipe)
         portrait:AddMaskTexture(mask)
         if isWipe then portrait:SetDesaturated(true); portrait:SetVertexColor(0.9, 0.6, 0.6) end
     end
-    local icon = BossIcon(boss)
-    local artKind, art
-    if not icon and MS.LearnedBossDisplay then
-        local aliases = MS.ForeverBossAliases and MS:ForeverBossAliases(boss, run)
-        local learned = MS:LearnedBossDisplay(boss, aliases)
-        if learned then artKind, art = "display", learned end
-    end
-    if not icon and not artKind and MS.ForeverBossArt then artKind, art = MS:ForeverBossArt(boss, run) end
+    local kind, art = MS:BossPortrait(boss, run)       -- Portraits.lua
     local drawn = false
-    if icon then
-        portrait:SetTexture(icon)
+    if kind == "icon" then
+        portrait:SetTexture(art)
         portrait:SetTexCoord(0.25, 0.75, 0.0, 1.0)
         Circle(); drawn = true
-    elseif artKind == "display" and SetPortraitTextureFromCreatureDisplayID then
+    elseif kind == "display" and SetPortraitTextureFromCreatureDisplayID then
         drawn = pcall(SetPortraitTextureFromCreatureDisplayID, portrait, art)
         if drawn then Circle() end
-    elseif artKind == "file" then
+    elseif kind == "file" then
         portrait:SetTexture(art)
         portrait:SetTexCoord(0.08, 0.92, 0.08, 0.92)
         Circle(); drawn = true
@@ -771,8 +773,8 @@ end
 -- ── Segments + medallions ─────────────────────────────────────────────────
 -- Returns where the drawn track ends and what is still going on there.
 local function DrawBosses(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, live, X, At, Solid = c.cv, c.run, c.live, c.X, c.At, c.Solid
+    local Art, Seg, SegButton, InBarText, CountDeaths, clampT = c.Art, c.Seg, c.SegButton, c.InBarText, c.CountDeaths, c.clampT
     local prevT = 0
     local liveKind = "trash"
     local superseded, medInfo = PlaceMedallions(c)
@@ -852,8 +854,8 @@ end
 -- ── Tail of the run ────────────────────────────────────────────────────────
 -- Returns the growing segment of a live run, if there is one.
 local function DrawTail(c, prevT, liveKind)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, isMPlus, live, Solid, Art = c.cv, c.run, c.isMPlus, c.live, c.Solid, c.Art
+    local Tex, Seg, SegButton, InBarText, keyLimit, visualEnd = c.Tex, c.Seg, c.SegButton, c.InBarText, c.keyLimit, c.visualEnd
     local liveSeg
     if visualEnd then
         if visualEnd > prevT then
@@ -902,8 +904,8 @@ end
 
 -- ── Key timer marker (Mythic+ only) ───────────────────────────────────────
 local function DrawKeyTimer(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, isMPlus, X, At, Solid = c.cv, c.run, c.isMPlus, c.X, c.At, c.Solid
+    local Btn, keyLimit = c.Btn, c.keyLimit
     if isMPlus and keyLimit then
         local kx = X(keyLimit)
         local runDur = MS:GetRunDuration(run)
@@ -944,8 +946,8 @@ end
 -- ── Completion marker: a line from the track down to the axis, with ──
 -- ── the finishing time printed on the axis itself ────────────────────
 local function DrawCompletion(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, W, isMPlus, X, At = c.cv, c.run, c.W, c.isMPlus, c.X, c.At
+    local Solid, Art, Text, Btn, keyLimit, compSec = c.Solid, c.Art, c.Text, c.Btn, c.keyLimit, c.compSec
     if compSec then
         local fx = X(compSec)
         -- Finished on a boss kill: stand just clear of that boss's block
@@ -1002,15 +1004,16 @@ end
 -- ── The rim takes the class colour; deaths close together merge into
 -- ── one diamond with a count.
 local function DrawDeaths(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, W, X, At, Solid = c.cv, c.run, c.W, c.X, c.At, c.Solid
+    local Art, Text, Btn, clampT = c.Art, c.Text, c.Btn, c.clampT
     local allDeaths = {}
     for _, p in pairs(run.players or {}) do
         for _, de in ipairs(p.deathEvents or {}) do
             _ins(allDeaths, { player = p, playerName = DN(p.name), playerClass = p.class,
                               time = clampT and _min(de.time or 0, clampT) or (de.time or 0),
                               rawTime = de.time or 0,
-                              spell = de.spell or "Unknown", killer = de.killer or "Unknown" })
+                              spell = de.spell or "Unknown", killer = de.killer or "Unknown",
+                              events = de.events })
         end
     end
     _sort(allDeaths, function(a, b) return a.time < b.time end)
@@ -1026,34 +1029,21 @@ local function DrawDeaths(c)
         end
     end
 
+    -- The killing blow and the hits before it, copied when the death happened.
     local function AddRecap(d)
-        local rec = d.player
-        local recapID = rec and rec.deathRecapID or 0
-        if recapID ~= 0 and DeathRecap_GetEvents then
-            local ok, events = pcall(DeathRecap_GetEvents, recapID)
-            if ok and events and #events > 0 then
-                local kill
-                for i = #events, 1, -1 do
-                    local ev = events[i]
-                    if ev and ev.overkill and ev.overkill > 0 then kill = ev; break end
-                end
-                kill = kill or events[#events]
-                if kill then
-                    local line = "    |cffaaaaaaKilling blow:|r |cffff9944" .. (kill.spellName or "Unknown") .. "|r"
-                    if kill.caster and kill.caster ~= "" then
-                        line = line .. " |cff888888by|r |cffffd700" .. kill.caster .. "|r"
-                    end
-                    GameTooltip:AddLine(line, 1, 1, 1)
-                end
-                for i = _max(1, #events - 2), #events do
-                    local ev = events[i]
-                    if ev and ev.spellName then
-                        local hit = "      |cff777777" .. ev.spellName .. "|r"
-                        if ev.amount and ev.amount ~= 0 then hit = hit .. "  |cffff6666" .. Abbrev(-(ev.amount)) .. "|r" end
-                        if ev.overkill and ev.overkill > 0 then hit = hit .. " |cffff0000(killing blow)|r" end
-                        GameTooltip:AddLine(hit, 1, 1, 1)
-                    end
-                end
+        local events = d.events
+        local kill = MS.KillingBlow(events)
+        if kill then
+            local line = "    |cffaaaaaaKilling blow:|r |cffff9944" .. (kill.spellName or "Unknown") .. "|r"
+            if kill.caster and kill.caster ~= "" then
+                line = line .. " |cff888888by|r |cffffd700" .. kill.caster .. "|r"
+            end
+            GameTooltip:AddLine(line, 1, 1, 1)
+            for _, ev in ipairs(events) do
+                local hit = "      |cff777777" .. (ev.spellName or "?") .. "|r"
+                if ev.amount and ev.amount ~= 0 then hit = hit .. "  |cffff6666" .. Abbrev(-(ev.amount)) .. "|r" end
+                if ev.overkill and ev.overkill > 0 then hit = hit .. " |cffff0000(killing blow)|r" end
+                GameTooltip:AddLine(hit, 1, 1, 1)
             end
         elseif d.killer ~= "Unknown" then
             local line = "    |cffaaaaaaKilled by|r |cffff9944" .. d.killer .. "|r"
@@ -1130,8 +1120,8 @@ end
 -- ── the addon spaces them evenly, so per-kick ticks implied a
 -- ── precision the data doesn't have.)
 local function DrawInterrupts(c)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, totalDur, W, X, At = c.cv, c.run, c.totalDur, c.W, c.X, c.At
+    local Solid, Btn, clampT = c.Solid, c.Btn, c.clampT
     do
         local BUCKET_PX = 6
         local nb = _ceil(W / BUCKET_PX)
@@ -1191,8 +1181,8 @@ end
 
 -- ── Live head (in-progress runs) ───────────────────────────────────────────
 local function DrawLiveHead(strip, c, prevT, liveSeg)
-    local cv, run, totalDur, W, isMPlus, live, X, At, Solid, Art, Tex, Mask, Text, Btn,
-          Seg, SegButton, InBarText, CountDeaths, Weather, keyLimit, compSec, visualEnd, clampT = Unpack(c)
+    local cv, run, totalDur, W, live, X = c.cv, c.run, c.totalDur, c.W, c.live, c.X
+    local Solid, Art, Text = c.Solid, c.Art, c.Text
     if live then
         if strip._liveTag then strip._liveTag:Show() end
 
@@ -1218,8 +1208,8 @@ local function DrawLiveHead(strip, c, prevT, liveSeg)
             if not lRun or not lTotalDur or lTotalDur <= 0 then return end
             local elapsed = MS:GetRunDuration(lRun)
             if (lRun.keystoneLevel or 0) == 0 and not lRun.completed
-                    and elapsed >= lTotalDur - 2 and UI.frame and UI.frame._rebuildTimeline then
-                UI.frame._rebuildTimeline(true)  -- rolling window is full: grow it
+                    and elapsed >= lTotalDur - 2 and UI.RebuildTimeline then
+                UI.RebuildTimeline(true)        -- rolling window is full: grow it
                 return
             end
             local hx = TL_L + _min(1, elapsed / lTotalDur) * W
@@ -1266,26 +1256,29 @@ local function BuildTimeline(strip, run, totalDur)
     strip:SetScript("OnUpdate", nil)
     if strip._liveTag then strip._liveTag:Hide() end
 
-    if run and run.completed and run.players then
-        MS:_BackfillSyntheticInterrupts(run)
-    end
-
     local c = NewContext(strip, run, totalDur)
-    if not c then return strip end
-    DrawTrack(c)
-    DrawAxis(c)
-    local prevT, liveKind = DrawBosses(c)
-    local liveSeg = DrawTail(c, prevT, liveKind)
-    DrawKeyTimer(c)
-    DrawCompletion(c)
-    DrawDeaths(c)
-    DrawInterrupts(c)
-    DrawLiveHead(strip, c, prevT, liveSeg)
+    if not c then
+        if strip._pools then FinishPools(strip._pools) end
+        return strip
+    end
+    -- Whatever happens in the steps, the pieces left over are hidden after.
+    local ok, err = pcall(function()
+        DrawTrack(c)
+        DrawAxis(c)
+        local prevT, liveKind = DrawBosses(c)
+        local liveSeg = DrawTail(c, prevT, liveKind)
+        DrawKeyTimer(c)
+        DrawCompletion(c)
+        DrawDeaths(c)
+        DrawInterrupts(c)
+        DrawLiveHead(strip, c, prevT, liveSeg)
+    end)
+    FinishPools(strip._pools)
+    if not ok then error(err, 0) end
     return strip
 end
 
 -- Published for the other UI files.
-UI.BossIcon = BossIcon
 UI.BuildTimeline = BuildTimeline
 UI.BuildTimelineChrome = BuildTimelineChrome
 UI.GetTimelineDuration = GetTimelineDuration

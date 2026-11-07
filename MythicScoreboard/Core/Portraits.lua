@@ -1,5 +1,12 @@
 -- Boss portraits.
 --
+-- MS:BossPortrait(boss, run) is the one place that decides what a boss's
+-- medallion shows. In order:
+--   1. the journal's creature icon (retail: saved per encounter)
+--   2. a model ID learned from the journal or in play (below)
+--   3. Forever's bundled table (Core/BossPortraits.lua, via Forever.lua)
+-- and nil when there's nothing: the medallion shows a crest.
+--
 -- Main source: the game's Encounter Journal, read on entering an instance.
 -- WoW Forever has no journal for its dungeons and uses the bundled table in
 -- Core/BossPortraits.lua instead (see MS:ForeverBossArt in Core/Forever.lua).
@@ -139,13 +146,13 @@ local function KnownBossName(name)
     for _, b in ipairs(run and run.bosses or {}) do
         if Norm(b.name) == n then return true end
     end
-    local def = MS.ForeverDungeon and run and MS:ForeverDungeon(run)
-    if not def and MS.FOREVER_DUNGEONS and run then
-        def = MS.FOREVER_DUNGEONS[run.dungeonName or ""]
-    end
-    for _, e in ipairs(def and def.bosses or {}) do
-        if Norm(e.name) == n then return true end
-        for _, a in ipairs(e.aka or {}) do if Norm(a) == n then return true end end
+    -- Forever: this dungeon's bosses, or every wing's while it isn't known yet.
+    local defs = run and MS.ForeverDefsFor and MS:ForeverDefsFor(run) or {}
+    for _, def in ipairs(defs) do
+        for _, e in ipairs(def.bosses or {}) do
+            if Norm(e.name) == n then return true end
+            for _, a in ipairs(e.aka or {}) do if Norm(a) == n then return true end end
+        end
     end
     return false
 end
@@ -209,6 +216,108 @@ function MS:LearnedBossDisplay(boss, aliases)
         id = store[Norm(a) or ""]
         if id then return id end
     end
+    return nil
+end
+
+-- ── Journal icons (retail) ─────────────────────────────────────────────────
+-- The journal's creature icon for an encounter, cached per encounter in
+-- MythicScoreboardDB.bossIcons so saved runs keep their portraits.
+local function IconCache(create)
+    local db = rawget(_G, "MythicScoreboardDB")
+    if not db then return nil end
+    if create then db.bossIcons = db.bossIcons or {} end
+    return db.bossIcons
+end
+
+local function CachedIcon(boss)
+    if boss.icon then return boss.icon end
+    local cache = IconCache()
+    if not cache then return nil end
+    local id = boss.dungeonEncounterId
+    if id and cache[id] then return cache[id] end
+    if boss.name and cache["n:" .. boss.name] then return cache["n:" .. boss.name] end
+    return nil
+end
+
+-- At a pull: look the encounter up in the journal for this instance.
+function MS:ResolveBossIcon(boss)
+    if not boss or boss.icon then return end
+    local id = boss.dungeonEncounterId
+    if not id or Secret(id) then return end
+    local cache = IconCache()
+    if cache and cache[id] then boss.icon = cache[id]; return end
+    C_Timer.After(0, function()
+        local inst = JournalInstanceHere()
+        if not (inst and EJ_GetEncounterInfoByIndex and EJ_GetCreatureInfo) then return end
+        local icon
+        for i = 1, 40 do
+            local ok, name, _, journalID, _, _, _, dungeonEncID = pcall(EJ_GetEncounterInfoByIndex, i, inst)
+            if not ok or not name or Secret(name) then break end
+            if dungeonEncID == id then
+                local ok2, _, _, _, _, iconImage = pcall(EJ_GetCreatureInfo, 1, journalID)
+                if ok2 and not Secret(iconImage) then icon = iconImage end
+                break
+            end
+        end
+        if icon then
+            boss.icon = icon
+            IconCache(true)[id] = icon
+            self:SaveCurrentRun()
+            Changed()
+        end
+    end)
+end
+
+-- One-time scan of the whole journal: every dungeon boss's icon, keyed by
+-- dungeonEncounterID and by "n:<boss name>", for saved runs recorded before
+-- icons were captured. Skipped in combat and while the journal is open
+-- (it changes the journal's selected tier briefly).
+local _ejIndexBuilt = false
+local function BuildJournalIndex()
+    if _ejIndexBuilt or not rawget(_G, "MythicScoreboardDB") then return end
+    if InCombatLockdown() then return end
+    if EncounterJournal and EncounterJournal.IsShown and EncounterJournal:IsShown() then return end
+    if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex
+            and EJ_GetEncounterInfoByIndex and EJ_GetCreatureInfo) then return end
+    _ejIndexBuilt = true
+    local cache = IconCache(true)
+    local prevTier = EJ_GetCurrentTier and EJ_GetCurrentTier()
+    pcall(function()
+        for tier = EJ_GetNumTiers(), 1, -1 do       -- newest first: remakes win
+            EJ_SelectTier(tier)
+            for i = 1, 80 do
+                local instID = EJ_GetInstanceByIndex(i, false)
+                if not instID then break end
+                for e = 1, 30 do
+                    local name, _, journalID, _, _, _, dungeonEncID = EJ_GetEncounterInfoByIndex(e, instID)
+                    if not name then break end
+                    local _, _, _, _, icon = EJ_GetCreatureInfo(1, journalID)
+                    if icon then
+                        if dungeonEncID and not cache[dungeonEncID] then cache[dungeonEncID] = icon end
+                        if not cache["n:" .. name] then cache["n:" .. name] = icon end
+                    end
+                end
+            end
+        end
+    end)
+    if prevTier then pcall(EJ_SelectTier, prevTier) end
+end
+
+-- ── The answer ─────────────────────────────────────────────────────────────
+-- What a boss's medallion shows: "icon", texture | "display", model ID |
+-- "file", path | nil.
+function MS:BossPortrait(boss, run)
+    if not boss then return nil end
+    local icon = CachedIcon(boss)
+    if not icon and not MS.ForeverBossArt then
+        BuildJournalIndex()                 -- saved runs from before icons were kept
+        icon = CachedIcon(boss)
+    end
+    if icon then return "icon", icon end
+    local aliases = MS.ForeverBossAliases and MS:ForeverBossAliases(boss, run)
+    local learned = MS:LearnedBossDisplay(boss, aliases)
+    if learned then return "display", learned end
+    if MS.ForeverBossArt then return MS:ForeverBossArt(boss, run) end
     return nil
 end
 

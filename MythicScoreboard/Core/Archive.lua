@@ -5,12 +5,14 @@
 -- oldest first, so trends survive after a run drops out of history:
 --
 --   at       wall-clock start (time())      dungeon, diff, key
---   dur      run time in seconds            cleared, inTime, onLeave
+--   dur      run time in seconds            cleared, inTime, onLeave, quit
 --   deaths   group deaths                   wipes   failed boss pulls
 --   bosses   { {n = name, t = kill time, d = fight length, m = your DPS in it} }  in kill order
 --   loot     { {i = item string, l = link, q = quality, t = time, b = boss} }  gear that dropped for you
 --   me       your own numbers: lvl ilvl cls role dps hps dmg heal taken avoid int deaths
 --   group    { {n = name key, c = class} }  everyone else
+--   prog     (Forever) what the run did for you: xp, lv levels, k kills,
+--            q quests, g gold in copper, rep { [faction] = amount }
 --
 -- Roughly 300 bytes a run; MAX_RUNS keeps the saved file small.
 
@@ -28,6 +30,7 @@ local function Int(n) return _floor((tonumber(n) or 0) + 0.5) end
 local _rev = 0
 local function Bump() _rev = _rev + 1 end
 MS.BumpStats = Bump
+function MS:StatsRevision() return _rev end   -- changes whenever any archived run does
 
 -- ── Storage ────────────────────────────────────────────────────────────────
 -- Each character's archive lives in the account-wide saved variables
@@ -35,7 +38,6 @@ MS.BumpStats = Bump
 -- show every character, and it's written to disk once. Before 2.5 it was
 -- saved with the character and copied account-wide (written twice); that
 -- copy is moved over the first time the character logs in.
-local _owner = setmetatable({}, { __mode = "k" })   -- archive entry -> character key
 
 local function Account()
     if type(rawget(_G, "MythicScoreboardAccountDB")) ~= "table" then MythicScoreboardAccountDB = {} end
@@ -56,36 +58,54 @@ local function CharKey()
     return name .. "@" .. (type(realm) == "string" and realm or ""), name, realm
 end
 
--- Older archives are brought up to date (Migrations.lua) when first used.
-local function Upgrade(a)
-    if MS.MigrateArchive then MS:MigrateArchive(a) end
+local function NewArchive() return { v = MS.ARCHIVE_VERSION, runs = {} } end
+local function Valid(a) return type(a) == "table" and type(a.runs) == "table" end
+
+-- An archive is brought up to date (Migrations.lua) the first time it's
+-- used in a session, not on every read.
+local _ready = setmetatable({}, { __mode = "k" })
+local function Ready(a)
+    if not _ready[a] then
+        if MS.MigrateArchive then MS:MigrateArchive(a) end
+        _ready[a] = true
+    end
     return a
 end
 
-local function NewArchive() return { v = MS.ARCHIVE_VERSION, runs = {} } end
-
--- This character's archive table: { v = data version, runs, seeded }.
-local function Store()
-    if not MythicScoreboardDB then return nil end
-    local key = MS._charKey or CharKey()
-    local old = MythicScoreboardDB.archive
-    if not key then
-        -- Name not known yet: keep it with the character until it is.
-        if type(old) ~= "table" or type(old.runs) ~= "table" then old = NewArchive(); MythicScoreboardDB.archive = old end
-        return Upgrade(old)
-    end
-    MS._charKey = key
+-- Once per character: the archive saved with the character before 2.5 (and
+-- the old account-wide copy of its runs) moved into its account-wide slot.
+local function MoveAccountWide(key)
     local chars = Account().chars
     local c = chars[key]
     if not c then c = {}; chars[key] = c end
-    if type(old) == "table" and type(old.runs) == "table" then
-        c.archive = old                       -- moved account-wide
-        MythicScoreboardDB.archive = nil
+    local old = MythicScoreboardDB.archive
+    if Valid(old) then
+        c.archive = old
         Bump()
     end
-    c.runs = nil                              -- the old account-wide copy
-    if type(c.archive) ~= "table" or type(c.archive.runs) ~= "table" then c.archive = NewArchive() end
-    return Upgrade(c.archive)
+    MythicScoreboardDB.archive = nil
+    c.runs = nil
+    if not Valid(c.archive) then c.archive = NewArchive() end
+    return c.archive
+end
+
+-- This character's archive table: { v = data version, runs, seeded }.
+-- Reading it changes nothing once it's in place.
+local function Store()
+    if not MythicScoreboardDB then return nil end
+    local key = MS._charKey or CharKey()
+    if not key then
+        -- Name not known yet: keep it with the character until it is.
+        if not Valid(MythicScoreboardDB.archive) then MythicScoreboardDB.archive = NewArchive() end
+        return Ready(MythicScoreboardDB.archive)
+    end
+    MS._charKey = key
+    local acc = rawget(_G, "MythicScoreboardAccountDB")
+    local c = type(acc) == "table" and type(acc.chars) == "table" and acc.chars[key]
+    if c and Valid(c.archive) and c.runs == nil and MythicScoreboardDB.archive == nil then
+        return Ready(c.archive)
+    end
+    return Ready(MoveAccountWide(key))
 end
 MS._ArchiveStore = Store                      -- for tests
 
@@ -107,6 +127,18 @@ local function FindSelf(run)
     return myName and MS:PlayerByName(myName, run) or nil
 end
 
+-- The boss a piece of loot came from: a kill in the two minutes before it
+-- dropped. Anything later came from trash (or the end-of-run chest).
+local function LootBoss(run, t)
+    local boss, at = nil, -1
+    for _, b in ipairs(run.bosses or {}) do
+        if b.killTime and b.killTime <= t + 2 and b.killTime >= t - 120 and b.killTime > at then
+            boss, at = b.name, b.killTime
+        end
+    end
+    return boss
+end
+
 -- A compact summary of a finished run, or nil if there's nothing to keep.
 function MS:SummarizeRun(run)
     if type(run) ~= "table" or not run.dungeonName or run.dungeonName == "" then return nil end
@@ -115,13 +147,14 @@ function MS:SummarizeRun(run)
 
     local e = {
         at      = run._wallClockStart,
-        dungeon = run.dungeonName,
+        dungeon = self:RunTitle(run),
         diff    = (run.difficultyLabel ~= "" and run.difficultyLabel) or nil,
         key     = ((run.keystoneLevel or 0) > 0) and run.keystoneLevel or nil,
         dur     = dur,
         cleared = run.completed and true or nil,
         inTime  = run.inTime and true or nil,
         onLeave = run.finishedOnLeave and true or nil,
+        quit    = run.abandoned and true or nil,     -- abandoned by hand (never joined to the next run)
         deaths  = 0,
         wipes   = 0,
         bosses  = {},
@@ -153,19 +186,20 @@ function MS:SummarizeRun(run)
         end
     end
     _sort(e.group, function(a, b) return a.n < b.n end)
+    local pr = run.progress
+    if pr then
+        local rep
+        for f, n in pairs(pr.rep or {}) do rep = rep or {}; rep[f] = Int(n) end
+        e.prog = { xp = Int(pr.xp), lv = (pr.levels or 0) > 0 and pr.levels or nil, k = pr.kills or 0,
+                   q = #(pr.quests or {}), g = Int(pr.gold), rep = rep }
+    end
     -- Your loot, with the boss it came from: a kill in the two minutes
     -- before it dropped. Anything later came from trash.
     if me and me.loot and #me.loot > 0 then
         e.loot = {}
         for _, l in ipairs(me.loot) do
-            local boss, at = nil, -1
-            local t = l.t or 0
-            for _, b in ipairs(run.bosses or {}) do
-                if b.killTime and b.killTime <= t + 2 and b.killTime >= t - 120 and b.killTime > at then
-                    boss, at = b.name, b.killTime
-                end
-            end
-            _ins(e.loot, { i = (not l.link) and MS.LootItemString(l) or nil, l = l.link, q = l.quality, t = Int(l.t), b = boss })
+            _ins(e.loot, { i = (not l.link) and MS.LootItemString(l) or nil, l = l.link, q = l.quality,
+                           t = Int(l.t), b = LootBoss(run, l.t or 0) })
         end
     end
     return e
@@ -188,6 +222,23 @@ function MS:ArchiveRun(run)
     _ins(a.runs, e)
     while #a.runs > MAX_RUNS do _rem(a.runs, 1) end
     Bump()
+end
+
+-- Your loot that arrived after a run was saved (the Mythic+ chest): added to
+-- that run's archived summary too, so the Stats page's loot list has it.
+function MS:ArchiveLateLoot(run, l)
+    local a = Store()
+    if not (a and run and l) then return end
+    for i = #a.runs, _max(1, #a.runs - 5), -1 do
+        local e = a.runs[i]
+        if e.at == run._wallClockStart and e.dungeon == MS:RunTitle(run) then
+            e.loot = e.loot or {}
+            _ins(e.loot, { i = (not l.link) and MS.LootItemString(l) or nil, l = l.link, q = l.quality,
+                           t = Int(l.t), b = LootBoss(run, l.t or 0) })
+            Bump()
+            return true
+        end
+    end
 end
 
 -- First use: copy in the runs already in history, oldest first.
@@ -291,8 +342,6 @@ function MS:StatsCharacters()
 end
 
 function MS:CharacterInfo(key) return key and Account().chars[key] end
-function MS:RunOwner(e) return _owner[e] end
-function MS:IsOwnRun(e) return _owner[e] == nil or _owner[e] == self._charKey end
 
 -- The cache key for what the Stats page shows right now.
 local _memo, _memoKey = {}, nil
@@ -313,6 +362,24 @@ local function Memo(self, name, fn, ...)
     return v
 end
 
+-- Which character each archived run belongs to.
+local function OwnersNow(self)
+    local out = {}
+    for _, e in ipairs(self:ArchiveRuns()) do out[e] = self._charKey end
+    for key, c in pairs(Account().chars) do
+        if key ~= self._charKey then
+            for _, e in ipairs(CharRuns(c)) do out[e] = key end
+        end
+    end
+    return out
+end
+function MS:RunOwner(e) return Memo(self, "owners", OwnersNow)[e] end
+function MS:IsOwnRun(e)
+    if not self._charKey then return true end      -- name not known yet: everything is ours
+    local owner = self:RunOwner(e)
+    return owner ~= nil and owner == self._charKey
+end
+
 -- The runs the Stats page shows, oldest first.
 local StatsRunsNow
 function MS:StatsRuns()
@@ -323,17 +390,11 @@ end
 function StatsRunsNow(self)
     local mine = self:ArchiveRuns()
     local me, want = self._charKey, self:GetStatsChar()
-    if not me or want == me then
-        for _, e in ipairs(mine) do _owner[e] = me end
-        return mine
-    end
+    if not me or want == me then return mine end
     local out = {}
     for key, c in pairs(Account().chars) do
         if want == "all" or want == key then
-            for _, e in ipairs(key == me and mine or CharRuns(c)) do
-                _owner[e] = key
-                _ins(out, e)
-            end
+            for _, e in ipairs(key == me and mine or CharRuns(c)) do _ins(out, e) end
         end
     end
     _sort(out, function(x, y) return (x.at or 0) < (y.at or 0) end)
@@ -431,7 +492,8 @@ local RECENT = 12   -- runs in a dungeon's recent-times strip
 -- Everything the overview shows, from the archive.
 local function StatsOverviewNow(self)
     local runs = self:StatsRuns()
-    local out = { runs = #runs, cleared = 0, time = 0, deaths = 0, dungeons = {}, mates = {} }
+    local out = { runs = #runs, cleared = 0, time = 0, deaths = 0, dungeons = {}, mates = {},
+                  xp = 0, levels = 0, kills = 0, quests = 0, gold = 0, progRuns = 0 }
     local byName, mates = {}, {}
 
     for _, e in ipairs(runs) do
@@ -447,6 +509,15 @@ local function StatsOverviewNow(self)
         end
         d.runs = d.runs + 1
         d.deaths = d.deaths + (e.deaths or 0)
+        local pg = e.prog
+        if pg then
+            out.progRuns = out.progRuns + 1
+            out.xp, out.kills = out.xp + (pg.xp or 0), out.kills + (pg.k or 0)
+            out.levels, out.quests = out.levels + (pg.lv or 0), out.quests + (pg.q or 0)
+            out.gold = out.gold + (pg.g or 0)
+            d.xp, d.xpRuns = (d.xp or 0) + (pg.xp or 0), (d.xpRuns or 0) + 1
+            d.xpTime = (d.xpTime or 0) + (e.dur or 0)
+        end
         if e.cleared then
             d.cleared = d.cleared + 1
             _ins(d.clearTimes, e.dur)
@@ -475,6 +546,10 @@ local function StatsOverviewNow(self)
     for _, d in ipairs(out.dungeons) do
         d.typical = Median(d.clearTimes)
         d.deathsPerRun = d.runs > 0 and d.deaths / d.runs or 0
+        if d.xpRuns and d.xpRuns > 0 then
+            d.xpPerRun = d.xp / d.xpRuns
+            d.xpPerHour = (d.xpTime or 0) > 0 and d.xp / d.xpTime * 3600 or nil
+        end
     end
     _sort(out.dungeons, function(a, b)
         if a.last ~= b.last then return a.last > b.last end

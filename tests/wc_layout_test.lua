@@ -17,7 +17,7 @@ end
 local function layout(bosses, dur)
     MythicScoreboardDB.runs = { { dungeonName = "Wailing Caverns", _wallClockStart = 1, duration = dur,
         completed = true, clearedAt = dur, players = {}, bosses = bosses } }
-    MS.displayRun = nil; MS.UI._medPlanCache = nil
+    MS.displayRun = nil; MS.UI._medPlanLRU = nil
     MS:ShowScoreboard(); MS:RefreshOverview(); M.RunTimers(3)
     local cv = MythicScoreboardFrame.timelineContainer._children[1]
     local meds = {}

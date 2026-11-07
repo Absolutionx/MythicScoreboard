@@ -11,14 +11,44 @@ local _sort   = table.sort
 local MS = _G["MythicScoreboard"]
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, BossIcon, Btn, BuildTimeline, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.BossIcon, UI.Btn, UI.BuildTimeline, UI.CELL_FONT_SIZE
-local CLASS_ICON_COORDS, COLS, COL_SORT_VALUES, CT, ClassColor, ComputeColumnAnchors = UI.CLASS_ICON_COORDS, UI.COLS, UI.COL_SORT_VALUES, UI.CT, UI.ClassColor, UI.ComputeColumnAnchors
+local Abbrev, Art, Btn, BuildTimeline, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.BuildTimeline, UI.CELL_FONT_SIZE
+local CLASS_ICON_COORDS, COLS, CT, ClassColor, ComputeColumnAnchors = UI.CLASS_ICON_COORDS, UI.COLS, UI.CT, UI.ClassColor, UI.ComputeColumnAnchors
 local DN, DiffShort, FRAME_W, GetRole, GetTimelineDuration, HGrad = UI.DN, UI.DiffShort, UI.FRAME_W, UI.GetRole, UI.GetTimelineDuration, UI.HGrad
 local Outline, P, PAD_X, ROLE_ICON_COORDS, ROLE_ICON_TEX, ROW_H = UI.Outline, UI.P, UI.PAD_X, UI.ROLE_ICON_COORDS, UI.ROLE_ICON_TEX, UI.ROW_H
 local ScoreColor, SetFont, Solid, SplitAbbrev, Text, Tint = UI.ScoreColor, UI.SetFont, UI.Solid, UI.SplitAbbrev, UI.Text, UI.Tint
-local _playersBuf, _rowPool, overviewRows, sortState = UI._playersBuf, UI._rowPool, UI.overviewRows, UI.sortState
 
 -- Scoreboard table: rows, cells, header line and refresh.
+
+-- ===========================================================================
+-- Table state: rows on screen, the row pool, the sort
+-- ===========================================================================
+
+local overviewRows = {}
+local _rowPool    = {}
+local _playersBuf = {}
+
+local sortState    = { key = nil, dir = 1 }
+local colHdrLabels = {}
+
+local COL_SORT_VALUES = {
+    player     = function(p) return p.name or "" end,
+    loot       = function(p) return p.loot and #p.loot or 0 end,
+    level      = function(p) return p.level or 0 end,
+    score      = function(p) return p.mythicScore or 0 end,
+    deaths     = function(p) return p.deaths or 0 end,
+    dmgTaken   = function(p) return p.damageTaken or 0 end,
+    avoidable  = function(p) return p.avoidableDamageTaken or 0 end,
+    damage     = function(p) return p.damageDone or 0 end,
+    healing    = function(p) return p.healingDone or 0 end,
+    -- Per second, as shown: the meter's rate, else the total over the run.
+    dps        = function(p, dur) return (p.dps or 0) > 0 and p.dps or ((dur or 0) > 0 and (p.damageDone or 0) / dur or 0) end,
+    hps        = function(p, dur) return (p.hps or 0) > 0 and p.hps or ((dur or 0) > 0 and (p.healingDone or 0) / dur or 0) end,
+    interrupts = function(p) return p.interrupts or 0 end,
+    dispels    = function(p) return p.dispels or 0 end,
+}
+
+-- Shared with UI.lua (the column header) and the tests.
+UI.overviewRows, UI.sortState, UI.colHdrLabels = overviewRows, sortState, colHdrLabels
 
 -- ===========================================================================
 -- Row pool
@@ -29,38 +59,37 @@ local _playersBuf, _rowPool, overviewRows, sortState = UI._playersBuf, UI._rowPo
 local GetInstant = (C_Item and C_Item.GetItemInfoInstant) or GetItemInfoInstant
 local GetInfo    = (C_Item and C_Item.GetItemInfo) or GetItemInfo
 
+-- Link, quality, icon and item level for a loot entry. What the game fills
+-- in later is remembered here, beside the entry; saved data isn't changed
+-- by drawing it.
+local _looked = setmetatable({}, { __mode = "k" })
 local function LootDetails(entry)
-    local link, quality, icon, ilvl = entry.link, entry.quality, nil, entry.ilvl
+    local known = _looked[entry]
+    if not known then known = {}; _looked[entry] = known end
     local item = MS.LootItemString(entry)
-    if GetInfo then
-        local ok, _, fullLink, q = pcall(GetInfo, entry.link or item)
+    local link = entry.link or known.link
+    local quality = entry.quality or known.quality
+    local ilvl = entry.ilvl or known.ilvl
+    if GetInfo and not (link and quality) then
+        local ok, _, fullLink, q = pcall(GetInfo, link or item)
         if ok then
-            link = link or fullLink
-            quality = quality or q
-            if q and not entry.quality then entry.quality = q end
-            if fullLink and not entry.link then entry.link = fullLink end
+            link = link or fullLink; known.link = link
+            quality = quality or q; known.quality = quality
         end
     end
+    local icon
     if GetInstant then
         local ok, _, _, _, _, ic = pcall(GetInstant, item)
         if ok then icon = ic end
     end
     if not ilvl and C_Item and C_Item.GetDetailedItemLevelInfo then
         local ok, lvl = pcall(C_Item.GetDetailedItemLevelInfo, link or item)
-        if ok and lvl and lvl > 0 then ilvl = lvl; entry.ilvl = lvl end
+        if ok and lvl and lvl > 0 then ilvl = lvl; known.ilvl = lvl end
     end
     return link or item, quality, icon, ilvl
 end
 
-local function QualityColor(q)
-    if q and C_Item and C_Item.GetItemQualityColor then
-        local ok, r, g, b = pcall(C_Item.GetItemQualityColor, q)
-        if ok and r then return r, g, b end
-    end
-    local c = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
-    if c then return c.r, c.g, c.b end
-    return P.bronze[1], P.bronze[2], P.bronze[3]
-end
+local QualityColor = UI.QualityColor
 
 local function MakeLootIcon(row, x, idx)
     local b = Btn(row)
@@ -108,6 +137,10 @@ local function MakeLootIcon(row, x, idx)
     return b
 end
 
+-- Healers who have an interrupt (Wind Shear / Earth Shock, Spear Hand
+-- Strike, Quell), so "fewest in group" can apply to them.
+local KICK_HEALERS = { SHAMAN = true, MONK = true, EVOKER = true }
+
 -- One tooltip handler for every row; it reads the row's player and run.
 local function RowOnEnter(self2)
     local pc = self2._player
@@ -136,7 +169,7 @@ local function RowOnEnter(self2)
 
     -- Highest / lowest interrupt badge (healers other than Shaman excluded from "lowest").
     local intCount = pc.interrupts or 0
-    local canKick = (pc.role ~= "HEALER") or (pc.class == "SHAMAN")
+    local canKick = (pc.role ~= "HEALER") or KICK_HEALERS[pc.class]
     local badge = ""
     local rr = self2._run
     if rr and rr.players then
@@ -145,7 +178,7 @@ local function RowOnEnter(self2)
             local v = op.interrupts or 0
             n = n + 1
             if v > hi then hi = v end
-            if op.role ~= "HEALER" or op.class == "SHAMAN" then
+            if op.role ~= "HEALER" or KICK_HEALERS[op.class] then
                 loN = loN + 1
                 if v < lo then lo = v end
             end
@@ -192,13 +225,8 @@ local function RowOnEnter(self2)
                     end
                 end
                 GameTooltip:AddLine("|cffff9900" .. MS:FormatTime(dt) .. "|r" .. segStr, 1, 1, 1)
-                if de.events then
-                    local kill
-                    for i = #de.events, 1, -1 do
-                        local ev = de.events[i]
-                        if ev and ev.overkill and ev.overkill > 0 then kill = ev; break end
-                    end
-                    kill = kill or de.events[#de.events]
+                do
+                    local kill = MS.KillingBlow(de.events)
                     if kill then
                         local line = "  |cffff9944" .. (kill.spellName or "Unknown") .. "|r"
                         if kill.caster and kill.caster ~= "" then
@@ -312,10 +340,6 @@ end
 
 local function ReleaseRow(row)
     if not row then return end
-    if row.GetObjectType and row:GetObjectType() ~= "Frame" then
-        if row.Hide then row:Hide() end
-        return
-    end
     row:Hide()
     row:SetParent(UIParent)
     row:ClearAllPoints()
@@ -559,7 +583,7 @@ function MS:ShowScoreboard()
     if self.inDungeon and not InCombatLockdown() then self:SnapshotFromDamageMeter() end
     local ok, err = pcall(self._DoRefreshOverview, self)
     if not ok then
-        print("|cffff4444[MythicScoreboard]|r Scoreboard refresh error: " .. tostring(err))
+        UI.SayOnce("Scoreboard refresh", err)
     end
     if UI.frame.RefreshHistBtn then UI.frame.RefreshHistBtn() end
 end
@@ -578,7 +602,7 @@ function MS:RefreshOverview()
         local ok, err = pcall(self._DoRefreshOverview, self)
         self._refreshing = false
         if not ok then
-            print("|cffff4444[MythicScoreboard]|r Scoreboard refresh error: " .. tostring(err))
+            UI.SayOnce("Scoreboard refresh", err)
         end
         if UI.frame and UI.frame.RefreshHistBtn then UI.frame.RefreshHistBtn() end
     end)
@@ -596,30 +620,12 @@ local function DefaultPlayerSort(a, b)
     return (a.damageDone or 0) > (b.damageDone or 0)
 end
 
-local function IsPersonalBest(run)
-    if not (run.completed and run.inTime and (run.keystoneLevel or 0) > 0 and MythicScoreboardDB) then
-        return false
-    end
-    local thisDur = run.duration or 0
-    if thisDur <= 0 then return false end
-    local key = (run.dungeonName or "") .. ":" .. (run.keystoneLevel or 0)
-    local pb = MythicScoreboardDB.personalBests and MythicScoreboardDB.personalBests[key]
-    if pb then return thisDur <= pb end
-    for _, r in ipairs(MythicScoreboardDB.runs or {}) do
-        if r ~= run and r.completed and r.inTime and r.dungeonName == run.dungeonName
-                and (r.keystoneLevel or 0) == (run.keystoneLevel or 0) then
-            local d = r.duration or 0
-            if d > 0 and d < thisDur then return false end
-        end
-    end
-    return true
-end
-
 local function RefreshHeader(run)
     if not run then
         UI.frame.DungeonName:SetText("Dungeon Scoreboard")
         UI.frame.SetBadge(nil)
         UI.frame.Subline:SetText("No runs yet. Enter a dungeon you track and the scoreboard fills in as you play.")
+        UI.frame.SublineRun = nil
         UI.frame.PBLabel:Hide()
         UI.frame.LayoutAffixIcons(0)
         if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
@@ -629,7 +635,7 @@ local function RefreshHeader(run)
 
     local isMPlus = (run.keystoneLevel or 0) > 0
     local title = UI.frame.DungeonName
-    title:SetText(run.dungeonName or "?")
+    title:SetText(MS:RunTitle(run))
     SetFont(title, "title", 24)
     if title:GetStringWidth() > 560 then SetFont(title, "title", 19) end
 
@@ -648,7 +654,6 @@ local function RefreshHeader(run)
         _ins(parts, CT(P.ivory, MS:FormatTime(dur)))
     end
 
-    local live = (run == MS.currentRun and MS.inDungeon and not run.completed)
     if run.completed then
         if isMPlus and limit and limit > 0 then
             local diff = _abs(limit - dur)
@@ -659,10 +664,9 @@ local function RefreshHeader(run)
         else
             _ins(parts, CT(P.verd, "Cleared"))
         end
-    elseif live then
-        _ins(parts, CT(P.bronzeHi, "In progress"))
     else
-        _ins(parts, "Abandoned")
+        local text, col = UI.RunResult(run)    -- in progress, paused, finished or abandoned
+        _ins(parts, CT(col, text))
     end
 
     if MS.Flavor.bossProgress and not isMPlus then
@@ -688,14 +692,29 @@ local function RefreshHeader(run)
         if isMPlus and penalty > 0 then s = s .. ", -" .. MS:FormatTime(penalty) end
         _ins(parts, CT(P.blood, s))
     end
-    UI.frame.Subline:SetText(table.concat(parts, "      "))
+    -- Forever: what the run did for you (the full list is in the tooltip).
+    local pr = MS.Flavor.progressStats and run.progress
+    if pr then
+        local xp = CT(P.ivory, MS.FormatThousands(pr.xp)) .. " XP"
+        if (pr.levels or 0) > 0 then
+            xp = xp .. CT(P.verdHi, "  +" .. pr.levels .. (pr.levels == 1 and " level" or " levels"))
+        end
+        _ins(parts, xp)
+        _ins(parts, CT(P.ivory, pr.kills or 0) .. ((pr.kills or 0) == 1 and " kill" or " kills"))
+        local nq = #(pr.quests or {})
+        if nq > 0 then _ins(parts, CT(P.ivory, nq) .. (nq == 1 and " quest" or " quests")) end
+        if (pr.gold or 0) > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(pr.gold))) end
+    end
+    -- (A tighter gap when the line also carries the run's progress.)
+    UI.frame.Subline:SetText(table.concat(parts, pr and "    " or "      "))
+    UI.frame.SublineRun = pr and run or nil
 
-    UI.frame.PBLabel:SetShown(IsPersonalBest(run))
+    UI.frame.PBLabel:SetShown(MS:IsPersonalBest(run))
 
     -- Affixes
     local affixIDs = {}
     for _, af in ipairs(run.affixes or {}) do _ins(affixIDs, af.id or af) end
-    if #affixIDs == 0 and isMPlus and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
+    if #affixIDs == 0 and isMPlus and run == MS.currentRun and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
         local _, keystoneAffixes = C_ChallengeMode.GetActiveKeystoneInfo()
         for _, id in ipairs(keystoneAffixes or {}) do _ins(affixIDs, id) end
     end
@@ -742,6 +761,7 @@ local function RefreshHeader(run)
             or "Damage and healing weren't recorded for this fight"))
     end
     UI.frame.Subline:SetText(table.concat(fp, "      "))
+    UI.frame.SublineRun = nil
 end
 
 local function BossSig(r)
@@ -763,6 +783,85 @@ local function BossSig(r)
         tostring(r.keystoneTimeLimit), deaths, _floor(kicks / 8), tostring(FocusedBoss(r)) }, ":")
 end
 
+-- ── Timeline ───────────────────────────────────────────────────────────────
+-- What the timeline last drew, so it's rebuilt only when that changes.
+local tl = { run = nil, builtRun = nil, sig = nil, builtAt = nil, totalDur = nil, busy = false }
+
+local function RebuildTimeline(force)
+    if tl.busy or not UI.frame then return end
+    local r   = tl.run
+    local sig = BossSig(r)
+    local changed = (r ~= tl.builtRun) or (sig ~= tl.sig)
+    if not force and not changed and tl.builtAt then return end
+    tl.builtAt, tl.builtRun, tl.sig, tl.busy = GetTime(), r, sig, true
+    local tlc = UI.frame.timelineContainer
+    if r then
+        tlc:Show()
+        tl.totalDur = GetTimelineDuration(r)
+        local ok, err = pcall(BuildTimeline, tlc, r, tl.totalDur)
+        if not ok then
+            UI.SayOnce("Timeline", err)
+            tl.builtAt = GetTime() + 2.0
+            tlc:Hide()
+        end
+    else
+        tlc:Hide()
+    end
+    tl.busy = false
+end
+UI.RebuildTimeline = RebuildTimeline      -- the live head asks for it when its window fills
+
+-- ── The table's numbers ────────────────────────────────────────────────────
+-- Worked out from the players before anything is drawn.
+
+local function SortPlayers(players, dur)
+    if sortState.key and COL_SORT_VALUES[sortState.key] then
+        local getter, dir = COL_SORT_VALUES[sortState.key], sortState.dir
+        local isStr = sortState.key == "player"
+        _sort(players, function(a, b)
+            if not a or not b then return false end
+            local av, bv = getter(a, dur), getter(b, dur)
+            if isStr then
+                if dir == 1 then return av < bv else return av > bv end
+            end
+            if av ~= bv then
+                if dir == 1 then return av > bv else return av < bv end
+            end
+            return (a.name or "") < (b.name or "")
+        end)
+    else
+        _sort(players, DefaultPlayerSort)
+    end
+end
+
+-- Columns where some value reads "25.8K": a plain "549" there lines up with
+-- their right edge instead of their decimal point.
+local function SuffixColumns(players, dur, run)
+    local out = {}
+    for _, c in ipairs(COLS) do
+        if c.num == "abbr" then
+            for _, p in ipairs(players) do
+                if (tonumber((COL_RENDERERS[c.key](p, dur, run))) or 0) >= 1000 then out[c.key] = true; break end
+            end
+        end
+    end
+    return out
+end
+
+-- The top DPS and HPS, which the share bars are measured against.
+local function TopRates(players, dur)
+    local topDps, topHps = 0, 0
+    for _, p in ipairs(players) do
+        topDps = _max(topDps, RateOf(p, "dps", "damageDone", dur))
+        topHps = _max(topHps, RateOf(p, "hps", "healingDone", dur))
+    end
+    return topDps, topHps
+end
+UI.TableModel = { Sort = SortPlayers, SuffixColumns = SuffixColumns, TopRates = TopRates }   -- for tests
+
+-- What the rows last showed.
+local drawn = {}
+
 function MS:_DoRefreshOverview()
     if not UI.frame then return end
     -- The Stats page owns the window while it's open.
@@ -779,46 +878,11 @@ function MS:_DoRefreshOverview()
     RefreshHeader(run)
 
     -- ── Timeline (rebuilt only when the run or its bosses change) ────────
-    UI.frame._tlRun = run
-    if not UI.frame._rebuildTimeline then
-        UI.frame._rebuildTimeline = function(force)
-            if UI.frame._tlRebuilding then return end
-            local r   = UI.frame._tlRun
-            local sig = BossSig(r)
-            local changed = (r ~= UI.frame._tlLastBuiltRun) or (sig ~= (UI.frame._tlLastBossSig or ""))
-            -- Redrawn only when the run or what's on it changed (or forced).
-            if not force and not changed and UI.frame._tlLastBuild then return end
-            UI.frame._tlLastBuild    = GetTime()
-            UI.frame._tlLastBuiltRun = r
-            UI.frame._tlLastBossSig  = sig
-            UI.frame._tlRebuilding   = true
-
-            local tlc = UI.frame.timelineContainer
-            if r then
-                -- Saved runs without portraits: fill them in from the guide.
-                for _, b in ipairs(r.bosses or {}) do
-                    if not BossIcon(b) then MS:_BuildEJIndex(); break end
-                end
-                tlc:Show()
-                local totalDur = GetTimelineDuration(r)
-                UI.frame._tlTotalDur = totalDur
-                local ok, err = pcall(BuildTimeline, tlc, r, totalDur)
-                if not ok then
-                    print("|cffff4444[MythicScoreboard]|r Timeline build error: " .. tostring(err))
-                    UI.frame._tlLastBuild = GetTime() + 2.0
-                    tlc:Hide()
-                end
-            else
-                tlc:Hide()
-            end
-            UI.frame._tlRebuilding = false
-        end
-    end
-    UI.frame._rebuildTimeline()
-
+    tl.run = run
+    RebuildTimeline()
     local tlc = UI.frame.timelineContainer
-    if tlc.UpdateLive and UI.frame._tlRun then
-        tlc.UpdateLive(UI.frame._tlRun, UI.frame._tlTotalDur or GetTimelineDuration(UI.frame._tlRun))
+    if tlc.UpdateLive and tl.run then
+        tlc.UpdateLive(tl.run, tl.totalDur or GetTimelineDuration(tl.run))
     end
 
     -- ── Player rows ──────────────────────────────────────────────────────
@@ -828,19 +892,13 @@ function MS:_DoRefreshOverview()
     local runSeq  = run and (run._seq or 0) or -1
     local focus   = run and FocusedBoss(run)
     local focusSig = focus and (tostring(focus) .. (focus.stats and "+" or "")) or ""
-    local rowsDirty = (run ~= UI.frame._lastRowsRun)
-                   or (focusSig ~= UI.frame._lastFocusSig)
-                   or (runSeq ~= (UI.frame._lastRowsSeq or -2))
-                   or (sortState.key ~= UI.frame._lastRowsSortKey)
-                   or (sortState.dir ~= UI.frame._lastRowsSortDir)
-                   or ((MS._lootRev or 0) ~= UI.frame._lastLootRev)
-    if not rowsDirty then return end
-    UI.frame._lastLootRev = MS._lootRev or 0
-    UI.frame._lastRowsRun     = run
-    UI.frame._lastFocusSig    = focusSig
-    UI.frame._lastRowsSeq     = runSeq
-    UI.frame._lastRowsSortKey = sortState.key
-    UI.frame._lastRowsSortDir = sortState.dir
+    local lootRev = MS._lootRev or 0
+    if drawn.done and run == drawn.run and focusSig == drawn.focus and runSeq == drawn.seq
+            and sortState.key == drawn.sortKey and sortState.dir == drawn.sortDir and lootRev == drawn.loot then
+        return
+    end
+    drawn.done, drawn.run, drawn.focus, drawn.seq = true, run, focusSig, runSeq
+    drawn.sortKey, drawn.sortDir, drawn.loot = sortState.key, sortState.dir, lootRev
 
     -- Rows are reused in place between refreshes. Handing them back to the
     -- pool and re-anchoring them every poll swapped out the row under the
@@ -860,7 +918,6 @@ function MS:_DoRefreshOverview()
         end
         UI.frame._emptyLbl:SetText("Your group's damage, healing, deaths and interrupts will show here.")
         UI.frame._emptyLbl:Show()
-        _ins(overviewRows, UI.frame._emptyLbl)
         content:SetHeight(60); sf.UpdateRange()
         return
     end
@@ -871,41 +928,9 @@ function MS:_DoRefreshOverview()
     for _, p in pairs(run.players) do _ins(_playersBuf, p) end
     local players = _playersBuf
 
-    if sortState.key and COL_SORT_VALUES[sortState.key] then
-        local getter, dir = COL_SORT_VALUES[sortState.key], sortState.dir
-        local isStr = sortState.key == "player"
-        _sort(players, function(a, b)
-            if not a or not b then return false end
-            local av, bv = getter(a), getter(b)
-            if isStr then
-                if dir == 1 then return av < bv else return av > bv end
-            end
-            if av ~= bv then
-                if dir == 1 then return av > bv else return av < bv end
-            end
-            return (a.name or "") < (b.name or "")
-        end)
-    else
-        _sort(players, DefaultPlayerSort)
-    end
-
-    -- In a column where some values read "25.8K", a plain "549" lines up
-    -- with their right edge instead of their decimal point.
-    local hasSuffix = {}
-    for _, c in ipairs(COLS) do
-        if c.num == "abbr" then
-            for _, p in ipairs(players) do
-                if (tonumber((COL_RENDERERS[c.key](p, dur, run))) or 0) >= 1000 then hasSuffix[c.key] = true; break end
-            end
-        end
-    end
-
-    -- Top values drive the share bars under DPS and HPS.
-    local topDps, topHps = 0, 0
-    for _, p in ipairs(players) do
-        topDps = _max(topDps, RateOf(p, "dps", "damageDone", dur))
-        topHps = _max(topHps, RateOf(p, "hps", "healingDone", dur))
-    end
+    SortPlayers(players, dur)
+    local hasSuffix = SuffixColumns(players, dur, run)
+    local topDps, topHps = TopRates(players, dur)
     -- Share bars run from the value's right edge back toward the column start.
     local dpsCellW, hpsCellW
     for _, c in ipairs(COLS) do

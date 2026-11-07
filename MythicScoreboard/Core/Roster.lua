@@ -95,8 +95,16 @@ local _groupUnitsDirty = true
 function MS:RebuildGroupUnitsCache()
     wipe(_groupUnits)
     _groupUnits[1] = "player"
-    local prefix = IsInRaid() and "raid" or "party"
-    for i = 1, GetNumGroupMembers() do _groupUnits[#_groupUnits + 1] = prefix .. i end
+    -- party1..party4 (GetNumGroupMembers counts you too); raid1..raid40 include
+    -- you, who is "player" here already.
+    if IsInRaid() then
+        for i = 1, GetNumGroupMembers() do
+            local u = "raid" .. i
+            if not UnitIsUnit or not UnitIsUnit(u, "player") then _groupUnits[#_groupUnits + 1] = u end
+        end
+    else
+        for i = 1, math.max(0, GetNumGroupMembers() - 1) do _groupUnits[#_groupUnits + 1] = "party" .. i end
+    end
     _groupUnitsDirty = false
 end
 
@@ -125,11 +133,13 @@ end
 
 -- By any form of their name: "Jay", "Jay-Breezy", "Jay Breezy", "Jay-Realm".
 -- On Forever a first name alone ("Jay") matches when only one player in the
--- run has it, since some messages leave the surname out.
+-- run has it, since some messages leave the surname out. An exact key wins
+-- first: two players with one name are kept apart as "Jay" and "Jay-Realm".
 function MS:PlayerByName(name, run)
     local players = Players(run)
     name = Readable(name)
     if not (players and name) then return nil end
+    if players[name] then return players[name] end
     local key = ShortName(name)
     if players[key] then return players[key] end
     if MS.Flavor.twoPartNames and not key:find("%-") then
@@ -154,13 +164,24 @@ function MS:PlayerByGUID(guid, run)
     end
     local unit = self:UnitForGUID(guid)
     local p = unit and self:PlayerByName(self:UnitPlayerName(unit), run)
+    if p and Readable(p.guid) and p.guid ~= guid then return nil end   -- someone else with that name
     if p then p.guid = guid end
     return p
 end
 
+-- A name match that's really someone else: a different GUID is known.
+local function SomeoneElse(p, guid)
+    return p and guid and Readable(p.guid) and p.guid ~= guid
+end
+
 -- For a unit token: by GUID when the game shows it, otherwise by name.
 function MS:PlayerForUnit(unit, run)
-    return self:PlayerByGUID(UnitGUIDReadable(unit), run) or self:PlayerByName(self:UnitPlayerName(unit), run)
+    local guid = UnitGUIDReadable(unit)
+    local p = self:PlayerByGUID(guid, run)
+    if p then return p end
+    p = self:PlayerByName(self:UnitPlayerName(unit), run)
+    if SomeoneElse(p, guid) then return nil end
+    return p
 end
 
 -- For a C_DamageMeter source. Nil for pets, guardians and anyone not in the
@@ -174,7 +195,10 @@ function MS:PlayerForMeterSource(src, run)
 
     local p = (isLocal and self:PlayerForUnit("player", run))
         or (guid and self:PlayerByGUID(guid, run))
-        or self:PlayerByName(src.name, run)
+    if not p then
+        p = self:PlayerByName(src.name, run)
+        if SomeoneElse(p, guid) then return nil end
+    end
     if not p then return nil end
 
     local cls = Readable(src.classFilename)
@@ -199,7 +223,18 @@ function MS:EnsurePlayer(unit)
         cls = Readable(cls)
         cls = (cls and MS.ValidClass[cls:upper()]) and cls:upper() or "UNKNOWN"
         local key = ShortName(uname)
-        p = MS.NewPlayerStats(key, cls, UnitGUIDReadable(unit))
+        local guid = UnitGUIDReadable(unit)
+        if run.players[key] then
+            -- That name is taken by someone else in the group (same name,
+            -- another realm): this one is kept under its full name.
+            local _, second = UnitName(unit)
+            local realm = (not MS.Flavor.twoPartNames) and Readable(second)
+                or (GetRealmName and Readable(GetRealmName()))
+            local alt = key .. "-" .. ((realm and realm:gsub("[%s']", "")) or (guid and guid:sub(-4)) or "2")
+            if run.players[alt] then alt = alt .. "-" .. ((guid and guid:sub(-4)) or tostring(#run.players)) end
+            key = alt
+        end
+        p = MS.NewPlayerStats(key, cls, guid)
         run.players[key] = p
     end
     p.guid = UnitGUIDReadable(unit) or p.guid

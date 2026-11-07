@@ -6,21 +6,17 @@
 
 local MS = _G["MythicScoreboard"]
 
+-- No Mythic+ (WoW Forever): nothing to show, so no tooltip hook or events.
+if not MS.Flavor.mythicPlus then return end
+
 -- ── Helpers ───────────────────────────────────────────────────────────────────
 
 local function IsInMythicPlus()
     return select(3, GetInstanceInfo()) == MS.MYTHIC_PLUS
 end
 
-local function IsTooltipEnabled()
-    local s = MythicScoreboardDB and MythicScoreboardDB.settings
-    return s and s.showMobForces ~= false
-end
-
-local function IsNameplateEnabled()
-    local s = MythicScoreboardDB and MythicScoreboardDB.settings
-    return s and s.showMobForcesNameplates ~= false
-end
+local function IsTooltipEnabled() return MS:GetMobForcesTooltip() end
+local function IsNameplateEnabled() return MS:GetMobForcesNameplate() end
 
 -- ── Tooltip ───────────────────────────────────────────────────────────────────
 
@@ -163,27 +159,7 @@ end)
 
 HookTooltip()
 
--- ── Public toggle helpers ─────────────────────────────────────────────────────
-
-function MS:GetMobForcesTooltip()
-    return MythicScoreboardDB and MythicScoreboardDB.settings
-        and MythicScoreboardDB.settings.showMobForces ~= false
-end
-
-function MS:SetMobForcesTooltip(v)
-    if MythicScoreboardDB and MythicScoreboardDB.settings then
-        MythicScoreboardDB.settings.showMobForces = v and true or false
-    end
-end
-
-function MS:GetMobForcesNameplate()
-    return MythicScoreboardDB and MythicScoreboardDB.settings
-        and MythicScoreboardDB.settings.showMobForcesNameplates ~= false
-end
-
-function MS:SetMobForcesNameplate(v)
-    if MythicScoreboardDB and MythicScoreboardDB.settings then
-        MythicScoreboardDB.settings.showMobForcesNameplates = v and true or false
-        if v then RefreshAllNameplates() else ClearAll() end
-    end
-end
+-- Turning the nameplate labels on or off (Settings.lua) shows or clears them.
+MS:OnSettingChanged("showMobForcesNameplates", function(on)
+    if on then RefreshAllNameplates() else ClearAll() end
+end)

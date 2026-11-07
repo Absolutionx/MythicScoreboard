@@ -356,9 +356,11 @@ local SCORE_TIERS = {
 
 local function ScoreColor(score)
     score = score or 0
-    if C_ChallengeMode and C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor then
-        local col = C_ChallengeMode.GetSpecificDungeonOverallScoreRarityColor(score)
-        if col then return col.r, col.g, col.b end
+    -- Overall season rating (GetSpecificDungeon... is for one dungeon's
+    -- score, a much smaller number, and painted every rating orange).
+    if C_ChallengeMode and C_ChallengeMode.GetDungeonScoreRarityColor then
+        local ok, col = pcall(C_ChallengeMode.GetDungeonScoreRarityColor, score)
+        if ok and col then return col.r, col.g, col.b end
     end
     for _, t in ipairs(SCORE_TIERS) do
         if score >= t[1] then return t[2], t[3], t[4] end
@@ -378,48 +380,37 @@ local function DiffShort(run)
     return label ~= "" and label or "?"
 end
 
--- Result text + colour for a run.
+-- How each result reads (MS:RunStatus / MS:ArchiveStatus in RunModel.lua).
+local STATUS = {
+    inTime    = { "In time",     P.verd },
+    overTime  = { "Over time",   P.avoid },
+    cleared   = { "Cleared",     P.verd },
+    live      = { "In progress", P.bronzeHi },
+    paused    = { "Paused",      P.bronzeHi },
+    finished  = { "Finished",    P.ivory },
+    abandoned = { "Abandoned",   P.ash },
+}
+
+-- Result text + colour for a run, or for an archive entry.
 local function RunResult(run)
-    local isMPlus = (run.keystoneLevel or 0) > 0
-    if run.completed then
-        if isMPlus then
-            if run.inTime then return "In time", P.verd end
-            return "Over time", P.avoid
-        end
-        return "Cleared", P.verd
-    end
-    if run == MS.currentRun and MS.inDungeon then return "In progress", P.bronzeHi end
-    if run == MS.currentRun and run._suspended then return "Paused", P.bronzeHi end
-    if run.finishedOnLeave then return "Finished", P.ivory end
-    return "Abandoned", P.ash
+    local s = STATUS[MS:RunStatus(run)] or STATUS.abandoned
+    return s[1], s[2]
+end
+local function ArchiveResult(e)
+    local s = STATUS[MS:ArchiveStatus(e)] or STATUS.abandoned
+    return s[1], s[2]
 end
 
--- ===========================================================================
--- Frame state (declared up front so every function sees the same locals)
--- ===========================================================================
-
-local overviewRows = {}
-local _rowPool    = {}
-local _playersBuf = {}
-
-local sortState    = { key = nil, dir = 1 }
-local colHdrLabels = {}
-
-local COL_SORT_VALUES = {
-    player     = function(p) return p.name or "" end,
-    loot       = function(p) return p.loot and #p.loot or 0 end,
-    level      = function(p) return p.level or 0 end,
-    score      = function(p) return p.mythicScore or 0 end,
-    deaths     = function(p) return p.deaths or 0 end,
-    dmgTaken   = function(p) return p.damageTaken or 0 end,
-    avoidable  = function(p) return p.avoidableDamageTaken or 0 end,
-    damage     = function(p) return p.damageDone or 0 end,
-    healing    = function(p) return p.healingDone or 0 end,
-    dps        = function(p) return (p.dps or 0) > 0 and p.dps or (p.damageDone or 0) end,
-    hps        = function(p) return (p.hps or 0) > 0 and p.hps or (p.healingDone or 0) end,
-    interrupts = function(p) return p.interrupts or 0 end,
-    dispels    = function(p) return p.dispels or 0 end,
-}
+-- Item quality colour (r, g, b), bronze when unknown.
+local function QualityColor(q)
+    if q and C_Item and C_Item.GetItemQualityColor then
+        local ok, r, g, b = pcall(C_Item.GetItemQualityColor, q)
+        if ok and r then return r, g, b end
+    end
+    local c = q and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[q]
+    if c then return c.r, c.g, c.b end
+    return P.bronze[1], P.bronze[2], P.bronze[3]
+end
 
 -- ===========================================================================
 -- Scroll frame
@@ -527,6 +518,42 @@ end
 
 -- ===========================================================================
 
+-- An error line in chat, once per message (a broken redraw would otherwise
+-- repeat it every poll).
+local _said = {}
+function UI.SayOnce(what, err)
+    local msg = tostring(err)
+    if _said[msg] then return end
+    _said[msg] = true
+    print("|cffff4444[MythicScoreboard]|r " .. what .. " error: " .. msg)
+end
+
+-- What a run did for your character (Forever), for a tooltip.
+-- prog: a live run's run.progress, or an archive entry's e.prog.
+function UI.AddProgressLines(prog, fromArchive)
+    if not prog then return end
+    local xp     = prog.xp or 0
+    local levels = (fromArchive and prog.lv or prog.levels) or 0
+    local kills  = (fromArchive and prog.k or prog.kills) or 0
+    local quests = fromArchive and (prog.q or 0) or #(prog.quests or {})
+    local gold   = (fromArchive and prog.g or prog.gold) or 0
+    local a, b, c = P.ash[1], P.ash[2], P.ash[3]
+    GameTooltip:AddDoubleLine("Experience", MS.FormatThousands(xp)
+        .. (levels > 0 and ("  (+" .. levels .. (levels == 1 and " level)" or " levels)")) or ""), a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Mobs killed", kills, a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine("Quests completed", quests, a, b, c, 1, 1, 1)
+    if not fromArchive then
+        for _, t in ipairs(prog.quests or {}) do GameTooltip:AddLine("   " .. t, 0.8, 0.8, 0.8) end
+    end
+    GameTooltip:AddDoubleLine("Gold looted", MS.FormatGold(gold), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+    local reps = {}
+    for f, n in pairs(prog.rep or {}) do reps[#reps + 1] = { f = f, n = n } end
+    table.sort(reps, function(x, y) return x.n > y.n end)
+    for _, r in ipairs(reps) do
+        GameTooltip:AddDoubleLine(r.f, "+" .. MS.FormatThousands(r.n) .. " reputation", a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
+    end
+end
+
 -- Published for the other UI files.
 UI.Abbrev = Abbrev
 UI.Art = Art
@@ -536,7 +563,6 @@ UI.CELL_FONT_SIZE = CELL_FONT_SIZE
 UI.CLASS_ICON_COORDS = CLASS_ICON_COORDS
 UI.COLS = COLS
 UI.COL_HDR_H = COL_HDR_H
-UI.COL_SORT_VALUES = COL_SORT_VALUES
 UI.CT = CT
 UI.ClassColor = ClassColor
 UI.ClassHex = ClassHex
@@ -559,6 +585,8 @@ UI.ROLE_ICON_COORDS = ROLE_ICON_COORDS
 UI.ROLE_ICON_TEX = ROLE_ICON_TEX
 UI.ROW_H = ROW_H
 UI.RunResult = RunResult
+UI.ArchiveResult = ArchiveResult
+UI.QualityColor = QualityColor
 UI.ScoreColor = ScoreColor
 UI.SetFont = SetFont
 UI.Solid = Solid
@@ -569,8 +597,3 @@ UI.Tint = Tint
 UI.VGrad = VGrad
 UI.WIPE_BOT = WIPE_BOT
 UI.WIPE_TOP = WIPE_TOP
-UI._playersBuf = _playersBuf
-UI._rowPool = _rowPool
-UI.colHdrLabels = colHdrLabels
-UI.overviewRows = overviewRows
-UI.sortState = sortState

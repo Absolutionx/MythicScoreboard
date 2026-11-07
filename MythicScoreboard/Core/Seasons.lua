@@ -5,7 +5,9 @@ local MS = _G["MythicScoreboard"]
 
 MS.MYTHIC_PLUS = 8            -- difficulty ID of a Mythic+ keystone run
 
--- M+ time limits, used when C_ChallengeMode.GetDeadlineExpiration() is unavailable.
+-- M+ time limits, for when the game doesn't give one (see MS:KnownTimeLimit).
+-- Keyed by the dungeon's English name: on other languages these are skipped
+-- and the game's own numbers are used.
 MS.DUNGEON_TIMERS = {
     -- Season 2 (patch 12.1)
     ["Altar of Fangs"]         = 30 * 60,
@@ -27,7 +29,9 @@ MS.DUNGEON_TIMERS = {
     ["Skyreach"]               = 28 * 60,
 }
 
--- Boss counts for completion detection. EJ is the fallback for unlisted dungeons.
+-- Boss counts for clear detection outside Mythic+ (Completion.lua). Dungeons
+-- not listed, and every dungeon on other languages, are counted from the
+-- Encounter Journal instead.
 MS.BOSS_COUNTS = {
     -- Season 2 (patch 12.1)
     ["Altar of Fangs"]         = 3,
@@ -48,3 +52,16 @@ MS.BOSS_COUNTS = {
     ["Skyreach"]               = 4,
     ["Pit of Saron"]           = 3,
 }
+
+-- A key's time limit: the game's own for this map, else the table above.
+function MS:KnownTimeLimit(run)
+    local mapID = run and run.challengeMapID
+    if mapID and C_ChallengeMode and C_ChallengeMode.GetMapUIInfo then
+        local ok, _, _, limit = pcall(C_ChallengeMode.GetMapUIInfo, mapID)
+        if ok and type(limit) == "number" and not (issecretvalue and issecretvalue(limit))
+                and limit > 10 and limit < 7200 then
+            return limit
+        end
+    end
+    return run and MS.DUNGEON_TIMERS[run.dungeonName or ""]
+end
