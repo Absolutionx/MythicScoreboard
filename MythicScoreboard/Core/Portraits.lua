@@ -19,14 +19,12 @@
 -- from its own model. No artwork ships with the addon.
 
 local MS = _G["MythicScoreboard"]
-local _issecret = issecretvalue
+local L = MS.L
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
-local function Secret(v) return _issecret and v ~= nil and _issecret(v) end
+local Secret = IsSecret
 
-local function Norm(s)
-    if type(s) ~= "string" then return nil end
-    return (s:gsub("\226\128\153", "'")):lower()
-end
+local Norm = MS.BossKey      -- (the key portraits are saved under)
 
 local function DB()
     MythicScoreboardPortraitsDB = MythicScoreboardPortraitsDB or {}
@@ -48,7 +46,7 @@ end
 
 local function Changed()
     MS._portraitRev = (MS._portraitRev or 0) + 1
-    if MS.RefreshOverview then MS:RefreshOverview() end
+    MS:Changed("portraits")
 end
 
 -- ── Encounter Journal ──────────────────────────────────────────────────────

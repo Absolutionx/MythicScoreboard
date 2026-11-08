@@ -93,7 +93,7 @@ end
 local function CurrentUiMap()
     if not (C_Map and C_Map.GetBestMapForUnit) then return nil end
     local ok, map = pcall(C_Map.GetBestMapForUnit, "player")
-    if ok and type(map) == "number" and not (issecretvalue and issecretvalue(map)) then return map end
+    if ok and type(map) == "number" and not MS.IsSecret(map) then return map end
 end
 
 -- Whether a paused run can carry on here: the same dungeon, and for an
@@ -219,7 +219,7 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     run.startTime       = GetTime()
     run.challengeMapID  = ActiveChallengeMap()
     local instanceID    = select(8, GetInstanceInfo())
-    if type(instanceID) == "number" and not (issecretvalue and issecretvalue(instanceID)) then
+    if type(instanceID) == "number" and not MS.IsSecret(instanceID) then
         run.instanceID = instanceID
     end
     run.affixes = CurrentAffixes()
@@ -238,7 +238,7 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
                 if tl then
                     run.keystoneTimeLimit = tl
                     self:SaveCurrentRun()
-                    if self.RefreshOverview then self:RefreshOverview() end
+                    self:Changed("run")
                 end
             end
             C_Timer.After(1.0, TryFetchTimeLimit)
@@ -258,20 +258,20 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
             SeedPlayers()
             self:PopulateAll()
             self:PopulateRolesAndScores()
-            if self.RefreshOverview then self:RefreshOverview() end
+            self:Changed("run")
         end)
     end
     self:PopulateAll()
     self:PopulateRolesAndScores()
     run._wallClockStart = time()
     self:SaveCurrentRun()
-    if self.RefreshOverview then self:RefreshOverview() end
+    self:Changed("run")
     -- Short delay lets roster seeding settle before first snapshot.
     C_Timer.After(0.5, function()
         if self.currentRun and not InCombatLockdown() then
             self:SnapshotFromDamageMeter()
             self:SaveCurrentRun()
-            if self.RefreshOverview then self:RefreshOverview() end
+            self:Changed("run")
         end
     end)
 end
@@ -323,7 +323,7 @@ function MS:ResumeRun()
     self:WarmPetCache(1.0)
     self:SaveCurrentRun()
     Say(_fmt(L["Run resumed: %s"], run.dungeonName or ""))
-    if self.RefreshOverview then self:RefreshOverview() end
+    self:Changed("run")
 end
 
 -- paused -> none: closed as abandoned (or finished, under the clear rules).
@@ -370,7 +370,7 @@ local function CheckLocation(self, confirmedOutside)
         -- but a ghost outside is on a corpse run, whatever the rule.
         local leaveRule = self:LeaveEndsRuns()
         local ghost = UnitIsDeadOrGhost and UnitIsDeadOrGhost("player")
-        if issecretvalue and issecretvalue(ghost) then ghost = false end
+        if MS.IsSecret(ghost) then ghost = false end
         if (run.keystoneLevel or 0) == 0 and not run.completed and not run.finalDown
                 and (not leaveRule or ghost) then
             self:PauseRun()
@@ -442,7 +442,7 @@ end)
 resetFrame:SetScript("OnEvent", function(_, _, msg)
     local run = MS.currentRun
     if not (_resetPattern and run and run._suspended and type(msg) == "string") then return end
-    if issecretvalue and issecretvalue(msg) then return end
+    if MS.IsSecret(msg) then return end
     local dungeon = msg:match(_resetPattern)
     if dungeon and dungeon == run.dungeonName then MS:ClosePausedRun() end
 end)

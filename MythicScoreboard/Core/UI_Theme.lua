@@ -567,13 +567,7 @@ end
 
 -- An error line in chat, once per message (a broken redraw would otherwise
 -- repeat it every poll).
-local _said = {}
-function UI.SayOnce(what, err)
-    local msg = tostring(err)
-    if _said[msg] then return end
-    _said[msg] = true
-    print("|cffff4444[MythicScoreboard]|r " .. what .. " error: " .. msg)
-end
+function UI.SayOnce(what, err) MS:ReportError(what, err) end
 
 -- What a run did for your character (Forever), for a tooltip.
 -- prog: a live run's run.progress, or an archive entry's e.prog.
@@ -636,6 +630,21 @@ UI.ArchiveResult = ArchiveResult
 UI.QualityColor = QualityColor
 UI.ScoreColor = ScoreColor
 UI.SetFont = SetFont
+
+-- SetText for a long name in a fixed width: if the game cuts it short, the
+-- font steps down a size at a time (to minSize) until it fits, rather than
+-- ending in "...". Back to full size for the next, shorter text.
+function UI.FitText(fs, text, kind, size, minSize)
+    if fs._msFitSize ~= size then SetFont(fs, kind, size); fs._msFitSize = size end
+    fs:SetText(text)
+    if not fs.IsTruncated then return end
+    local s = size
+    while fs:IsTruncated() and s > (minSize or size - 3) do
+        s = s - 1
+        SetFont(fs, kind, s); fs._msFitSize = s
+        fs:SetText(text)
+    end
+end
 UI.SetNameText = SetNameText
 UI.ScriptOf = ScriptOf
 UI.Solid = Solid

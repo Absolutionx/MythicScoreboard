@@ -146,6 +146,10 @@ local Mk = dofile("wowmock.lua")
 GetLocale = function() return PREVIEW and "enUS" or "ruRU" end
 Mk.LoadTOC(DIR, TOC)
 local A = rawget(_G, "MythicScoreboard")
+-- Nothing is translated while the files load: the language isn't settled
+-- until ADDON_LOADED, so a label made then stays English (LK is for those).
+check("no translations looked up while loading", A._earlyLookups and #A._earlyLookups == 0,
+    A._earlyLookups and table.concat(A._earlyLookups, " | "))
 check("English while loading", A.L["Deaths"] == "Deaths")
 local clock = 1800000000
 time = function() return clock end

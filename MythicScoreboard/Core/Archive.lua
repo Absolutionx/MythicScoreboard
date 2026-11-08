@@ -47,7 +47,7 @@ local function Account()
 end
 
 local function Plain(v)
-    if v == nil or (issecretvalue and issecretvalue(v)) then return nil end
+    if v == nil or MS.IsSecret(v) then return nil end
     return v
 end
 

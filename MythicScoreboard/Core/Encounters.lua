@@ -8,7 +8,7 @@ local _ins = table.insert
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local function Now(run) return MS:GetRunDuration(run) end
 
@@ -159,8 +159,7 @@ function MS:NoteMobDied(name)
     local run = self.currentRun
     local boss = run and run.activeBoss
     if not boss or boss.killTime or boss.wipeTime or type(name) ~= "string" then return end
-    local function norm(s) return (s:lower():gsub("[%s%p]", "")) end
-    if norm(boss.name or "") == norm(name) then boss._diedAt = Now(run) end
+    if MS.SameBossName(boss.name, name) then boss._diedAt = Now(run) end
 end
 
 -- Out of combat with a fight still open: once nobody in the group has been
@@ -226,7 +225,7 @@ function MS:RecordDeathEvent(who)
 end
 
 local function Plain(v)
-    if v == nil or (_issecret and _issecret(v)) then return nil end
+    if v == nil or IsSecret(v) then return nil end
     return v
 end
 

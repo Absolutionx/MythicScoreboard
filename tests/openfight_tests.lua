@@ -50,10 +50,15 @@ kill("Ghamoo-ra"); wait(200); kill("Lady Sarevess"); wait(300); kill("Geilhast")
 noEnd("Lorgus Jett")
 local lj = Boss(run, "Lorgus Jett")
 check("reset: still open at once", lj and not lj.wipeTime and not lj.killTime)
-wait(8); M.RunTimers(8)
+M.Advance(3)
+check("reset: still open 3s later (the group may still be fighting)", not lj.wipeTime)
+inCombat = true; M.Advance(4)
+check("reset: kept open while anyone's in combat", not lj.wipeTime)
+inCombat = false; M.Advance(7)
 check("reset: closed", lj.wipeTime ~= nil and lj.reset == true and not lj.killTime, tostring(lj.wipeTime))
 check("reset: ended when combat did", lj.wipeTime and math.abs(lj.wipeTime - (lj.pullTime + 27)) < 1, lj.wipeTime and (lj.wipeTime - lj.pullTime))
 check("reset: no fight open", run.activeBoss == nil)
+check("reset: result", MS.FightResult(lj) == "reset" and MS.FightLost(lj) and MS.FightTag(lj):find("reset") ~= nil)
 
 -- Deaths later aren't Lorgus Jett's, and Aku'mai clears it (he doesn't always spawn).
 wait(500); kill("Old Serra'kis"); wait(400); kill("Twilight Lord Kelris"); wait(300); kill("Aku'mai", 70)
@@ -75,6 +80,7 @@ noEnd("Lorgus Jett", true)
 lj = Boss(run, "Lorgus Jett")
 wait(8); M.RunTimers(8)
 check("xp: killed", lj.killTime ~= nil and not lj.wipeTime, tostring(lj.killTime))
+check("xp: result", MS.FightResult(lj) == "kill" and not MS.FightLost(lj) and MS.FightTag(lj) == "")
 check("xp: at the death", lj.killTime and math.abs(lj.killTime - (lj.pullTime + 25)) < 1)
 
 -- ── Its ENCOUNTER_END comes late after all: no harm ─────────────────────────
@@ -98,7 +104,7 @@ M.Fire("ENCOUNTER_START", 3, "Twilight Lord Kelris"); wait(10)
 M.dead.player = true; inCombat = false; M.Fire("PLAYER_REGEN_ENABLED")
 wait(12); M.RunTimers(8)
 local tk = Boss(run, "Twilight Lord Kelris")
-check("dead: fight kept open", not tk.wipeTime and not tk.killTime)
+check("dead: fight kept open", MS.FightResult(tk) == "open" and MS.FightEnd(tk) == nil)
 M.dead.player = nil
 M.Fire("ENCOUNTER_END", 3, "Twilight Lord Kelris", 1, 5, 1); M.RunTimers(4)
 check("dead: then killed", tk.killTime ~= nil)
@@ -127,6 +133,13 @@ for _, p in pairs(saved.players) do total = total + (p.deaths or 0); for _, de i
     check("no death after the clear", de.time <= saved.clearedAt + 2, de.time) end end
 check("cleared on leaving", saved.completed and saved.clearedAt ~= nil)
 check("deaths after Aku'mai dropped", total == before, total)
+
+-- ── Boss names, compared one way ───────────────────────────────────────────
+check("names: key", MS.BossKey("Ner\226\128\153zhul") == "ner'zhul")
+check("names: case", MS.SameBossName("Lorgus Jett", "lorgus jett"))
+check("names: punctuation", MS.SameBossName("Lorgus-Jett", "Lorgus Jett"))
+check("names: curly apostrophe", MS.SameBossName("Aku\226\128\153mai", "Aku'mai"))
+check("names: different bosses", not MS.SameBossName("Gelihast", "Ghamoo-ra"))
 
 io.stdout:write(("openfight_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

@@ -52,7 +52,7 @@ local function OnLoaded()
             active._suspended = { at = active._savedAt or time(), offline = active._offline }
             MS:RestoreCurrentRun()
         end
-        C_Timer.After(0.2, function() MS:RefreshOverview() end)
+        C_Timer.After(0.2, function() MS:Changed("run") end)
     end
     print("|cff00ccff[MythicScoreboard]|r v" .. MS.version .. "  " .. L["/sb to open."])
 end

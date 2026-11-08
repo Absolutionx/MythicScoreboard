@@ -6,7 +6,7 @@
 local _floor, _ins, _rem = math.floor, table.insert, table.remove
 
 local MS = _G["MythicScoreboard"]
-local _issecret = issecretvalue  -- nil on pre-12.0 clients
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local inspectQueue   = {}
 local inspectPending = nil
@@ -27,13 +27,13 @@ local function EnsureInspectFrame()
         inspectPending = nil
         if targetUnit and C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel then
             local ok, il = pcall(C_PaperDollInfo.GetInspectItemLevel, targetUnit)
-            if ok and type(il) == "number" and not (_issecret and _issecret(il)) and il > 0 then
+            if ok and type(il) == "number" and not IsSecret(il) and il > 0 then
                 il = _floor(il)
                 MS.itemLevelCache = MS.itemLevelCache or {}
                 MS.itemLevelCache[name] = il
                 local p = MS:PlayerByName(name)
                 if p then p.itemLevel = il end
-                if MS.RefreshOverview then MS:RefreshOverview() end
+                MS:Changed("run")
             end
         end
         ClearInspectPlayer()
@@ -82,7 +82,7 @@ function MS:PopulateRolesAndScores()
             if C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary then
                 local ok, sc = pcall(C_PlayerInfo.GetPlayerMythicPlusRatingSummary, unit)
                 local v = ok and type(sc) == "table" and sc.currentSeasonScore
-                if type(v) == "number" and not (_issecret and _issecret(v)) then score = v end
+                if type(v) == "number" and not IsSecret(v) then score = v end
             end
             if score and score > 0 then
                 p.mythicScore = score
@@ -106,7 +106,7 @@ function MS:PopulateAll()
             -- Character level matters in Forever's levelling dungeons and
             -- can change mid-run, so it's refreshed on every snapshot.
             local lvl = UnitLevel and UnitLevel(unit)
-            if type(lvl) == "number" and not (_issecret and _issecret(lvl)) and lvl > 0 then
+            if type(lvl) == "number" and not IsSecret(lvl) and lvl > 0 then
                 p.level = lvl
             end
             local cached = self.itemLevelCache[short]

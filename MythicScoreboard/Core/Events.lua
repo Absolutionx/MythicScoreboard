@@ -6,7 +6,7 @@
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local MYTHIC_PLUS = MS.MYTHIC_PLUS
 
@@ -133,7 +133,7 @@ function H.GROUP_ROSTER_UPDATE()
         EndUnfinishedKey()
         return
     end
-    C_Timer.After(2.0, function() if MS.RefreshOverview then MS:RefreshOverview() end end)
+    C_Timer.After(2.0, function() MS:Changed("run") end)
 end
 
 function H.UNIT_PET(ownerUnit)
@@ -142,7 +142,7 @@ function H.UNIT_PET(ownerUnit)
         local petUnit = ownerUnit .. "pet"
         if UnitExists(petUnit) then
             local ok, petGUID = pcall(UnitGUID, petUnit)
-            if ok and petGUID and not (_issecret and _issecret(petGUID))
+            if ok and petGUID and not IsSecret(petGUID)
                     and type(petGUID) == "string"
                     and (petGUID:find("^Pet%-") or petGUID:find("^Creature%-")) then
                 local ownerName = MS:UnitPlayerName(ownerUnit)
@@ -199,17 +199,11 @@ end)
 -- M+) and death state every 0.75s (UNIT_DIED via the combat log is blocked).
 -- Both only run while you're in a run.
 local ACTIVE = { active = true }
-local _said = {}
-local function SayOnce(what, err)
-    local msg = tostring(err)
-    if _said[msg] then return end
-    _said[msg] = true
-    print("|cffff4444[MythicScoreboard]|r " .. what .. " error: " .. msg)
-end
+local function SayOnce(what, err) MS:ReportError(what, err) end
 MS:StateTicker(2, ACTIVE, function()
     if not MS.inDungeon then return end
     local ok, err = pcall(function()
-        if MS:SnapshotFromDamageMeter() then MS:RefreshOverview() end
+        if MS:SnapshotFromDamageMeter() then MS:Changed("run") end
     end)
     if not ok then SayOnce("Meter poll", err) end
 end)

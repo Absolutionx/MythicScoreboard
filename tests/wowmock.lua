@@ -133,10 +133,15 @@ function M.Fire(event, ...)
         if s then s(f, event, ...) end
     end
 end
+-- Timers. Each remembers when it's due (M.now + its delay).
+--   M.RunTimers(n): n rounds of firing every pending timer at once, due or
+--     not (the old, time-blind way most tests are written for).
+--   M.Advance(s):   moves the clock on s seconds and fires timers and tickers
+--     only as they come due, in order, as the game would.
 function M.RunTimers(times)
     for _ = 1, (times or 1) do
         local t = M.timers; M.timers = {}
-        for _, fn in ipairs(t) do fn() end
+        for _, e in ipairs(t) do if not e.cancelled then e.fn() end end
     end
 end
 function M.Tick()
@@ -144,19 +149,42 @@ function M.Tick()
     for i, t in ipairs(M.tickers) do list[i] = t end
     for _, t in ipairs(list) do if not t.cancelled then t.fn() end end
 end
+function M.Advance(seconds)
+    local stop = M.now + seconds
+    while true do
+        -- the next thing due: a timer, or a ticker's next beat
+        local nextT, which, idx = nil, nil, nil
+        for i, e in ipairs(M.timers) do
+            if not e.cancelled and e.due <= stop and (not nextT or e.due < nextT) then nextT, which, idx = e.due, e, i end
+        end
+        for _, t in ipairs(M.tickers) do
+            t.nextAt = t.nextAt or (t.started + t.every)
+            if not t.cancelled and t.nextAt <= stop and (not nextT or t.nextAt < nextT) then nextT, which, idx = t.nextAt, t, nil end
+        end
+        if not nextT then break end
+        if nextT > M.now then M.now = nextT end
+        if idx then table.remove(M.timers, idx); which.fn()
+        else which.nextAt = which.nextAt + which.every; which.fn() end
+    end
+    M.now = stop
+end
 
 -- ── Global API ─────────────────────────────────────────────────────────────
 C_Timer = {
-    After = function(_, fn) table.insert(M.timers, fn) end,
-    NewTicker = function(_, fn)
-        local t = { fn = fn }
+    After = function(delay, fn) table.insert(M.timers, { fn = fn, due = M.now + (delay or 0) }) end,
+    NewTicker = function(every, fn)
+        local t = { fn = fn, every = math.max(every or 0, 0.001), started = M.now }
         t.Cancel = function()
             t.cancelled = true
             for i, x in ipairs(M.tickers) do if x == t then table.remove(M.tickers, i); break end end
         end
         table.insert(M.tickers, t); return t
     end,
-    NewTimer = function(_, fn) table.insert(M.timers, fn); return { Cancel = noop } end,
+    NewTimer = function(delay, fn)
+        local e = { fn = fn, due = M.now + (delay or 0) }
+        e.Cancel = function() e.cancelled = true end
+        table.insert(M.timers, e); return e
+    end,
 }
 GetTime = function() return M.now end
 time = os.time

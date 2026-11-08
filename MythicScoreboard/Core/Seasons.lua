@@ -58,7 +58,7 @@ function MS:KnownTimeLimit(run)
     local mapID = run and run.challengeMapID
     if mapID and C_ChallengeMode and C_ChallengeMode.GetMapUIInfo then
         local ok, _, _, limit = pcall(C_ChallengeMode.GetMapUIInfo, mapID)
-        if ok and type(limit) == "number" and not (issecretvalue and issecretvalue(limit))
+        if ok and type(limit) == "number" and not MS.IsSecret(limit)
                 and limit > 10 and limit < 7200 then
             return limit
         end

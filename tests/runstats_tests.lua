@@ -50,7 +50,9 @@ M.Fire("CHAT_MSG_COMBAT_FACTION_CHANGE", "Your Orgrimmar reputation has increase
 M.Fire("CHAT_MSG_COMBAT_FACTION_CHANGE", "Your Orgrimmar reputation has increased by 10.")
 check("rep: by faction", pr.rep and pr.rep.Orgrimmar == 35, pr.rep and pr.rep.Orgrimmar)
 
--- Quests: one finished in here, one already done before.
+-- Quests: one finished in here (the game reports the objective's progress),
+-- one already done before.
+M.Fire("QUEST_WATCH_UPDATE", 1)                     -- log index 1 (classic)
 M.quests[1].done = true
 M.Fire("QUEST_LOG_UPDATE"); M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
 check("quests: the one finished here", #pr.quests == 1 and pr.quests[1] == "Searching for the Lost Satchel",
@@ -62,12 +64,29 @@ M.quests[#M.quests + 1] = { title = "Ziz Fizziks", id = 201, done = true }
 M.quests[#M.quests + 1] = { title = "Harpy Lieutenants", id = 202, done = true }
 M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
 check("quests: already done when first seen don't count", #pr.quests == 1, #pr.quests)
--- One that shows up incomplete and then completes does.
+-- Quests long done that read as not done while the log loads, then done
+-- (City of Dalaran: ten of them counted at zone-in): no progress, no count.
+for i, t in ipairs({ "Wrongly Blamed, Justly Corrected", "Kill Grundig Darkcloud", "Regthar Deathgate" }) do
+    M.quests[#M.quests + 1] = { title = t, id = 300 + i, done = false }
+end
+M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+for i = #M.quests - 2, #M.quests do M.quests[i].done = true end
+M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+check("quests: done ones that loaded as not done don't count", #pr.quests == 1, #pr.quests)
+-- One that shows up incomplete, makes progress here, and completes does.
 M.quests[#M.quests + 1] = { title = "Deathstalkers in Shadowfang", id = 203, done = false }
 M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+M.Fire("QUEST_WATCH_UPDATE", 203)                   -- quest ID (newer clients)
 M.quests[#M.quests].done = true
 M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
-check("quests: seen incomplete, then complete", #pr.quests == 2 and pr.quests[2] == "Deathstalkers in Shadowfang", #pr.quests)
+check("quests: progress here, then complete", #pr.quests == 2 and pr.quests[2] == "Deathstalkers in Shadowfang", #pr.quests)
+-- One completed right after an objective line ("Arcane Mote: 1/1").
+M.quests[#M.quests + 1] = { title = "Heart of Disruption", id = 204, done = false }
+M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+M.Fire("UI_INFO_MESSAGE", 288, "Arcane Mote: 1/1")
+M.quests[#M.quests].done = true
+M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+check("quests: right after an objective line", #pr.quests == 3 and pr.quests[3] == "Heart of Disruption", #pr.quests)
 
 -- Gold.
 money(10850); money(12000)
@@ -99,10 +118,10 @@ end
 zone(WORLD)
 local runs = MS:ArchiveRuns()
 local e = runs[#runs]
-check("archive: progress kept", e and e.prog and e.prog.xp == 1400 and e.prog.k == 3 and e.prog.q == 2
+check("archive: progress kept", e and e.prog and e.prog.xp == 1400 and e.prog.k == 3 and e.prog.q == 3
     and e.prog.g == 2000 and e.prog.lv == 1 and e.prog.rep.Orgrimmar == 35)
 local st = MS:StatsOverview()
-check("stats: totals", st.xp == 1400 and st.kills == 3 and st.quests == 2 and st.gold == 2000, st.xp)
+check("stats: totals", st.xp == 1400 and st.kills == 3 and st.quests == 3 and st.gold == 2000, st.xp)
 check("stats: per dungeon", st.dungeons[1] and st.dungeons[1].xpPerRun == 1400)
 
 -- Formatting.

@@ -42,7 +42,7 @@ function MS:ClearHistory()
     if MythicScoreboardDB then MythicScoreboardDB.runs = {} end
     self._lastCommittedRun = nil
     self.displayRun = nil
-    if self.RefreshOverview then self:RefreshOverview() end
+    self:Changed("history")
 end
 
 -- ── Personal bests ─────────────────────────────────────────────────────────

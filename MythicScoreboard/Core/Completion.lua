@@ -16,9 +16,9 @@ local _max = math.max
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
-local function Readable(v) return v ~= nil and not (_issecret and _issecret(v)) and v or nil end
+local Readable = _G["MythicScoreboard"].ReadableValue
 
 -- ── Clear strategies ───────────────────────────────────────────────────────
 -- A strategy has:
@@ -117,7 +117,7 @@ function MS:ApplyLeaveRules(run)
     if not run then return false end
     -- A fight still open is over: ended when combat did, if that's known.
     local ab = run.activeBoss
-    if ab and not ab.killTime and not ab.wipeTime then
+    if ab and MS.FightResult(ab) == "open" then
         self:CloseOpenFight(run, run._combatEndedAt or ab.pullTime)
     end
     -- Final boss down with optional bosses left: leaving finishes it, cleared.
@@ -270,7 +270,7 @@ function MS:CommitRun(outcome)
     self:ClearSavedActiveRun()
     self.displayRun = nil
     self:SetRunState("none")
-    if self.RefreshOverview then self:RefreshOverview() end
+    self:Changed("run")
     if outcome.show then C_Timer.After(0.5, function() MS:ShowScoreboard() end) end
 end
 
