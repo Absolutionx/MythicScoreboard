@@ -10,6 +10,10 @@
 -- another) and the rest are let go. Until then L shows English, so labels
 -- defined while loading are written LK("...") and translated where shown.
 --
+-- A key can carry a note after "#" when one English word needs different
+-- translations in different places: L["Cleared#column"] shows "Cleared" in
+-- English, but a language can give the column header a shorter word.
+--
 -- Counts go through MS.Plural(n, "%d run", "%d runs"), since languages
 -- form plurals differently: a language file can set MS.PluralRule, and
 -- give a third form under "<plural key>|few" (Russian: 2-4 and 22-24...).
@@ -37,10 +41,19 @@ end
 -- An English label kept as is while loading; L[label] where it's shown.
 function MS.LK(s) return s end
 
+-- Looked up before the language is settled (while files load): English for
+-- good, whatever the language. Kept so a test can catch it (use LK instead).
+MS._earlyLookups = {}
 MS.L = setmetatable({}, {
     __index = function(_, key)
+        local early = MS._earlyLookups
+        if early then early[#early + 1] = key end
         local v = T[key]
-        if v == nil or v == "" then return key end
+        if v == nil or v == "" then
+            -- "Cleared#column": the same English, a translation of its own
+            -- (a short one for a narrow column); shown as the part before #.
+            return (key:gsub("#.*$", ""))
+        end
         return v
     end,
     __newindex = function() error("MS.L is read-only: add translations to MS.Translations") end,
@@ -78,6 +91,7 @@ function MS:UseLocale(loc)
     MS.PluralRule = (data and MS.PluralRules[data.rule]) or MS.PluralRules.english
     MS.Locale = loc
     MS.LocaleData = nil
+    MS._earlyLookups = nil
     return loc
 end
 

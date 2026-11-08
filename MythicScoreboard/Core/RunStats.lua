@@ -9,7 +9,8 @@
 --   xp, levels   your XP bar, read whenever it changes
 --   kills        "<mob> dies, you gain N experience." in chat: kills that
 --                gave you XP (none for grey mobs, or at max level)
---   quests       quests seen incomplete in your log during the run, then
+--   quests       quests seen incomplete in your log during the run, that
+--                the game said made progress in here, then
 --                complete (not ones already done: the log loads in pieces
 --                after a loading screen, and collapsed headers hide quests)
 --   gold         money gained while the run is going (not while paused)
@@ -21,9 +22,9 @@ local MS = _G["MythicScoreboard"]
 local L = MS.L
 if not MS.Flavor.progressStats then return end
 
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 local function Plain(v)
-    if v == nil or (_issecret and _issecret(v)) then return nil end
+    if v == nil or IsSecret(v) then return nil end
     return v
 end
 
@@ -36,7 +37,7 @@ end
 
 local function Changed(run)
     MS:SaveCurrentRun()
-    if MS.RefreshOverview then MS:RefreshOverview() end
+    MS:Changed("run")
 end
 
 -- ── Readings ───────────────────────────────────────────────────────────────
@@ -194,14 +195,39 @@ local function QuestLog()
 end
 
 -- quest ID -> whether it was complete when last seen. A quest counts only
--- when it's seen incomplete and later complete: right after a loading
--- screen the log fills in over a moment, and quests under collapsed headers
--- aren't listed, so "complete and not seen before" proves nothing.
+-- when it's seen incomplete and later complete, AND the game said it made
+-- progress in here. Right after a loading screen the log fills in over a
+-- moment (even quests long since done read as not done at first), and
+-- quests under collapsed headers aren't listed: neither proves anything.
 local seen = {}
+-- Progress the game reported during the run: per quest (QUEST_WATCH_UPDATE),
+-- and the time of the last objective line ("Arcane Mote: 1/1").
+local progressed = {}
+local lastObjectiveAt = -math.huge
+local OBJECTIVE_GRACE = 5            -- a quest completing within this of a line
 
 local function QuestBaseline()
-    wipe(seen)
+    wipe(seen); wipe(progressed)
+    lastObjectiveAt = -math.huge
     for id, q in pairs(QuestLog()) do seen[id] = q.done end
+end
+
+-- QUEST_WATCH_UPDATE: an objective of this quest moved on. Classic clients
+-- give the log index, newer ones the quest ID.
+local function OnQuestProgress(arg)
+    if type(arg) ~= "number" then return end
+    local id = arg
+    if GetQuestLogTitle and GetNumQuestLogEntries and arg <= (GetNumQuestLogEntries() or 0) then
+        local qid = select(8, GetQuestLogTitle(arg))
+        if type(qid) == "number" then id = qid end
+    end
+    progressed[id] = true
+end
+
+-- UI_INFO_MESSAGE: "Arcane Mote: 1/1", "Kobold slain: 4/10".
+local function OnInfoMessage(msg)
+    msg = Plain(msg)
+    if type(msg) == "string" and msg:find("%d+/%d+") then lastObjectiveAt = GetTime() end
 end
 
 local function NoteQuest(run, id, title)
@@ -218,8 +244,9 @@ local function OnQuestLog()
     local run = MS.currentRun
     if not (run and MS.inDungeon) then return end
     local any = false
+    local recentLine = GetTime() - lastObjectiveAt <= OBJECTIVE_GRACE
     for id, q in pairs(QuestLog()) do
-        if q.done and seen[id] == false then
+        if q.done and seen[id] == false and (progressed[id] or recentLine) then
             if NoteQuest(run, id, q.title) then any = true end
         end
         seen[id] = q.done
@@ -239,7 +266,8 @@ end
 -- ── Events ─────────────────────────────────────────────────────────────────
 local frame = CreateFrame("Frame")
 local EVENTS = { "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "CHAT_MSG_COMBAT_XP_GAIN",
-                 "CHAT_MSG_COMBAT_FACTION_CHANGE", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN" }
+                 "CHAT_MSG_COMBAT_FACTION_CHANGE", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN",
+                 "QUEST_WATCH_UPDATE", "UI_INFO_MESSAGE" }
 local listening = false
 MS:WatchRunState(function(state)
     local want = state == "active"
@@ -272,9 +300,13 @@ frame:SetScript("OnEvent", function(_, event, ...)
             C_Timer.After(0.5, function() pendingQuests = false; OnQuestLog() end)
         elseif event == "QUEST_TURNED_IN" then
             OnQuestTurnedIn((...))
+        elseif event == "QUEST_WATCH_UPDATE" then
+            OnQuestProgress((...))
+        elseif event == "UI_INFO_MESSAGE" then
+            OnInfoMessage(select(2, ...))
         end
     end, ...)
-    if not ok and MS.UI and MS.UI.SayOnce then MS.UI.SayOnce("Run stats", err) end
+    if not ok then MS:ReportError("Run stats", err) end
 end)
 
 -- ── Shown as ───────────────────────────────────────────────────────────────

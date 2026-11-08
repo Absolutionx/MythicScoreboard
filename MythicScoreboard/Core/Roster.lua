@@ -10,12 +10,12 @@
 -- versions still load; each entry also carries the player's GUID once known.
 
 local MS = _G["MythicScoreboard"]
-local _issecret = issecretvalue  -- nil on pre-12.0 clients
+local IsSecret = _G["MythicScoreboard"].IsSecret
 
 -- ── Readable values ────────────────────────────────────────────────────────
 -- A value the addon may read and store: present, not secret, a non-empty string.
 local function Readable(v)
-    if v == nil or (_issecret and _issecret(v)) or type(v) ~= "string" or v == "" then return nil end
+    if v == nil or IsSecret(v) or type(v) ~= "string" or v == "" then return nil end
     return v
 end
 MS.Readable = Readable
@@ -49,7 +49,7 @@ end
 -- give as "Jay-Breezy"), so the whole name is kept, with a hyphen between
 -- the parts, and only a realm suffix is removed.
 local function ShortName(name)
-    if type(name) ~= "string" or (_issecret and _issecret(name)) then return name end
+    if type(name) ~= "string" or IsSecret(name) then return name end
     if not MS.Flavor.twoPartNames then return name:match("^([^%-]+)") or name end
     local n = name:gsub("^%s+", ""):gsub("%s+$", ""):gsub("%s+", "-")
     local base, last = n:match("^(.-)%-([^%-]+)$")
@@ -191,7 +191,7 @@ function MS:PlayerForMeterSource(src, run)
     local guid = Readable(src.sourceGUID)
     if guid and not guid:find("^Player%-") then return nil end
     local isLocal = src.isLocalPlayer
-    if _issecret and isLocal ~= nil and _issecret(isLocal) then isLocal = nil end
+    if IsSecret(isLocal) then isLocal = nil end
 
     local p = (isLocal and self:PlayerForUnit("player", run))
         or (guid and self:PlayerByGUID(guid, run))

@@ -70,7 +70,11 @@ function MS:BuildUI()
     sbFrame = CreateFrame("Frame", "MythicScoreboardFrame", UIParent)
     UI.frame = sbFrame
     sbFrame:SetSize(FRAME_W, FRAME_H)
-    sbFrame:SetFrameStrata("DIALOG")
+    -- HIGH, as windows are; toplevel so a click brings it to the front. (In
+    -- DIALOG, with another addon's DIALOG window in front, frame levels
+    -- interleave and parts of this one showed through the other.)
+    sbFrame:SetFrameStrata("HIGH")
+    sbFrame:SetToplevel(true)
     sbFrame:SetMovable(true); sbFrame:EnableMouse(true)
     sbFrame:RegisterForDrag("LeftButton")
     sbFrame:SetScript("OnDragStart", sbFrame.StartMoving)
@@ -241,17 +245,18 @@ function MS:BuildUI()
     Box(histBtn, true)
 
     local chev = Art(histBtn, "Chevron", "ARTWORK")
-    chev:SetSize(14, 14); chev:SetPoint("RIGHT", -8, 0); Tint(chev, P.ash)
-    local hbIndex = Text(histBtn, "medium", 12, P.ash2, "CENTER")
-    hbIndex:SetPoint("LEFT", 6, 0); hbIndex:SetWidth(28)
+    chev:SetSize(14, 14); chev:SetPoint("RIGHT", -6, 0); Tint(chev, P.ash)
+    -- Tight: the dungeon's name gets every pixel the rest doesn't need.
+    local hbIndex = Text(histBtn, "medium", 12, P.ash2, "LEFT")
+    hbIndex:SetPoint("LEFT", 10, 0)                        -- as wide as its text
     local hbResult = Text(histBtn, "medium", 13, P.verd, "RIGHT")
-    hbResult:SetPoint("RIGHT", chev, "LEFT", -6, 0)
+    hbResult:SetPoint("RIGHT", chev, "LEFT", -4, 0)
     local hbTime = Text(histBtn, "medium", 13, P.ash, "RIGHT")
-    hbTime:SetPoint("RIGHT", hbResult, "LEFT", -8, 0)
+    hbTime:SetPoint("RIGHT", hbResult, "LEFT", -6, 0)
     local hbLevel = Text(histBtn, "semibold", 13, P.bronzeHi, "RIGHT")
-    hbLevel:SetPoint("RIGHT", hbTime, "LEFT", -8, 0)
+    hbLevel:SetPoint("RIGHT", hbTime, "LEFT", -6, 0)
     local hbDungeon = Text(histBtn, "game", 12, P.ivory, "LEFT")
-    hbDungeon:SetPoint("LEFT", hbIndex, "RIGHT", 6, 0)
+    hbDungeon:SetPoint("LEFT", hbIndex, "RIGHT", 7, 0)
     hbDungeon:SetPoint("RIGHT", hbLevel, "LEFT", -6, 0)
     local hbEmpty = Text(histBtn, "medium", 13, P.ash, "LEFT")
     hbEmpty:SetPoint("LEFT", 12, 0)
@@ -278,7 +283,12 @@ function MS:BuildUI()
         for _, fs in ipairs({ hbIndex, hbDungeon, hbLevel, hbTime, hbResult }) do fs:SetText("") end
         hbIndex:SetText(idx)
         hbDungeon:SetText(MS:RunTitle(r))
-        hbLevel:SetText(isMPlus and ("+" .. r.keystoneLevel) or DiffShort(r))
+        -- A dungeon's level range is already under the title ("Levels
+        -- 26-33"): left out here, so the name has the room.
+        local showLevel = isMPlus or not MS.Flavor.dungeonLevels
+        hbLevel:SetText(showLevel and (isMPlus and ("+" .. r.keystoneLevel) or DiffShort(r)) or "")
+        hbLevel:SetShown(showLevel)
+        hbDungeon:SetPoint("RIGHT", showLevel and hbLevel or hbTime, "LEFT", -6, 0)
         local lc = isMPlus and P.bronzeHi or P.ash
         hbLevel:SetTextColor(lc[1], lc[2], lc[3])
         hbTime:SetText(MS:FormatTime(MS:GetRunDuration(r)))

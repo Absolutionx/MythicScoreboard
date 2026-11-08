@@ -222,16 +222,7 @@ local function IsWingOf(key, name) return key ~= name and InstanceOf(key) == nam
 
 -- Lower-cased, curly apostrophe made straight. Remembered: the same few
 -- boss names are compared over and over while the scoreboard is open.
-local _norm = {}
-local function Norm(s)
-    if type(s) ~= "string" then return nil end
-    local n = _norm[s]
-    if not n then
-        n = (s:gsub("\226\128\153", "'")):lower()   -- curly apostrophe -> '
-        _norm[s] = n
-    end
-    return n
-end
+local Norm = MS.BossKey
 
 local FINAL_NAMES = {}
 for _, def in pairs(DUNGEONS) do

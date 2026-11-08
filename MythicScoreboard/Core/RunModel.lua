@@ -9,7 +9,8 @@
 --   duration         set when the run ends
 --   completed, inTime, clearedAt, finishedOnLeave, abandoned
 --   players[key]     see NewPlayerStats (keys: Roster.lua)
---   bosses[]         { name, pullTime, killTime | wipeTime, dungeonEncounterId, stats, ... }
+--   bosses[]         { name, pullTime, killTime | wipeTime, reset, dungeonEncounterId, stats, ... }
+--                    (how a fight went: MS.FightResult, never the fields directly)
 --
 -- Who is in it: Roster.lua. Recording it: Meter.lua, Encounters.lua.
 -- Starting and ending it: Lifecycle.lua, Completion.lua.
@@ -23,6 +24,54 @@ local L = MS.L
 MS.currentRun = nil
 MS.inDungeon  = false
 MS.scoreCache = {}
+
+-- ── Boss fights ────────────────────────────────────────────────────────────
+-- How a fight went, the one place that's worked out:
+--   "kill"   killTime set
+--   "wipe"   wipeTime set: the group died, or the fight ended without a kill
+--   "reset"  wipeTime set by Encounters' CloseOpenFight: the game never ended
+--            the fight and the boss didn't die (it reset, or was left)
+--   "open"   neither: going on now, or never finished in a run saved before
+--            such fights were closed
+function MS.FightResult(b)
+    if b.killTime then return "kill" end
+    if b.wipeTime then return b.reset and "reset" or "wipe" end
+    return "open"
+end
+-- When it ended (nil while open).
+function MS.FightEnd(b) return b.killTime or b.wipeTime end
+-- True for a fight that ended without a kill (wipe or reset).
+function MS.FightLost(b) return b.wipeTime ~= nil and not b.killTime end
+-- Boss names, compared the one way everywhere: the key is lower case with
+-- the game's curly apostrophe made plain ("Ner’zhul" = "ner'zhul"). It's
+-- also the key learned portraits are saved under, so it mustn't change.
+local _keyCache = {}
+function MS.BossKey(name)
+    if type(name) ~= "string" then return nil end
+    local k = _keyCache[name]
+    if not k then
+        k = (name:gsub("\226\128\153", "'")):lower()
+        _keyCache[name] = k
+    end
+    return k
+end
+-- Two names for the same boss: the same key, or the same letters once
+-- spaces and punctuation are dropped (a chat line's "Lorgus Jett" against
+-- an encounter's "Lorgus-Jett").
+function MS.SameBossName(a, b)
+    local ka, kb = MS.BossKey(a), MS.BossKey(b)
+    if not ka or not kb then return false end
+    if ka == kb then return true end
+    return (ka:gsub("[%s%p]", "")) == (kb:gsub("[%s%p]", ""))
+end
+
+-- " (wipe)" / " (reset)" after a boss's name, or "".
+function MS.FightTag(b)
+    local r = MS.FightResult(b)
+    if r == "wipe" then return " " .. L["(wipe)"] end
+    if r == "reset" then return " " .. L["(reset)"] end
+    return ""
+end
 
 -- ── The clock ──────────────────────────────────────────────────────────────
 -- Seconds into a run. Every time inside a run (boss pulls and kills, deaths,

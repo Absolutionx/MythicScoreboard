@@ -41,8 +41,13 @@ Core\UI_Theme.lua
 Core\UI_History.lua
 Core\UI_TimelineLayout.lua
 Core\UI_Timeline.lua
+Core\UI_TimelineBosses.lua
+Core\UI_TimelineMarks.lua
 Core\UI_Settings.lua
+Core\UI_ScoreboardRows.lua
 Core\UI_Scoreboard.lua
 Core\UI_Stats.lua
+Core\UI_StatsDungeon.lua
+Core\UI_StatsLoot.lua
 Core\UI.lua
 Core\UI_Minimap.lua

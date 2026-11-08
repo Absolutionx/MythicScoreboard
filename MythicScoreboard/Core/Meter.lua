@@ -13,7 +13,7 @@
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 local _ins = table.insert
 local Readable = MS.Readable
 local ShortName = MS.ShortName
@@ -34,7 +34,7 @@ end
 
 -- A number the addon may store, or nil.
 local function Num(v)
-    if v == nil or (_issecret and _issecret(v)) then return nil end
+    if v == nil or IsSecret(v) then return nil end
     return tonumber(v)
 end
 
@@ -45,18 +45,18 @@ end
 -- are matched by GUID and unreadable names are skipped source by source.
 -- `s` may be the overall damage session already read, to save reading it again.
 function MS:IsMeterHidden(s)
-    if not (_issecret and C_DamageMeter and C_DamageMeter.GetCombatSessionFromType) then return false end
+    if not (MS.HasSecrets and C_DamageMeter and C_DamageMeter.GetCombatSessionFromType) then return false end
     if not s then
         local ok
         ok, s = pcall(C_DamageMeter.GetCombatSessionFromType, 0, 0)
         if not (ok and s) then return false end
     end
-    if (s.maxValue ~= nil and _issecret(s.maxValue))
-            or (s.duration ~= nil and _issecret(s.duration)) then
+    if IsSecret(s.maxValue)
+            or IsSecret(s.duration) then
         return true
     end
     local first = s.combatSources and s.combatSources[1]
-    return first ~= nil and first.totalAmount ~= nil and _issecret(first.totalAmount)
+    return first ~= nil and IsSecret(first.totalAmount)
 end
 
 -- The overall session for one stat type, or nil.
@@ -246,7 +246,7 @@ local function ApplyDeaths(self, run)
                 end
             end
             local isLocal = src.isLocalPlayer
-            if isLocal ~= nil and issecretvalue and issecretvalue(isLocal) then isLocal = nil end
+            if isLocal ~= nil and MS.IsSecret(isLocal) then isLocal = nil end
             if isLocal then
                 local ok, id = pcall(rawget, src, "deathRecapID")
                 if ok and Num(id) and id ~= 0 then self:NoteDeathRecap(p, id) end
@@ -376,7 +376,7 @@ local function ReadSession(self, run, id)
         local ok, s = pcall(C_DamageMeter.GetCombatSessionFromID, id, statType)
         if not (ok and type(s) == "table" and s.combatSources) then return nil end
         for _, src in ipairs(s.combatSources) do
-            if src.totalAmount ~= nil and _issecret and _issecret(src.totalAmount) then return nil end
+            if IsSecret(src.totalAmount) then return nil end
             local amt = tonumber(src.totalAmount) or 0
             if amt > 0 then
                 local p = self:PlayerForMeterSource(src, run)
@@ -446,7 +446,7 @@ function MS:CaptureFightStats(run, readable)
     local n = #run.bosses
     local byName
     for i, boss in ipairs(run.bosses) do
-        if (boss.killTime or boss.wipeTime) and not boss.stats then
+        if MS.FightEnd(boss) and not boss.stats then
             local stats
             if not boss._session and not boss._named and C_DamageMeter.GetAvailableCombatSessions then
                 boss._named = true

@@ -11,7 +11,7 @@
 -- chest) is attached to that saved run for a few minutes.
 
 local MS = _G["MythicScoreboard"]
-local _issecret = issecretvalue
+local IsSecret = _G["MythicScoreboard"].IsSecret
 local _ins = table.insert
 
 local PREFIX         = "MSBLoot"
@@ -19,7 +19,7 @@ local LATE_WINDOW    = 300     -- seconds after a run ends that loot still count
 local DEDUPE_WINDOW  = 15
 local MAX_PER_PLAYER = 40      -- a full Blackrock Depths can drop a lot of greens
 
-local function Secret(v) return _issecret and v ~= nil and _issecret(v) end
+local Secret = IsSecret
 
 local function ItemString(link)
     if type(link) ~= "string" then return nil end
@@ -119,7 +119,7 @@ function MS:RecordLoot(playerName, link, source)
     run._seq = (run._seq or 0) + 1
     self._lootRev = self._lootRev + 1
     if run == self.currentRun then self:SaveCurrentRun() end
-    if self.RefreshOverview then self:RefreshOverview() end
+    self:Changed("loot")
 
     -- Share our own drops with other MythicScoreboard users in the group.
     if source ~= "comm" and p == self:PlayerForUnit("player", run) then
@@ -239,7 +239,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
         C_Timer.After(0.3, function()
             _infoRefreshPending = false
             MS._lootRev = (MS._lootRev or 0) + 1
-            if MS.RefreshOverview then MS:RefreshOverview() end
+            MS:Changed("loot")
         end)
     end
 end)
