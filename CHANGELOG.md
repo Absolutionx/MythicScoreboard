@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.8.0
+
+### Now in your language
+- Mythic Scoreboard is fully translated into German, French, Spanish, Portuguese, Italian, Russian, Korean and Chinese (Simplified and Traditional). Every window, tooltip and chat message follows your game's language.
+- Russian, Korean and Chinese text uses the game's own fonts, so nothing shows up as empty boxes.
+- On English and European clients, player names in Cyrillic, Korean or Chinese now display correctly.
+- Gold amounts and large numbers use your language's formatting.
+- New: `/sb lang <code>` (for example `/sb lang deDE`), then `/reload`, shows the addon in another language without changing your game's. `/sb lang off` switches back.
+
+### WoW Forever
+- The scoreboard now recognises dungeons on non-English clients, with level ranges and boss progress.
+- Krol'dok Stronghold now tracks its bosses, and The Drowned City is supported.
+- Lorgus Jett in Blackfathom Deeps is now optional, since he doesn't always spawn. Killing Aku'mai clears the dungeon.
+
+### Fixes
+- Fixed a boss staying "In combat" forever when the game never reported the fight ending. The fight now closes once combat is over, as a kill if the boss died or as a reset if not.
+- Deaths after a dungeon is cleared (while looting or exploring) no longer count against the run.
+- The run timeline's completion marker is now evenly spaced and lines up exactly with the last boss.
+- Fixed the run number sometimes not showing in the history dropdown.
+
 ## 2.6.0
 
 ### New
