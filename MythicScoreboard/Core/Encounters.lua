@@ -119,11 +119,36 @@ local function OpenFight(run, bossName)
     end
 end
 
+-- The game's end for a fight the addon already closed as a reset (nobody
+-- was fighting, so it looked over): the game knows better. A kill turns the
+-- reset into a kill, at the moment combat ended if the report came soon after
+-- (closing waits a few quiet seconds), or now if the fight had carried on. A
+-- wipe makes it a plain wipe.
+local LATE_END = 10 * 60
+local function LateEnd(self, run, bossName, dungeonEncounterId, field)
+    local now = Now(run)
+    for i = #run.bosses, 1, -1 do
+        local b = run.bosses[i]
+        if MS.SameBossName(b.name, bossName) then
+            if not (b.reset and b.wipeTime and not b.killTime and now - b.wipeTime <= LATE_END) then return nil end
+            b.reset = nil
+            if field == "killTime" then
+                b.killTime = (now - b.wipeTime <= 20) and b.wipeTime or now
+                b.wipeTime = nil
+            end
+            NoteEncounter(b, dungeonEncounterId)
+            if self.NoteFightEnd then self:NoteFightEnd(b) end
+            self:SaveCurrentRun()
+            return b
+        end
+    end
+end
+
 local function EndFight(self, bossName, dungeonEncounterId, field, at)
     local run = self.currentRun
     if not run then return nil end
     local boss = OpenFight(run, bossName)
-    if not boss then return nil end
+    if not boss then return LateEnd(self, run, bossName, dungeonEncounterId, field) end
     boss[field] = at or Now(run)
     NoteEncounter(boss, dungeonEncounterId)
     if run.activeBoss == boss then run.activeBoss = nil end

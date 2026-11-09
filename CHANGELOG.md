@@ -1,5 +1,18 @@
 # Changelog
 
+## Next release
+
+### New for Mythic+
+- **Keys tab on the Stats page:**
+  - **Your rating, key by key:** a chart with a line per character. Each key is a diamond coloured by how it went: bronze for +2 and +3, white for +1, red over time. Hover one for the dungeon, the level and the rating it took you to.
+  - **Per dungeon:** keys run, how many were timed, the average upgrade, your highest key timed and your highest key run. Click a dungeon for all its runs.
+  - **By level:** how many keys of each level you timed, so you can see where it starts getting hard.
+- Keys already on the Stats page pick up their upgrade and rating from your run history where it still has them.
+
+### Fixes
+- A boss the addon had marked as reset (nobody was fighting) now turns into a kill if the game reports the kill afterwards.
+- Deaths after a dungeon is cleared stay off the run even if you log out and back in, or restart your computer, before leaving.
+
 ## 2.9.0
 
 ### New for Mythic+
@@ -43,6 +56,27 @@
 - Deaths after a dungeon is cleared (while looting or exploring) no longer count against the run.
 - The run timeline's completion marker is now evenly spaced and lines up exactly with the last boss.
 - Fixed the run number sometimes not showing in the history dropdown.
+
+## 2.7.0
+
+### WoW Forever
+- **Run stats:** the header and the Stats page now show what a run did for you: experience and levels gained, kills, quests completed, gold looted and reputation.
+- Dungeon wings are named and tracked separately: Scarlet Monastery, Dire Maul, Stratholme and Blackrock Spire.
+- Running back after a wipe pauses the run under the "leaving" clear rule, and time spent logged out no longer counts towards a run's time.
+
+### Mythic+
+- Key results come straight from the game: the official time and whether it was in time, the timer for the dungeon, and the time lost to deaths. Ratings are coloured the way the game colours them.
+
+### Fixes
+- Retail Normal and Heroic dungeons are now marked as cleared.
+- Each death keeps its own recap of the hits that caused it.
+- Runs are no longer lost when logging in on another computer, starting a key while a run is paused, or clearing history while a run is paused or finishing.
+- Players with the same name from different realms are kept apart.
+- Deaths are still counted after the game's damage meter restarts.
+- Loot from end-of-dungeon chests now appears on the Stats page.
+- The history dropdown scrolls when it has more runs than fit.
+- The Stats page updates straight away after any change.
+- The timeline draws faster, especially for runs with many bosses.
 
 ## 2.6.0
 

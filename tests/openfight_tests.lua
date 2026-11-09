@@ -71,6 +71,27 @@ wait(300); M.dead.player = true; M.Tick(); wait(5); M.dead.player = nil; M.Tick(
 local deathsAfter = 0
 for _, p in pairs(run.players) do deathsAfter = deathsAfter + (p.deaths or 0) end
 check("a death after the clear isn't the run's", deathsAfter == deathsBefore, deathsBefore .. " -> " .. deathsAfter)
+-- Still so after a /reload, even one where the game clock started over (the
+-- computer restarted in between: a logout, not just a reload).
+for _, restart in ipairs({ false, true }) do
+    MS:FlushSave()
+    local db = MythicScoreboardDB
+    MS.currentRun, MS.inDungeon = nil, false
+    M.timers = {}
+    if restart then M.now = 50 end
+    MythicScoreboardDB = db
+    M.Fire("ADDON_LOADED", "MythicScoreboard"); zone(BFD)
+    local r2 = MS.currentRun
+    check("reload" .. (restart and " (restart)" or "") .. ": cleared run back", r2 and r2.completed)
+    local before2 = 0
+    for _, p in pairs(r2.players) do before2 = before2 + (p.deaths or 0) end
+    wait(30); M.dead.player = true; M.Tick(); wait(5); M.dead.player = nil; M.Tick()
+    local after2 = 0
+    for _, p in pairs(r2.players) do after2 = after2 + (p.deaths or 0) end
+    check("reload" .. (restart and " (restart)" or "") .. ": a death after the clear still isn't the run's",
+        after2 == before2, before2 .. " -> " .. after2)
+    run = r2
+end
 zone(WORLD)
 
 -- ── It died, the experience line says so: a kill ───────────────────────────
@@ -133,6 +154,35 @@ for _, p in pairs(saved.players) do total = total + (p.deaths or 0); for _, de i
     check("no death after the clear", de.time <= saved.clearedAt + 2, de.time) end end
 check("cleared on leaving", saved.completed and saved.clearedAt ~= nil)
 check("deaths after Aku'mai dropped", total == before, total)
+
+-- ── The game's end arrives after the addon closed the fight ────────────────
+run = fresh()
+noEnd("Twilight Lord Kelris"); M.Advance(8)
+local tk = Boss(run, "Twilight Lord Kelris")
+check("late: closed as a reset first", tk and tk.reset and tk.wipeTime and not tk.killTime)
+local closedAt = tk.wipeTime
+wait(3); M.Fire("ENCOUNTER_END", 2913, "Twilight Lord Kelris", 1, 5, 1); M.RunTimers(4)
+check("late kill: now a kill", tk.killTime ~= nil and not tk.wipeTime and not tk.reset, tostring(tk.killTime))
+check("late kill: at the close (reported straight after)", tk.killTime == closedAt, tostring(tk.killTime) .. " " .. tostring(closedAt))
+check("late kill: result", MS.FightResult(tk) == "kill")
+-- Much later (the fight carried on after it looked over): killed then.
+noEnd("Old Serra'kis"); M.Advance(8)
+local os2 = Boss(run, "Old Serra'kis")
+wait(90); local t = MS:GetRunDuration(run)
+M.Fire("ENCOUNTER_END", 2913, "Old Serra'kis", 1, 5, 1); M.RunTimers(4)
+check("late kill after a while: killed then", os2.killTime and math.abs(os2.killTime - t) < 1, tostring(os2.killTime) .. " " .. t)
+-- A late wipe: a plain wipe, no longer a reset.
+noEnd("Gelihast"); M.Advance(8)
+local gl = Boss(run, "Gelihast")
+M.Fire("ENCOUNTER_END", 2913, "Gelihast", 1, 5, 0); M.RunTimers(4)
+check("late wipe: a wipe", gl.wipeTime and not gl.reset and MS.FightResult(gl) == "wipe")
+-- An end for a boss whose last fight was a real kill changes nothing.
+local killsBefore = 0
+for _, b in ipairs(run.bosses) do if b.killTime then killsBefore = killsBefore + 1 end end
+M.Fire("ENCOUNTER_END", 2913, "Twilight Lord Kelris", 1, 5, 1); M.RunTimers(4)
+local killsAfter = 0
+for _, b in ipairs(run.bosses) do if b.killTime then killsAfter = killsAfter + 1 end end
+check("late: a second report changes nothing", killsAfter == killsBefore and tk.killTime == closedAt)
 
 -- ── Boss names, compared one way ───────────────────────────────────────────
 check("names: key", MS.BossKey("Ner\226\128\153zhul") == "ner'zhul")

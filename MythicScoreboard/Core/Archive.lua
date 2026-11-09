@@ -13,6 +13,8 @@
 --   group    { {n = name key, c = class} }  everyone else
 --   prog     (Forever) what the run did for you: xp, lv levels, k kills,
 --            q quests, g gold in copper, rep { [faction] = amount }
+--   (keys)   up levels the key went up (0 over time), lim the timer,
+--            r0 / r1 your rating before and after (r0 alone on older runs)
 --
 -- Roughly 300 bytes a run; MAX_RUNS keeps the saved file small.
 
@@ -140,6 +142,22 @@ local function LootBoss(run, t)
 end
 
 -- A compact summary of a finished run, or nil if there's nothing to keep.
+-- A key's upgrade, timer and your rating, from the saved run: the rating
+-- the game reported after it, or else your rating going in (from the group
+-- roster, read when the run started).
+local function KeyInfo(self, e, run, me)
+    if run.completed then
+        local up = self.RunUpgrades and self:RunUpgrades(run)
+        if up then e.up = up end
+    end
+    local lim = tonumber(run.keystoneTimeLimit)
+    if lim and lim > 0 then e.lim = Int(lim) end
+    local r0 = tonumber(run.ratingBefore) or (me and tonumber(me.mythicScore))
+    local r1 = tonumber(run.ratingAfter)
+    if r0 and r0 > 0 then e.r0 = Int(r0) end
+    if r1 and r1 > 0 then e.r1 = Int(r1) end
+end
+
 function MS:SummarizeRun(run)
     if type(run) ~= "table" or not run.dungeonName or run.dungeonName == "" then return nil end
     local dur = Int(self:GetRunDuration(run))
@@ -186,6 +204,7 @@ function MS:SummarizeRun(run)
         end
     end
     _sort(e.group, function(a, b) return a.n < b.n end)
+    if e.key then KeyInfo(self, e, run, me) end
     local pr = run.progress
     if pr then
         local rep
@@ -264,7 +283,27 @@ function MS:ArchiveRuns()
     local a = Store()
     if not a then return {} end
     self:_SeedArchive()
+    if not a.keysV then self:_BackfillKeys(a) end
     return a.runs
+end
+
+-- Keys archived before 2.9.1 lack the upgrade, timer and rating: filled in
+-- from the full runs still in history (the same run: same start and
+-- dungeon), once.
+function MS:_BackfillKeys(a)
+    a.keysV = 1
+    local hist = (MythicScoreboardDB and MythicScoreboardDB.runs) or {}
+    local byAt = {}
+    for _, r in ipairs(hist) do
+        if (r.keystoneLevel or 0) > 0 and r._wallClockStart then byAt[r._wallClockStart] = r end
+    end
+    for _, e in ipairs(a.runs) do
+        local r = e.key and e.at and byAt[e.at]
+        if r and r.keystoneLevel == e.key and self:RunTitle(r) == e.dungeon then
+            KeyInfo(self, e, r, FindSelf(r))
+        end
+    end
+    Bump()
 end
 
 -- ── Removing runs ──────────────────────────────────────────────────────────
@@ -610,6 +649,62 @@ local function StatsForDungeonNow(self, name)
         bosses = bosses,
     }
 end
+
+-- ── Keys (Mythic+) ──────────────────────────────────────────────────────────
+-- From the shown runs' keys:
+--   keys, timed               counts
+--   dungeons  { name, keys, timed, upSum, upN, bestTimed, highest }  most keys first
+--   levels    { level, keys, timed }   highest first
+--   rating    { [character key] = { {at, v, after, e}, ... } }   oldest first;
+--             v is the rating after the key, or going into it on older runs
+local function KeyStatsNow(self)
+    local out = { keys = 0, timed = 0, dungeons = {}, levels = {}, rating = {}, ratingChars = 0 }
+    local byName, byLevel = {}, {}
+    for _, e in ipairs(self:StatsRuns()) do
+        if e.key and not e.quit then
+            out.keys = out.keys + 1
+            local timed = e.inTime and true or false
+            if timed then out.timed = out.timed + 1 end
+            local d = byName[e.dungeon]
+            if not d then
+                d = { name = e.dungeon, keys = 0, timed = 0, upSum = 0, upN = 0 }
+                byName[e.dungeon] = d
+                _ins(out.dungeons, d)
+            end
+            d.keys = d.keys + 1
+            d.highest = _max(d.highest or 0, e.key)
+            if timed then
+                d.timed = d.timed + 1
+                d.bestTimed = _max(d.bestTimed or 0, e.key)
+            end
+            local up = tonumber(e.up) or (e.cleared and not timed and 0) or nil
+            if up then d.upSum, d.upN = d.upSum + up, d.upN + 1 end
+            local lv = byLevel[e.key]
+            if not lv then
+                lv = { level = e.key, keys = 0, timed = 0 }
+                byLevel[e.key] = lv
+                _ins(out.levels, lv)
+            end
+            lv.keys = lv.keys + 1
+            if timed then lv.timed = lv.timed + 1 end
+            local v = tonumber(e.r1) or tonumber(e.r0)
+            if v and v > 0 then
+                local who = self:RunOwner(e) or "?"
+                local list = out.rating[who]
+                if not list then list = {}; out.rating[who] = list; out.ratingChars = out.ratingChars + 1 end
+                _ins(list, { at = e.at or 0, v = v, after = e.r1 ~= nil, e = e })
+            end
+        end
+    end
+    _sort(out.dungeons, function(x, y)
+        if x.keys ~= y.keys then return x.keys > y.keys end
+        return x.name < y.name
+    end)
+    _sort(out.levels, function(x, y) return x.level > y.level end)
+    for _, list in pairs(out.rating) do _sort(list, function(x, y) return x.at < y.at end) end
+    return out
+end
+function MS:KeyStats() local _ = self:StatsRuns(); return Memo(self, "keys", KeyStatsNow) end
 
 function MS:StatsOverview() local _ = self:StatsRuns(); return Memo(self, "overview", StatsOverviewNow) end
 function MS:LootHistory() local _ = self:StatsRuns(); return Memo(self, "loot", LootHistoryNow) end

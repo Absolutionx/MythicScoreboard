@@ -16,9 +16,9 @@ cmap, hmtx, upm = font.getBestCmap(), font["hmtx"], font["head"].unitsPerEm
 def width(s):
     return sum(hmtx[cmap.get(ord(c), cmap[ord("?")])][0] for c in s) * SIZE / upm
 
-src = open(ADDON + "/Core/UI_Stats.lua", encoding="utf8").read()
+src = open(ADDON + "/Core/UI_Stats.lua", encoding="utf8").read() + open(ADDON + "/Core/UI_StatsKeys.lua", encoding="utf8").read()
 cols = []
-for table in ("DCOLS", "RCOLS", "LCOLS"):
+for table in ("DCOLS", "RCOLS", "LCOLS", "KCOLS"):
     body = re.search(r"local %s = \{(.*?)\n\}" % table, src, re.S).group(1)
     for label, w in re.findall(r'label = LK\("([^"]+)"\),\s*w = (\d+)', body):
         cols.append((table, label, int(w)))
