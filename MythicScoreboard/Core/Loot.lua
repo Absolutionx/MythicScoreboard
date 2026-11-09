@@ -8,7 +8,9 @@
 --
 -- Only equippable gear (weapons/armour, uncommon or better) is kept.
 -- Loot that arrives just after a run is committed to history (the Mythic+
--- chest) is attached to that saved run for a few minutes.
+-- end-of-key loot) is attached to that saved run for a few minutes, but
+-- only while you're still in that dungeon: gear you get after leaving (the
+-- Great Vault, a quest reward in town) isn't the run's.
 
 local MS = _G["MythicScoreboard"]
 local IsSecret = _G["MythicScoreboard"].IsSecret
@@ -63,14 +65,35 @@ end
 
 -- ── Which run does a piece of loot belong to? ───────────────────────────
 
+-- The instance you're in (its ID, or its name where there's no ID).
+local function InstanceHere()
+    if not GetInstanceInfo then return nil end
+    local ok, name, kind, _, _, _, _, _, id = pcall(GetInstanceInfo)
+    if not ok or kind == "none" then return nil end
+    return id or name
+end
+
+-- Notes where a run was saved, for its late loot (History.lua calls this).
+function MS:NoteCommittedHere() self._lastCommittedIn = InstanceHere() end
+
+local LEFT_GRACE = 15     -- seconds: loot already on its way as you leave
 function MS:_LootTargetRun()
     if self.currentRun then return self.currentRun end
     local r = self._lastCommittedRun
-    if r and self._lastCommittedAt and (GetTime() - self._lastCommittedAt) < LATE_WINDOW then
-        return r
-    end
+    if not (r and self._lastCommittedAt) then return nil end
+    local age = GetTime() - self._lastCommittedAt
+    if age >= LATE_WINDOW then return nil end
+    local here = InstanceHere()
+    if here ~= nil and here == self._lastCommittedIn then return r end
+    if age < LEFT_GRACE then return r end
     return nil
 end
+
+-- The same drop can reach us more than once: from the game, from chat, and
+-- from the player's own copy of the addon. Their item strings can differ
+-- (part of a link describes whoever is looking at it), so drops are matched
+-- by the item itself.
+local function ItemID(istr) return istr and istr:match("^item:(%d+)") end
 
 MS._lootRev = 0
 local _recent = {}
@@ -91,14 +114,15 @@ function MS:RecordLoot(playerName, link, source)
     if q and q < 2 then return end
 
     -- The same drop usually arrives via two or three sources.
-    local key = short .. "|" .. istr
+    local id = ItemID(istr) or istr
+    local key = short .. "|" .. id
     local now = GetTime()
     if _recent[key] and now - _recent[key] < DEDUPE_WINDOW then return end
     _recent[key] = now
 
     p.loot = p.loot or {}
     for _, l in ipairs(p.loot) do
-        if MS.LootItemString(l) == istr and (now - (l.at or 0)) < DEDUPE_WINDOW then return end
+        if (ItemID(MS.LootItemString(l)) or MS.LootItemString(l)) == id and (now - (l.at or 0)) < DEDUPE_WINDOW then return end
     end
     if #p.loot >= MAX_PER_PLAYER then return end
 
@@ -243,3 +267,41 @@ frame:SetScript("OnEvent", function(_, event, ...)
         end)
     end
 end)
+
+-- ── Removing a piece of loot by hand ───────────────────────────────────────
+-- /sb removeloot [item]: gear that isn't a run's (the Great Vault, a quest
+-- reward) taken off your runs from the last day, for every player, and off
+-- the Stats page. Older runs keep it: the same item may be a real drop there.
+local RECENT = 24 * 60 * 60
+function MS:RemoveLootItem(link)
+    local id = type(link) == "string" and link:match("item:(%d+)")
+    if not id then return nil end
+    local n = 0
+    local function Strip(list)
+        if type(list) ~= "table" then return false end
+        local hit = false
+        for i = #list, 1, -1 do
+            local s = MS.LootItemString(list[i])
+            if s and s:match("^item:(%d+)") == id then table.remove(list, i); hit = true end
+        end
+        return hit
+    end
+    local since = time() - RECENT
+    local runs = {}
+    if self.currentRun then runs[#runs + 1] = self.currentRun end
+    for _, r in ipairs((MythicScoreboardDB and MythicScoreboardDB.runs) or {}) do
+        if (r._wallClockStart or 0) >= since then runs[#runs + 1] = r end
+    end
+    for _, r in ipairs(runs) do
+        local hit = false
+        for _, p in pairs(r.players or {}) do hit = Strip(p.loot) or hit end
+        if hit then n = n + 1; r._seq = (r._seq or 0) + 1 end
+    end
+    for _, e in ipairs(self:ArchiveRuns()) do
+        if (e.at or 0) >= since then Strip(e.loot) end
+    end
+    if self.BumpStats then self.BumpStats() end
+    self._lootRev = (self._lootRev or 0) + 1
+    self:Changed("loot")
+    return n
+end

@@ -185,11 +185,60 @@ if not forever then
     local e = a[#a]
     check("late loot: in history", saved.players[MS.ShortName(me)].loot and #saved.players[MS.ShortName(me)].loot == 1)
     check("late loot: in stats", e and e.loot and #e.loot == 1, e and e.loot and #e.loot)
+    local myLoot = saved.players[MS.ShortName(me)].loot
+    -- The same drop from a groupmate's copy of the addon: its item string
+    -- differs (level and spec fields are the looker's), still the same drop.
+    wait(2); MS:RecordLoot(me, "item:12345::::::::70:250::::", "comm")
+    check("loot: same drop from the addon message not doubled", #myLoot == 1, #myLoot)
+    -- Something else, still inside: counted.
+    wait(20); MS:RecordLoot(me, "|cnIQ4:|Hitem:22222::::::::80:::::|h[Ring]|h|r", "chat")
+    check("late loot: still inside, counted", #myLoot == 2, #myLoot)
+    -- Out in the world (the Great Vault): not the run's.
+    zone(WORLD); wait(30)
+    MS:RecordLoot(me, "|cnIQ4:|Hitem:33333::::::::80:::::|h[Vault Gloves]|h|r", "chat")
+    check("late loot: after leaving, not the run's", #myLoot == 2, #myLoot)
+
+    -- /sb removeloot [item]: off the run and the Stats page.
+    local print_ = print
+    local said = {}
+    print = function(s) said[#said + 1] = s end
+    SlashCmdList["MYTHICSCOREBOARD"]("removeloot |cnIQ4:|Hitem:22222::::::::80:::::|h[Ring]|h|r")
+    print = print_
+    check("removeloot: off the run", #myLoot == 1 and myLoot[1].link:find("12345"), #myLoot)
+    local a2 = MS:ArchiveRuns()
+    local e2 = a2[#a2]
+    local inStats = false
+    for _, l in ipairs(e2.loot or {}) do if (l.l or l.i or ""):find("22222") then inStats = true end end
+    check("removeloot: off the Stats page", not inStats)
+    check("removeloot: says so", said[1] and said[1]:find("1") ~= nil, said[1])
+    said = {}
+    print = function(s) said[#said + 1] = s end
+    SlashCmdList["MYTHICSCOREBOARD"]("removeloot")
+    print = print_
+    check("removeloot: no item, says how", said[1] and said[1]:find("Shift") ~= nil, said[1])
 
     -- Rating colours use the overall-rating scale.
     local r, g = MS.UI.ScoreColor(1800)
     check("rating colour: overall scale", r == 0 and g == 0.7, tostring(r) .. "," .. tostring(g))
     C_ChallengeMode = nil
+end
+
+-- Loot saved twice by 2.9.0 (a groupmate's addon copy) is cleaned up once.
+do
+    local item = function(fields) return { link = "|cnIQ4:|Hitem:" .. fields .. "|h[X]|h|r", t = 0 } end
+    local a1, a2, a3 = item("500::::::::80:65::::"), item("500::::::::70:250::::"), item("501::::::::80:65::::")
+    a2.t, a3.t = 3, 4
+    local later = item("500::::::::80:65::::"); later.t = 900      -- a second real drop, much later
+    MythicScoreboardDB = { dataVersion = 4, runs = { { dungeonName = "Skyreach", duration = 1000, bosses = {},
+        players = { Xin = { name = "Xin", loot = { a1, a2, a3, later } } } } } }
+    MS:RunMigrations()
+    local L2 = MythicScoreboardDB.runs[1].players.Xin.loot
+    check("dedupe: the doubled drop once", #L2 == 3, #L2)
+    check("dedupe: other items and later drops kept", L2[2] == a3 and L2[3] == later)
+    local arch = { v = 5, runs = { { at = 1, dungeon = "Skyreach", dur = 1000,
+        loot = { { l = a1.link, t = 0 }, { l = a2.link, t = 2 } } } } }
+    MS:MigrateArchive(arch)
+    check("dedupe: Stats page copy too", #arch.runs[1].loot == 1 and arch.v == 6)
 end
 
 -- 10. Two players with one name (retail, another realm) stay two rows.

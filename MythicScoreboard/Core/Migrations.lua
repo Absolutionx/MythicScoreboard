@@ -204,6 +204,29 @@ local function CompactRun(run)
     end
 end
 
+-- ── Loot listed twice (2.9.0) ──────────────────────────────────────────────
+-- The same drop could be saved twice for a player who also ran the addon:
+-- their addon's copy of the item link differed from the one seen in chat.
+-- Later copies of an item (by its ID) within a few seconds of the first go.
+local DUP_SECONDS = 15
+local function ItemID(l)
+    local s = MS.LootItemString(l)
+    return s and s:match("^item:(%d+)") or s
+end
+local function DedupeLoot(list)
+    if type(list) ~= "table" then return end
+    local kept = {}
+    for _, l in ipairs(list) do
+        local id, dup = ItemID(l), false
+        for _, k in ipairs(kept) do
+            if id and ItemID(k) == id and math.abs((l.t or 0) - (k.t or 0)) <= DUP_SECONDS then dup = true; break end
+        end
+        if not dup then _ins(kept, l) end
+    end
+    for i = #list, 1, -1 do list[i] = nil end
+    for i, l in ipairs(kept) do list[i] = l end
+end
+
 local CHAR_STEPS = {
     -- 1 (2.5): runs split in two by the old zone-out bug are joined.
     function(db)
@@ -242,6 +265,12 @@ local CHAR_STEPS = {
         for _, r in ipairs(db.runs) do
             MS:_BackfillSyntheticInterrupts(r)
             for _, p in pairs(r.players or {}) do p.deathRecapID = nil end
+        end
+    end,
+    -- 5 (2.9.1): loot saved twice for the same player.
+    function(db)
+        for _, r in ipairs(db.runs) do
+            for _, p in pairs(r.players or {}) do DedupeLoot(p.loot) end
         end
     end,
 }
@@ -333,8 +362,12 @@ local ARCHIVE_STEPS = {
             end
         end
     end,
+    -- 6 (2.9.1): your loot saved twice.
+    [6] = function(a)
+        for _, e in ipairs(a.runs) do DedupeLoot(e.loot) end
+    end,
 }
-MS.ARCHIVE_VERSION = 5
+MS.ARCHIVE_VERSION = 6
 
 -- ── Running them ───────────────────────────────────────────────────────────
 function MS:MigrateArchive(a)

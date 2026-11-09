@@ -568,6 +568,19 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         LangCommand(langArg)
     elseif demoArg then
         DemoCommand(demoArg)
+    elseif _smatch(cmd, "^removeloot") then
+        -- /sb removeloot [item]: Shift-click the item into the line.
+        local link = _smatch(msg or "", "|H(item:[%-%d:]+)") or _smatch(msg or "", "(item:%d+)")
+        local n = link and MS:RemoveLootItem(link)
+        local tag = "|cff00ccff[MythicScoreboard]|r "
+        if not link then
+            print(tag .. L["Type /sb removeloot, then Shift-click the item into the line."])
+        elseif n and n > 0 then
+            print(tag .. MS.Plural(n, "Removed from %d run.", "Removed from %d runs."))
+            MS:RefreshOverview()
+        else
+            print(tag .. L["That item isn't on any of your runs from the last day."])
+        end
     elseif cmd == "" then
         MS:ShowScoreboard()
     elseif cmd == "stats" then
@@ -579,7 +592,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         end
     elseif cmd == "help" then
         print("|cff00ccff[MythicScoreboard]|r v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb removeloot, /sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)
