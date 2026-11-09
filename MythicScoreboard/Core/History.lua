@@ -31,6 +31,7 @@ function MS:_CommitRunToHistory(run)
     -- it to the saved copy for a few minutes.
     self._lastCommittedRun = saved
     self._lastCommittedAt  = GetTime()
+    if self.NoteCommittedHere then self:NoteCommittedHere() end
     if self.ArchiveRun then self:ArchiveRun(saved) end
     return saved
 end

@@ -1,6 +1,6 @@
 # Changelog
 
-## Next release
+## 2.9.1
 
 ### New for Mythic+
 - **Keys tab on the Stats page:**
@@ -10,6 +10,10 @@
 - Keys already on the Stats page pick up their upgrade and rating from your run history where it still has them.
 
 ### Fixes
+- Loot is no longer listed twice for a groupmate who also runs Mythic Scoreboard.
+- Gear you get after leaving the dungeon, such as from the Great Vault, no longer lands on your last run.
+- Loot already saved twice is cleaned up automatically the first time you log in.
+- **New:** `/sb removeloot`, then Shift-click an item into the line, takes that item off your runs from the last day and off the Stats page, for anything that ended up on a run but wasn't from it.
 - A boss the addon had marked as reset (nobody was fighting) now turns into a kill if the game reports the kill afterwards.
 - Deaths after a dungeon is cleared stay off the run even if you log out and back in, or restart your computer, before leaving.
 
