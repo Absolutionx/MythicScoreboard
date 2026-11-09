@@ -30,6 +30,7 @@ local P = {
     ash2     = {0.37, 0.34, 0.31},
     bronze   = {0.75, 0.54, 0.29},
     bronzeHi = {0.91, 0.72, 0.47},
+    gold     = {1.00, 0.82, 0.30},   -- a +3 key
     bronzeDk = {0.29, 0.23, 0.16},
     line     = {0.227, 0.188, 0.157},
     verd     = {0.60, 0.68, 0.42},   -- weathered olive: good outcomes
