@@ -4,7 +4,7 @@
 
 ### New for Mythic+
 - **Keys tab on the Stats page:**
-  - **Your rating, key by key:** a chart with a line per character. Each key is a diamond coloured by how it went: bronze for +2 and +3, white for +1, red over time. Hover one for the dungeon, the level and the rating it took you to.
+  - **Your rating, key by key:** a chart with a line per character. Each key is a diamond coloured by how it went: gold for +3, bronze for +2, white for +1, red over time. Hover one for the dungeon, the level and the rating it took you to.
   - **Per dungeon:** keys run, how many were timed, the average upgrade, your highest key timed and your highest key run. Click a dungeon for all its runs.
   - **By level:** how many keys of each level you timed, so you can see where it starts getting hard.
 - Keys already on the Stats page pick up their upgrade and rating from your run history where it still has them.
