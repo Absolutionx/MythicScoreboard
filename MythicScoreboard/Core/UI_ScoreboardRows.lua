@@ -118,6 +118,12 @@ local function RowOnEnter(self2)
     GameTooltip:SetOwner(self2, "ANCHOR_CURSOR_RIGHT", 12, 12)
     local r2, g2, b2 = ClassColor(pc.class)
     GameTooltip:SetText(DN(pc.name) or "?", r2, g2, b2)
+    local spec, specRole = MS.SpecLabel and MS.SpecLabel(pc.specID, pc.class)
+    if spec then
+        local role = (pc.role ~= "" and pc.role) or specRole
+        local roleName = role and rawget(_G, role)
+        GameTooltip:AddDoubleLine(spec, type(roleName) == "string" and roleName or "", r2, g2, b2, 1, 1, 1)
+    end
 
     if (pc.level or 0) > 0 and MS.Flavor.dungeonLevels then
         local lo, hi = MS:ForeverLevelRange(self2._run)
@@ -127,7 +133,8 @@ local function RowOnEnter(self2)
     local sc = pc.mythicScore or 0
     if sc > 0 then
         local sr, sg, sb2 = ScoreColor(sc)
-        GameTooltip:AddDoubleLine(L["Mythic+ rating"], sc, 0.8, 0.8, 0.8, sr, sg, sb2)
+        local gain = (pc.ratingGain or 0) > 0 and (" " .. CT(P.verdHi, "(+" .. pc.ratingGain .. ")")) or ""
+        GameTooltip:AddDoubleLine(L["Mythic+ rating"], sc .. gain, 0.8, 0.8, 0.8, sr, sg, sb2)
     end
     if (pc.itemLevel or 0) > 0 then
         GameTooltip:AddDoubleLine(L["Item level"], pc.itemLevel, 0.8, 0.8, 0.8, 1, 1, 1)
@@ -278,6 +285,13 @@ local function AcquireRow(parent)
                 tail:SetPoint("LEFT", row, "LEFT", col.anchor, 0)
             end
             row._statFs[col.key] = { main = main, tail = tail }
+            if col.key == "score" then
+                row._scoreAnchor = col.anchor
+                -- Your rating gain from this key, centred under the rating.
+                local gain = Text(row, "medium", 11, P.verdHi, "CENTER")
+                gain:SetPoint("TOP", main, "BOTTOM", 0, 1)
+                row._gainFs = gain
+            end
             if col.strong then
                 local bar = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 0.7)
                 bar:SetHeight(2)
@@ -462,6 +476,19 @@ local function FillRow(row, idx, p, isSelf, ctx)
                 cell.main:SetText(tostring(val))
             end
             cell.main:SetTextColor(vr, vg, vb)
+        end
+    end
+
+    if row._gainFs then
+        -- With a gain, the rating moves up so the two sit centred in the row.
+        local g = p.ratingGain or 0
+        row._gainFs:SetText(g > 0 and ("+" .. g) or "")
+        local main = row._statFs.score.main
+        local y = g > 0 and 5 or 0
+        if main._msY ~= y then
+            main:ClearAllPoints()
+            main:SetPoint("RIGHT", row, "LEFT", row._scoreAnchor, y)
+            main._msY = y
         end
     end
 

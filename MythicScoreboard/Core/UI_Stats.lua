@@ -440,7 +440,7 @@ local function OpenCharMenu(anchor)
     if charMenu then CloseCharMenu(); return end
     if not menuFrame then
         menuFrame = CreateFrame("Frame", nil, UIParent)
-        menuFrame:SetFrameStrata("TOOLTIP"); menuFrame:EnableMouse(true)
+        menuFrame:SetFrameStrata("FULLSCREEN_DIALOG"); menuFrame:EnableMouse(true)
         Box(menuFrame)
         menuFrame:SetScript("OnHide", function() charMenu = nil end)
     end

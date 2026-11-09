@@ -40,11 +40,28 @@ local INT_BASE  = TL.INT_BASE
 local INT_MAXH  = TL.INT_MAXH
 local COMPACT_W = TL.COMPACT_W
 
--- The completion line: 2px wide, with the same gap either side of it, between
--- the last boss's block and the line, and between the line and the track's end.
-local END_LINE_W = 2
-local END_GAP    = 5
-TL.END_LINE_W = END_LINE_W
+-- Screen pixels. The window's UI units are only screen pixels at one UI
+-- scale; at any other, a 2-unit line is 1.3 or 2.6 pixels and gaps come out
+-- uneven. So the timeline works on the screen's own pixel grid: PX is one
+-- screen pixel in the window's units, the track's width is a whole number of
+-- them, and every position is TL_L plus whole pixels. Edges the game snaps to
+-- the screen's pixels then keep exact distances wherever the window is.
+local function PixelSize()
+    local f = MS.UI.frame or UIParent
+    local ok, scale = pcall(f.GetEffectiveScale, f)
+    local _, h = (rawget(_G, "GetPhysicalScreenSize") or function() return 0, 768 end)()
+    if not (ok and type(scale) == "number" and scale > 0 and h and h > 0) then return 1 end
+    return 768 / h / scale
+end
+TL.PixelSize = PixelSize
+local function TrackW(px) return _floor(TL_TRACKW / px) * px end
+
+-- The completion line: 2 screen pixels wide. A run that ends on a kill has
+-- it right against the last boss's block; one that ends at the window's edge
+-- has the track end with it (nothing drawn after).
+local END_LINE_PX = 2
+local END_GAP_PX  = 0
+TL.END_LINE_PX = END_LINE_PX
 
 -- Whether a finished run ends on a boss kill (the line then stands just past
 -- that boss's block instead of on its edge).
@@ -53,6 +70,21 @@ local function EndsOnKill(r, t)
         if b.killTime and math.abs(b.killTime - t) < 2 then return true end
     end
     return false
+end
+
+-- Where a cleared run (not a key) ends on the timeline: the clear, which is
+-- usually the last kill. Time spent in the dungeon after it (looting, waiting
+-- to leave) isn't drawn, so the completion line ends the track.
+local function ClearedEnd(r)
+    local lastKill = 0
+    for _, b in ipairs(r.bosses or {}) do lastKill = _max(lastKill, b.killTime or 0) end
+    local at = tonumber(r.clearedAt)
+    if at and at > 0 then
+        if lastKill > 0 and math.abs(at - lastKill) < 2 then return lastKill end
+        return at
+    end
+    if lastKill > 0 then return lastKill end
+    return r.duration
 end
 
 local function GetTimelineDuration(r)
@@ -89,15 +121,22 @@ local function GetTimelineDuration(r)
     end
     -- A finished run that ends at the window's edge gets just enough empty
     -- track after it for the completion line and its gaps, to the pixel.
+    -- A key: the track runs to the timer (or a little past an over-time
+    -- finish). Anything else cleared ends exactly at the clear.
     if r.completed then
-        local lastKill = 0
-        for _, b in ipairs(r.bosses or {}) do lastKill = _max(lastKill, b.killTime or 0) end
-        local finish = _max(lastKill, MS:GetRunDuration(r))
-        if lastKill > 0 and finish - lastKill < 2 then finish = lastKill end   -- ended on the kill
-        local roomPx = EndsOnKill(r, finish) and (END_GAP + END_LINE_W + END_GAP)
-                                             or (END_LINE_W / 2 + END_GAP)
-        local W = TL_TRACKW
-        if finish > 0 and (dur - finish) / dur * W < roomPx + 1 then
+        local finish, exact
+        if isMPlus then
+            local lastKill = 0
+            for _, b in ipairs(r.bosses or {}) do lastKill = _max(lastKill, b.killTime or 0) end
+            finish = _max(lastKill, MS:GetRunDuration(r))
+            if lastKill > 0 and finish - lastKill < 2 then finish = lastKill end   -- ended on the kill
+        else
+            finish, exact = ClearedEnd(r), true
+        end
+        local px = PixelSize()
+        local roomPx = (finish and EndsOnKill(r, finish) and END_LINE_PX or END_LINE_PX / 2) * px
+        local W = TrackW(px)
+        if finish and finish > 0 and (exact or (dur - finish) / dur * W < roomPx + px) then
             dur = finish * W / (W - roomPx)
         end
     end
@@ -292,13 +331,19 @@ local function NewContext(strip, run, totalDur)
 
     -- Same calls as the shared helpers, drawing from the pools.
     local Solid0, Art0, Text0, Btn0 = Solid, Art, Text, Btn
+    -- Flat colour pieces (blocks, the completion line) snap their edges to
+    -- the screen's pixels, so the whole-pixel gaps between them stay exact.
+    local function Snap(t)
+        if t.SetSnapToPixelGrid then t:SetSnapToPixelGrid(true); t:SetTexelSnappingBias(0) end
+        return t
+    end
     local function Solid(parent, layer, sub, r, g, b, a)
         local key = "S" .. (layer or "") .. (sub or 0)
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, Solid0(parent, layer, sub, r, g, b, a), parent) end
+        if not t then return Snap(Keep(list, Solid0(parent, layer, sub, r, g, b, a), parent)) end
         ResetTexture(t)
         t:SetColorTexture(r, g, b, a or 1)
-        return t
+        return Snap(t)
     end
     local function Art(parent, file, layer, sub, tile)
         local key = "A" .. file .. (layer or "") .. (sub or 0) .. (tile and "t" or "")
@@ -346,14 +391,17 @@ local function NewContext(strip, run, totalDur)
 
     if not (totalDur and totalDur > 0) then return nil end
 
-    local W  = TL_TRACKW
+    local px = PixelSize()
+    local W  = TrackW(px)
+    local END_LINE_W, END_GAP = END_LINE_PX * px, END_GAP_PX * px
     local isMPlus = (run.keystoneLevel or 0) > 0
     -- Only the run in progress (or paused) is drawn live. A saved run that
     -- wasn't cleared is finished too: drawn still, to where it ended.
     local live = not run.completed and run == MS.currentRun
 
-    -- Whole pixels, so block edges are crisp and gaps come out exact.
-    local function X(t) return _floor(TL_L + _max(0, _min(1, t / totalDur)) * W + 0.5) end
+    -- Whole screen pixels from the track's start, so block edges are crisp
+    -- and gaps come out exact.
+    local function X(t) return TL_L + _floor(_max(0, _min(1, t / totalDur)) * W / px + 0.5) * px end
     local endLineL          -- left edge of the completion line, once known
 
     local function At(region, point, x, y)
@@ -363,28 +411,28 @@ local function NewContext(strip, run, totalDur)
     local function Weather(x, w, sub)
         local grit = Art(cv, "Grit", "ARTWORK", sub, true)
         grit:SetBlendMode("MOD")
-        grit:SetSize(_max(1, w), TRACK_H); At(grit, "BOTTOMLEFT", x, TRACK_Y)
+        grit:SetSize(_max(px, w), TRACK_H); At(grit, "BOTTOMLEFT", x, TRACK_Y)
         local groove = Tex(cv, "ARTWORK", sub)
-        groove:SetSize(_max(1, w), 4); At(groove, "BOTTOMLEFT", x, TRACK_Y + TRACK_H - 4)
+        groove:SetSize(_max(px, w), 4); At(groove, "BOTTOMLEFT", x, TRACK_Y + TRACK_H - 4)
         VGrad(groove, {0, 0, 0}, {0, 0, 0}, 0, 0.55)
         return grit
     end
     local function Seg(t1, t2, kind)
         local x1, x2 = X(t1), X(t2)
         local w = x2 - x1
-        if w < 1 then return nil end
+        if w < px then return nil end
         local tex
-        if kind == "trash" then
+        if kind == "trash" then         -- (a one-pixel seam before what follows)
             local base = Solid(cv, "ARTWORK", 0, 0.16, 0.14, 0.12, 1)
-            base:SetSize(_max(1, w - 1), TRACK_H); At(base, "BOTTOMLEFT", x1, TRACK_Y)
+            base:SetSize(_max(px, w - px), TRACK_H); At(base, "BOTTOMLEFT", x1, TRACK_Y)
             tex = Art(cv, "Hatch", "ARTWORK", 1, true)
             tex:SetVertexColor(0.225, 0.195, 0.165, 1)
-            tex:SetSize(_max(1, w - 1), TRACK_H); At(tex, "BOTTOMLEFT", x1, TRACK_Y)
-            Weather(x1, w - 1, 2)
+            tex:SetSize(_max(px, w - px), TRACK_H); At(tex, "BOTTOMLEFT", x1, TRACK_Y)
+            Weather(x1, w - px, 2)
             return base
         end
         tex = Tex(cv, "ARTWORK", 2)
-        tex:SetSize(_max(1, w), TRACK_H); At(tex, "BOTTOMLEFT", x1, TRACK_Y)
+        tex:SetSize(_max(px, w), TRACK_H); At(tex, "BOTTOMLEFT", x1, TRACK_Y)
         if kind == "fight" then
             VGrad(tex, FIGHT_BOT, FIGHT_TOP)
         elseif kind == "wipe" then
@@ -463,13 +511,8 @@ local function NewContext(strip, run, totalDur)
         if isMPlus and runEnd then
             compSec, visualEnd, clampT = runEnd, runEnd, runEnd
         else
-            for _, b in ipairs(run.bosses or {}) do
-                if b.killTime and b.killTime > (compSec or 0) then compSec = b.killTime end
-            end
-            visualEnd = _max(runEnd or 0, compSec or 0)
-            -- Saved a moment after the last kill: the run ends on the kill.
-            if compSec and visualEnd - compSec < 2 then visualEnd = compSec end
-            compSec = compSec or runEnd
+            compSec = ClearedEnd(run)
+            visualEnd = compSec
         end
         if compSec and compSec <= 0 then compSec = nil end
         if visualEnd and visualEnd <= 0 then visualEnd = nil end
@@ -488,6 +531,9 @@ local function NewContext(strip, run, totalDur)
         Solid = Solid, Art = Art, Tex = Tex, Mask = Mask, Text = Text, Btn = Btn,
         Seg = Seg, SegButton = SegButton, InBarText = InBarText, CountDeaths = CountDeaths, Weather = Weather,
         keyLimit = keyLimit, compSec = compSec, visualEnd = visualEnd, clampT = clampT, endLineL = endLineL,
+        px = px, endLineW = END_LINE_W,
+        -- Mythic+: the times for +3, +2 and +1 (marked on the axis).
+        thresholds = (isMPlus and keyLimit) and { { 3, keyLimit * 0.6 }, { 2, keyLimit * 0.8 }, { 1, keyLimit } } or nil,
     }
 end
 
@@ -563,6 +609,7 @@ local function BuildTimeline(strip, run, totalDur)
         -- (drawn by UI_TimelineBosses.lua and UI_TimelineMarks.lua)
         local prevT, liveKind = TL.DrawBosses(c)
         local liveSeg = TL.DrawTail(c, prevT, liveKind)
+        TL.DrawThresholds(c)
         TL.DrawKeyTimer(c)
         TL.DrawCompletion(c)
         TL.DrawDeaths(c)

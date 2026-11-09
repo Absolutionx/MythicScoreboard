@@ -38,7 +38,7 @@ end
 -- ── Handlers ───────────────────────────────────────────────────────────────
 local H = {}
 
-function H.PLAYER_LEAVING_WORLD() MS:FlushSave() end
+function H.PLAYER_LEAVING_WORLD() MS:FlushSave(); MS:MirrorHistory() end
 H.PLAYER_LOGOUT = H.PLAYER_LEAVING_WORLD
 
 function H.PLAYER_ENTERING_WORLD()

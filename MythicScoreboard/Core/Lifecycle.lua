@@ -209,6 +209,7 @@ end
 -- A new run, recording from now.
 function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     self.itemLevelCache = {}
+    self.specCache = {}
     self.displayRun     = nil
     local run = MS.NewRunData()
     self:SetRunState("active", run)
@@ -345,6 +346,20 @@ function MS:AbandonRun()
     self:CommitRun({ completed = false, inTime = false })
     Say(_fmt(L["Run abandoned: %s"], run.dungeonName or ""))
     return true
+end
+
+-- After abandoning a run while still inside: whether a fresh one can be
+-- started here and now (rather than by leaving and coming back in).
+function MS:CanStartFresh()
+    return self._abandonedIn ~= nil and self.currentRun == nil
+end
+function MS:StartFresh()
+    if not self:CanStartFresh() then return false end
+    self._abandonedIn = nil
+    self:AutoResetMeter()
+    self:BeginRun()
+    self:WarmPetCache(1.0, 3.0)
+    return self.currentRun ~= nil
 end
 
 -- ── The location check ─────────────────────────────────────────────────────

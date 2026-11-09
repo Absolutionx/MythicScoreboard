@@ -13,7 +13,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
 
     local settPop = CreateFrame("Frame", nil, sbFrame)
     settPop:SetSize(SETT_W, 100)          -- height set once the rows are placed
-    settPop:SetFrameStrata("TOOLTIP")
+    settPop:SetFrameStrata("FULLSCREEN_DIALOG")
     settPop:EnableMouse(true)
     settPop:SetPoint("TOPRIGHT", settBtn, "BOTTOMRIGHT", 0, -4)
     Box(settPop)

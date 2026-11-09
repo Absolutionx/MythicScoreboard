@@ -1,4 +1,5 @@
--- usage: lua5.1 pixel_tests.lua DIR TOC   (the completion line: whole pixels, equal gaps either side)
+-- usage: lua5.1 pixel_tests.lua DIR TOC   (the completion line: whole screen pixels, equal gaps either side,
+-- at a UI scale where window units are screen pixels and at one where they aren't)
 table.unpack = table.unpack or unpack
 local M = dofile("wowmock.lua")
 M.LoadTOC(arg[1], arg[2])
@@ -13,7 +14,10 @@ time = function() return clock end
 local function wait(s) M.now = M.now + s; clock = clock + s end
 local function zone(inst) M.instance = inst; M.Fire("PLAYER_ENTERING_WORLD", false, false); M.Fire("ZONE_CHANGED_NEW_AREA"); M.RunTimers(8) end
 
-local TRACK_Y, TRACK_H, GAP = 76, 14, 5
+local TRACK_Y, TRACK_H, GAP, LINE = 76, 14, 0, 2      -- gaps and line in screen pixels
+local PX = 1                                          -- one screen pixel in window units (set per pass)
+local function near(a, b) return math.abs(a - b) < 1e-6 end
+local function whole(v) return near(v, math.floor(v + 0.5)) end
 
 -- The timeline's pieces drawn since `from`: track bed, fight blocks, the line.
 local function Geometry(from)
@@ -27,7 +31,7 @@ local function Geometry(from)
             if y == TRACK_Y and f._h == TRACK_H then
                 if f._w > 1000 then bed = bed or { x = x, w = f._w }
                 else blocks[#blocks + 1] = { x = x, w = f._w } end
-            elseif y == 22 and f._w == 2 then line = { x = x }
+            elseif y == 22 and near(f._w, LINE * PX) then line = { x = x }
             end
         end
     end
@@ -69,22 +73,31 @@ local function Finish(bossTimes, trailing)
     return Geometry(from)
 end
 
-for _, case in ipairs({
-    { "wide last block",   { {300, 60}, {400, 70}, {500, 40}, {600, 78} } },
-    { "narrow last block", { {300, 60}, {400, 70}, {500, 40}, {600, 9} } },
-    { "long run",          { {900, 60}, {800, 70}, {700, 40}, {600, 78} } },
-}) do
-    local bed, line, blocks = Finish(case[2])
-    check(case[1] .. ": drawn", bed and line and #blocks > 0)
-    if bed and line then
-        local lastRight = -1
-        for _, b in ipairs(blocks) do
-            local r = b.x + b.w
-            if r <= line.x and r > lastRight then lastRight = r end
-            check(case[1] .. ": whole pixels", b.x == math.floor(b.x) and b.w == math.floor(b.w), b.x .. " " .. b.w)
+-- 1080 and 768 lines at UI scale 1: 1 unit = 1 pixel; 1440 lines: 1 unit = 1.875 pixels.
+for _, screenH in ipairs({ 768, 1440, 1080 }) do
+    GetPhysicalScreenSize = function() return math.floor(screenH * 16 / 9), screenH end
+    PX = 768 / screenH
+    for _, case in ipairs({
+        { "wide last block",   { {300, 60}, {400, 70}, {500, 40}, {600, 78} } },
+        { "narrow last block", { {300, 60}, {400, 70}, {500, 40}, {600, 9} } },
+        { "long run",          { {900, 60}, {800, 70}, {700, 40}, {600, 78} } },
+    }) do
+        local name = screenH .. "p " .. case[1]
+        local bed, line, blocks = Finish(case[2])
+        check(name .. ": drawn", bed and line and #blocks > 0)
+        if bed and line then
+            local lastRight = -1
+            for _, b in ipairs(blocks) do
+                local r = b.x + b.w
+                if r <= line.x + 1e-6 and r > lastRight then lastRight = r end
+                check(name .. ": whole pixels", whole((b.x - bed.x) / PX) and whole(b.w / PX), b.x .. " " .. b.w .. " bed " .. bed.x .. " " .. bed.w)
+            end
+            check(name .. ": track whole pixels", whole(bed.w / PX), bed.w / PX)
+            check(name .. ": line on a pixel", whole((line.x - bed.x) / PX), (line.x - bed.x) / PX)
+            check(name .. ": gap before the line", near((line.x - lastRight) / PX, GAP), (line.x - lastRight) / PX)
+            check(name .. ": gap after the line", near((bed.x + bed.w - line.x) / PX - LINE, GAP),
+                (bed.x + bed.w - line.x) / PX - LINE)
         end
-        check(case[1] .. ": gap before the line", line.x - lastRight == GAP, line.x - lastRight)
-        check(case[1] .. ": gap after the line", (bed.x + bed.w) - (line.x + 2) == GAP, (bed.x + bed.w) - (line.x + 2))
     end
 end
 

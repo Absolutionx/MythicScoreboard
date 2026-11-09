@@ -265,8 +265,8 @@ function MS:BuildUI()
     local function RefreshHistBtn()
         local runs = MythicScoreboardDB and MythicScoreboardDB.runs
         local r, idx = MS.displayRun, 1
-        if r and runs then
-            for i, v in ipairs(runs) do if v == r then idx = i; break end end
+        if r then
+            idx = MS:HistoryIndexOf(r) or 1
         elseif MS.currentRun then
             r, idx = MS.currentRun, L["Now"]            -- the live run
         else
@@ -300,12 +300,12 @@ function MS:BuildUI()
 
     histBtn:HookScript("OnEnter", function()
         Tint(chev, P.ivory)
-        local runs = MythicScoreboardDB and MythicScoreboardDB.runs
+        local n = #MS:HistoryEntries()
         local menuOpen = UI.IsHistOpen() or (sbFrame.SettingsPopup and sbFrame.SettingsPopup:IsShown())
-        if runs and #runs > 0 and not menuOpen then
+        if n > 0 and not menuOpen then
             GameTooltip:SetOwner(histBtn, "ANCHOR_BOTTOM")
             GameTooltip:SetText(L["Run history"])
-            GameTooltip:AddLine(MS.Plural(#runs, "Pick one of %d saved run to view.", "Pick one of %d saved runs to view."), 0.8, 0.8, 0.8)
+            GameTooltip:AddLine(MS.Plural(n, "Pick one of %d saved run to view.", "Pick one of %d saved runs to view."), 0.8, 0.8, 0.8)
             GameTooltip:Show()
         end
     end)
@@ -470,14 +470,104 @@ local function LangCommand(arg)
     say(_fmt(L["Type /reload to see the addon in %s."], LANG_NAMES[pick] or pick))
 end
 
+
+-- /sb demo [0-3]: a made-up finished key, to see how a key looks (the
+-- diamonds, your rating gain, the +3/+2/+1 marks, specializations) without
+-- running one. Shown only; never saved to history or stats. The number is
+-- the upgrade it got (0 = over time; 2 if left out).
+local DEMO_TIMES = { [0] = 1890, [1] = 1632, [2] = 1395, [3] = 1020 }   -- of a 30:00 timer
+local function DemoRun(up)
+    local dur, limit = DEMO_TIMES[up] or DEMO_TIMES[2], 1800
+    local frac = dur / 1475                   -- boss times below are for a 24:35 run
+    local function T(t) return math.floor(t * frac) end
+    local run = MS.NewRunData()
+    run.dungeonName, run.keystoneLevel, run.keystoneTimeLimit = "Ara-Kara, City of Echoes", 15, limit
+    run.difficultyLabel = "Mythic Keystone"
+    run.completed, run.inTime, run.keyUpgrades, run.duration = true, up > 0, up, dur
+    run._wallClockStart, run._demo = time() - dur, true
+    run.affixes = {}
+    run.bosses = {
+        { name = "Avanoxx",                 pullTime = T(300), killTime = T(420), progressPct = 38 },
+        { name = "Anub'zekt",               pullTime = T(780), killTime = T(905), progressPct = 71 },
+        { name = "Ki'katal the Harvester",  pullTime = T(1290), killTime = T(1475), progressPct = 100 },
+    }
+    -- Your current rating (if the game has one), and an 18-point gain.
+    local before = 2827
+    if C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary then
+        local ok, sc = pcall(C_PlayerInfo.GetPlayerMythicPlusRatingSummary, "player")
+        local v = ok and type(sc) == "table" and MS.ReadableValue(sc.currentSeasonScore)
+        if type(v) == "number" and v > 0 then before = v end
+    end
+    local gain = up > 0 and (6 * up + 6) or 0
+    run.ratingBefore, run.ratingAfter = before, before + gain
+
+    local myName = MS:UnitPlayerName("player") or UNKNOWN or "You"
+    local _, myClass = UnitClass("player")
+    local mySpec
+    if GetSpecialization and GetSpecializationInfo then
+        local ok, idx = pcall(GetSpecialization)
+        if ok and idx then local ok2, id = pcall(GetSpecializationInfo, idx); mySpec = ok2 and id or nil end
+    end
+    local role = MS.SpecLabel and select(2, MS.SpecLabel(mySpec, myClass)) or "DAMAGER"
+    local group = {
+        { MS.ShortName(myName), myClass or "WARRIOR", mySpec, role, 652, 0 },
+        { "Ironhide",  "PALADIN",     66,  "TANK",    649, 2910 },
+        { "Mosswhisper", "DRUID",     105, "HEALER",  651, 2766 },
+        { "Frostbyte", "MAGE",        63,  "DAMAGER", 650, 2934 },
+        { "Shadestep", "DEMONHUNTER", 577, "DAMAGER", 653, 2801 },
+        { "Arrowyn",   "HUNTER",      254, "DAMAGER", 648, 2745 },   -- if one above stayed home
+    }
+    local seen = { [role] = true }
+    run.players = {}
+    for i, g in ipairs(group) do
+        -- Your role is filled by you: the stand-in for it stays home.
+        local n = 0
+        for _ in pairs(run.players) do n = n + 1 end
+        if n < 5 and (i == 1 or not (seen[g[4]] and g[4] ~= "DAMAGER")) then
+            seen[g[4]] = true
+            local p = MS.NewPlayerStats(g[1], g[2], "Demo-" .. i)
+            p.specID, p.role, p.itemLevel = g[3], g[4], g[5]
+            p.mythicScore = i == 1 and run.ratingAfter or g[6]
+            if i == 1 and gain > 0 then p.ratingGain = gain end
+            local dps = g[4] == "HEALER" and 210000 or (g[4] == "TANK" and 640000 or 980000 + i * 60000)
+            p.damageDone, p.dps = dps * dur, dps
+            local hps = g[4] == "HEALER" and 1150000 or 45000
+            p.healingDone, p.hps = hps * dur, hps
+            p.damageTaken = (g[4] == "TANK" and 160 or 60) * 1000000
+            p.interrupts = g[4] == "HEALER" and 2 or 7 + i
+            for k = 1, p.interrupts do p.interruptEvents[k] = math.floor(dur * k / (p.interrupts + 1)) end
+            if i == 4 then
+                p.deaths = 1
+                p.deathEvents = { { time = T(860), events = {
+                    { spellName = "Burrow Charge", caster = "Anub'zekt", amount = 812000, overkill = 1 } } } }
+            end
+            run.players[g[1]] = p
+        end
+    end
+    return run
+end
+
+local function DemoCommand(arg)
+    local up = tonumber(arg)
+    if not (up and DEMO_TIMES[up]) then up = 2 end
+    MS:ShowScoreboard()
+    if UI.statsOpen then UI.CloseStats() end
+    MS.displayRun = DemoRun(up)
+    MS:RefreshOverview()
+    print("|cff00ccff[MythicScoreboard]|r " .. L["A sample key, not saved. Pick a run from history to go back."])
+end
+
 -- Slash commands work before the window is first opened (it is built then).
 SLASH_MYTHICSCOREBOARD1 = "/sb"
 SLASH_MYTHICSCOREBOARD2 = "/mscoreboard"
 SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
     local cmd = _slower(_smatch(msg or "", "^%s*(.-)%s*$"))
     local langArg = _smatch(cmd, "^lang%s*(.*)$")
+    local demoArg = _smatch(cmd, "^demo%s*(.*)$")
     if langArg then
         LangCommand(langArg)
+    elseif demoArg then
+        DemoCommand(demoArg)
     elseif cmd == "" then
         MS:ShowScoreboard()
     elseif cmd == "stats" then
@@ -489,7 +579,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         end
     elseif cmd == "help" then
         print("|cff00ccff[MythicScoreboard]|r v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)

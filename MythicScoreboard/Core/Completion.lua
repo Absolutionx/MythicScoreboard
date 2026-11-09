@@ -161,7 +161,7 @@ local function KeyResult()
         local ok, info = pcall(C_ChallengeMode.GetChallengeCompletionInfo)
         if ok and type(info) == "table" then
             local ms, onTime = Readable(info.time), Readable(info.onTime)
-            if type(ms) == "number" and ms > 0 then return ms, onTime end
+            if type(ms) == "number" and ms > 0 then return ms, onTime, info end
         end
     end
     if C_ChallengeMode.GetCompletionInfo then
@@ -181,11 +181,49 @@ end
 
 -- The key is done. Its time and result are known now; the meter's numbers
 -- are hidden for a moment, so the save waits (FinalizeKey).
+-- How many levels a key goes up for its time: 3 with 40% of the timer left,
+-- 2 with 20%, 1 in time, 0 over.
+function MS.KeyUpgrades(duration, limit, inTime)
+    if not (inTime and duration and limit and limit > 0) then return 0 end
+    if duration <= limit * 0.6 then return 3 end
+    if duration <= limit * 0.8 then return 2 end
+    return 1
+end
+
+-- A run's upgrade levels: the game's own count when it gave one.
+function MS:RunUpgrades(run)
+    if not (run and (run.keystoneLevel or 0) > 0 and run.completed) then return nil end
+    local n = tonumber(run.keyUpgrades)
+    if n then return n end
+    return MS.KeyUpgrades(run.duration, tonumber(run.keystoneTimeLimit), run.inTime)
+end
+
+-- The upgrade count and your rating before and after, from the game's
+-- completion info.
+local function NoteKeyInfo(self, run, info)
+    if type(info) ~= "table" then return end
+    local up = Readable(info.keystoneUpgradeLevels)
+    if type(up) == "number" and up >= 0 and up <= 3 then run.keyUpgrades = up end
+    local old, new = Readable(info.oldOverallDungeonScore), Readable(info.newOverallDungeonScore)
+    if type(old) == "number" and type(new) == "number" and new > 0 then
+        run.ratingBefore, run.ratingAfter = old, new
+        local me = self:UnitPlayerName("player")
+        local p = me and self:PlayerByName(me, run)
+        if p then
+            p.mythicScore = new
+            p.ratingGain = new > old and math.floor(new - old + 0.5) or nil
+            if self.scoreCache then self.scoreCache[p.name] = new end
+        end
+    end
+end
+
 function MS:OnKeyCompleted(totalTimeMs, onTime)
     local run = self.currentRun
     if not (self.inDungeon and run) then return end
     self:SetRunState("finishing")
+    local _, _, info = KeyResult()
     if not totalTimeMs then totalTimeMs, onTime = KeyResult() end
+    NoteKeyInfo(self, run, info)
     run.deathPenaltySeconds = self:KeyDeathPenalty() or run.deathPenaltySeconds
 
     local elapsed = totalTimeMs and totalTimeMs > 0 and totalTimeMs / 1000 or nil
