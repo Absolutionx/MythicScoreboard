@@ -655,3 +655,17 @@ UI.Tint = Tint
 UI.VGrad = VGrad
 UI.WIPE_BOT = WIPE_BOT
 UI.WIPE_TOP = WIPE_TOP
+
+-- A key's upgrade as three diamonds in a line of text: one filled for each
+-- level it went up (+1, +2, +3), all hollow for a key over time.
+function UI.Pips(n, size)
+    size = size or 12
+    local out = {}
+    for i = 1, 3 do
+        local on = i <= (n or 0)
+        local c = on and P.bronzeHi or P.ash2
+        out[i] = string.format("|T%s%s:%d:%d:0:0:32:32:0:32:0:32:%d:%d:%d|t", MEDIA, on and "PipFull" or "PipEmpty",
+            size, size, math.floor(c[1] * 255 + 0.5), math.floor(c[2] * 255 + 0.5), math.floor(c[3] * 255 + 0.5))
+    end
+    return table.concat(out)
+end

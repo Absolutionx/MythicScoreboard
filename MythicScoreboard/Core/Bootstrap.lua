@@ -23,6 +23,7 @@ local function OnLoaded()
     end
     MS:RunMigrations()                      -- saved data up to date before anything reads it
     MS:SyncAccountStats()                   -- this character's runs, account-wide
+    MS:MirrorHistory()                      -- and its history, for the other characters' lists
     -- The window is built the first time it's opened.
     if MS.UpdateMinimapButton then MS:UpdateMinimapButton() end
     -- A run in progress at the last logout or /reload. Inside (or paused),

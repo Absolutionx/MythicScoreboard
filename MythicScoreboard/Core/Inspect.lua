@@ -1,7 +1,9 @@
--- Item level, character level, role and rating for each group member.
+-- Item level, specialization, character level, role and rating for each
+-- group member.
 --
--- Item levels need an inspect, one player at a time; the result is cached
--- for the run. Roles and ratings are read on roster changes.
+-- Item levels and other players' specializations need an inspect, one
+-- player at a time; the result is cached for the session. Roles and ratings
+-- are read on roster changes.
 
 local _floor, _ins, _rem = math.floor, table.insert, table.remove
 
@@ -14,6 +16,33 @@ local INSPECT_DELAY  = 0.5
 local inspectFrame   = nil
 
 local function Later(fn) C_Timer.After(INSPECT_DELAY, fn) end
+
+-- Specializations exist on this client (not in Forever).
+local HAS_SPECS = rawget(_G, "GetInspectSpecialization") ~= nil and rawget(_G, "GetSpecializationInfoByID") ~= nil
+MS.specCache = MS.specCache or {}
+
+local function ValidSpec(id)
+    return type(id) == "number" and not IsSecret(id) and id > 0 and id or nil
+end
+
+-- Your own specialization, read directly.
+local function OwnSpec()
+    if not (HAS_SPECS and GetSpecialization and GetSpecializationInfo) then return nil end
+    local ok, idx = pcall(GetSpecialization)
+    if not (ok and type(idx) == "number" and idx > 0) then return nil end
+    local ok2, id = pcall(GetSpecializationInfo, idx)
+    return ok2 and ValidSpec(id) or nil
+end
+
+-- A spec ID as "Holy Paladin" (localised), and its role.
+function MS.SpecLabel(specID, class)
+    if not (HAS_SPECS and specID) then return nil end
+    local ok, _, specName, _, _, role = pcall(GetSpecializationInfoByID, specID)
+    if not (ok and type(specName) == "string" and specName ~= "") then return nil end
+    local names = rawget(_G, "LOCALIZED_CLASS_NAMES_MALE")
+    local className = names and class and names[class]
+    return className and (specName .. " " .. className) or specName, role
+end
 
 local function EnsureInspectFrame()
     if inspectFrame then return end
@@ -34,6 +63,15 @@ local function EnsureInspectFrame()
                 local p = MS:PlayerByName(name)
                 if p then p.itemLevel = il end
                 MS:Changed("run")
+            end
+        end
+        if targetUnit and HAS_SPECS then
+            local ok, id = pcall(GetInspectSpecialization, targetUnit)
+            id = ok and ValidSpec(id)
+            if id then
+                MS.specCache[name] = id
+                local p = MS:PlayerByName(name)
+                if p and p.specID ~= id then p.specID = id; MS:Changed("run") end
             end
         end
         ClearInspectPlayer()
@@ -78,6 +116,12 @@ function MS:PopulateRolesAndScores()
             local short = p.name
             local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit)
             if role and role ~= "" and role ~= "NONE" then p.role = role end
+            if unit == "player" then
+                local spec = OwnSpec()
+                if spec then p.specID = spec; self.specCache[short] = spec end
+            elseif self.specCache[short] then
+                p.specID = self.specCache[short]
+            end
             local score
             if C_PlayerInfo and C_PlayerInfo.GetPlayerMythicPlusRatingSummary then
                 local ok, sc = pcall(C_PlayerInfo.GetPlayerMythicPlusRatingSummary, unit)
@@ -110,9 +154,18 @@ function MS:PopulateAll()
                 p.level = lvl
             end
             local cached = self.itemLevelCache[short]
-            if cached and cached > 0 then
-                p.itemLevel = cached
-            elseif not inspectPending then
+            if cached and cached > 0 then p.itemLevel = cached end
+            local needSpec = false
+            if unit == "player" then
+                p.specID = OwnSpec() or p.specID
+            elseif self.specCache[short] then
+                p.specID = self.specCache[short]
+            elseif p.specID then
+                self.specCache[short] = p.specID      -- known before a /reload
+            else
+                needSpec = HAS_SPECS
+            end
+            if (not (cached and cached > 0) or needSpec) and not inspectPending then
                 local already = false
                 for _, e in ipairs(inspectQueue) do
                     if e.name == short then already = true; break end

@@ -31,7 +31,6 @@ local DEATH_Y   = TL.DEATH_Y
 local INT_BASE  = TL.INT_BASE
 local INT_MAXH  = TL.INT_MAXH
 local COMPACT_W = TL.COMPACT_W
-local END_LINE_W = TL.END_LINE_W
 local SegmentLabelFor = TL.SegmentLabelFor
 
 
@@ -127,6 +126,58 @@ local function DrawKeyTimer(c)
     end
 end
 
+-- ── Upgrade thresholds (Mythic+ only) ──────────────────────────────────────
+-- On the time axis, like a ruler: a diamond where the key would go up three
+-- levels (60% of the timer), two (80%) and one (the timer), labelled "+3",
+-- "+2", "+1" beside it on the axis line. Filled bronze for a threshold the
+-- key beat, hollow otherwise.
+local NOTCH_Y = 27                   -- the axis ticks' middle
+local function DrawThresholds(c)
+    local cv, run, X, At, Art, Text, Btn = c.cv, c.run, c.X, c.At, c.Art, c.Text, c.Btn
+    if not c.thresholds then return end
+    local runDur = MS:GetRunDuration(run)
+    local up = MS:RunUpgrades(run) or 0
+    local compX = c.endLineL and (c.endLineL + c.endLineW / 2)
+    for _, th in ipairs(c.thresholds) do
+        local n, t = th[1], th[2]
+        local x = X(t)
+        local beat = run.completed and up >= n
+        local col = beat and P.bronzeHi or P.ash
+        local d = Art(cv, beat and "PipFull" or "PipEmpty", "OVERLAY", 3)
+        d:SetSize(11, 11); Tint(d, col)
+        At(d, "CENTER", x, NOTCH_Y)
+
+        -- The label beside its diamond, on the axis line (the time labels
+        -- below keep their row). Right of it, unless the finishing time or
+        -- the end of the track is there.
+        local lbl = Text(cv, "semibold", 11, col, "LEFT")
+        lbl:SetText("+" .. n)
+        local right = x + 7 + lbl:GetStringWidth() <= TL_L + c.W
+        if compX and compX > x and compX - x < 40 then right = false end
+        if right then At(lbl, "LEFT", x + 7, NOTCH_Y)
+        else lbl:SetJustifyH("RIGHT"); At(lbl, "RIGHT", x - 7, NOTCH_Y) end
+
+        local b = Btn(cv)
+        b:SetSize(18, 30)
+        At(b, "BOTTOMLEFT", x - 9, 4)
+        b:SetFrameLevel(cv:GetFrameLevel() + 7)
+        b:SetScript("OnEnter", function(self2)
+            GameTooltip:SetOwner(self2, "ANCHOR_TOP")
+            GameTooltip:SetText(n == 1 and L["Key timer"] or _fmt(L["+%d timer"], n), P.ivory[1], P.ivory[2], P.ivory[3])
+            GameTooltip:AddLine(MS:FormatTime(t), 1, 1, 1)
+            if run.completed and runDur > 0 then
+                if runDur <= t then
+                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(t - runDur)), P.verdHi[1], P.verdHi[2], P.verdHi[3])
+                else
+                    GameTooltip:AddLine(_fmt(L["Over by %s"], MS:FormatTime(runDur - t)), P.ash[1], P.ash[2], P.ash[3])
+                end
+            end
+            GameTooltip:Show()
+        end)
+        b:SetScript("OnLeave", GameTooltip_Hide)
+    end
+end
+
 -- ── Completion marker: a line from the track down to the axis, with ──
 -- ── the finishing time printed on the axis itself ────────────────────
 local function DrawCompletion(c)
@@ -135,11 +186,11 @@ local function DrawCompletion(c)
     if compSec then
         -- Finished on a boss kill: END_GAP past that boss's block (NewContext).
         local lineL = c.endLineL
-        local fx = lineL + END_LINE_W / 2               -- the line's middle
+        local fx = lineL + c.endLineW / 2               -- the line's middle
         local fc = (isMPlus and not run.inTime) and P.avoid or P.verd
 
         local line = Solid(cv, "OVERLAY", 1, fc[1], fc[2], fc[3], 1)
-        line:SetSize(END_LINE_W, TRACK_Y + TRACK_H + 4 - 22)
+        line:SetSize(c.endLineW, TRACK_Y + TRACK_H + 4 - 22)
         At(line, "BOTTOMLEFT", lineL, 22)
         local cap = Art(cv, "Diamond", "OVERLAY", 2)
         cap:SetSize(10, 10); Tint(cap, fc)
@@ -429,4 +480,5 @@ local function DrawLiveHead(strip, c, prevT, liveSeg)
 end
 
 TL.DrawTail, TL.DrawKeyTimer, TL.DrawCompletion = DrawTail, DrawKeyTimer, DrawCompletion
+TL.DrawThresholds = DrawThresholds
 TL.DrawDeaths, TL.DrawInterrupts, TL.DrawLiveHead = DrawDeaths, DrawInterrupts, DrawLiveHead

@@ -195,6 +195,39 @@ local function AbandonButton()
     return b
 end
 
+-- After abandoning a run inside a dungeon: start a new one right here, from
+-- now, without leaving and coming back in. Sits where "Abandon run" was.
+local function StartFreshButton()
+    local f = UI.frame
+    if f.FreshRunBtn then return f.FreshRunBtn end
+    local b = Btn(f)
+    b:SetSize(130, 22)
+    b:SetPoint("TOPRIGHT", f, "TOPRIGHT", -14, -54)
+    b:SetFrameLevel(f:GetFrameLevel() + 20)
+    local txt = Text(b, "medium", 13, P.bronzeHi, "RIGHT")
+    txt:SetPoint("RIGHT", b, "RIGHT", -4, 0)
+    txt:SetText(L["Start new run"])
+    b:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        MS:StartFresh()
+    end)
+    b:SetScript("OnEnter", function(self2)
+        txt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
+        GameTooltip:SetOwner(self2, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(L["Start new run"], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:AddLine(L["Starts a new run in this dungeon, from now. No need to leave and come back in."],
+            0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end)
+    b:SetScript("OnLeave", function()
+        txt:SetTextColor(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:Hide()
+    end)
+    b:Hide()
+    f.FreshRunBtn = b
+    return b
+end
+
 -- ===========================================================================
 -- Public API
 -- ===========================================================================
@@ -247,6 +280,12 @@ local function DefaultPlayerSort(a, b)
     return (a.damageDone or 0) > (b.damageDone or 0)
 end
 
+local function Thousands(n)
+    n = _floor(n + 0.5)
+    local B = rawget(_G, "BreakUpLargeNumbers")
+    return B and B(n) or tostring(n)
+end
+
 local function RefreshHeader(run)
     if not run then
         UI.frame.DungeonName:SetText(L["Dungeon Scoreboard"])
@@ -257,6 +296,7 @@ local function RefreshHeader(run)
         UI.frame.LayoutAffixIcons(0)
         if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
         if UI.frame.AbandonBtn then UI.frame.AbandonBtn:Hide() end
+        StartFreshButton():SetShown(MS:CanStartFresh())
         return
     end
 
@@ -284,10 +324,13 @@ local function RefreshHeader(run)
     if run.completed then
         if isMPlus and limit and limit > 0 then
             local diff = _abs(limit - dur)
-            if run.inTime then _ins(parts, CT(P.verd, _fmt(L["In time, %s to spare"], MS:FormatTime(diff))))
-            else _ins(parts, CT(P.avoid, _fmt(L["Over time by %s"], MS:FormatTime(diff)))) end
+            local res
+            if run.inTime then res = CT(P.verd, _fmt(L["In time, %s to spare"], MS:FormatTime(diff)))
+            else res = CT(P.avoid, _fmt(L["Over time by %s"], MS:FormatTime(diff))) end
+            _ins(parts, res .. "  " .. UI.Pips(MS:RunUpgrades(run), 13))
         elseif isMPlus then
-            _ins(parts, run.inTime and CT(P.verd, L["In time"]) or CT(P.avoid, L["Over time"]))
+            _ins(parts, (run.inTime and CT(P.verd, L["In time"]) or CT(P.avoid, L["Over time"]))
+                .. "  " .. UI.Pips(MS:RunUpgrades(run), 13))
         else
             _ins(parts, CT(P.verd, L["Cleared"]))
         end
@@ -318,6 +361,13 @@ local function RefreshHeader(run)
         local penalty = run.deathPenaltySeconds or 0
         if isMPlus and penalty > 0 then s = s .. ", -" .. MS:FormatTime(penalty) end
         _ins(parts, CT(P.blood, s))
+    end
+    -- Your rating after a key, and what it gained.
+    if isMPlus and run.completed and (run.ratingAfter or 0) > 0 then
+        local r = _fmt(L["Rating %s"], CT(P.ivory, Thousands(run.ratingAfter)))
+        local gain = math.floor(run.ratingAfter - (run.ratingBefore or run.ratingAfter) + 0.5)
+        if gain > 0 then r = r .. " " .. CT(P.verdHi, "+" .. gain) end
+        _ins(parts, r)
     end
     -- Forever: what the run did for you (the full list is in the tooltip).
     local pr = MS.Flavor.progressStats and run.progress
@@ -360,11 +410,14 @@ local function RefreshHeader(run)
     local canAbandon = run == MS.currentRun and not run.completed
     if not canAbandon and ab:IsShown() then ab.Disarm() end
     ab:SetShown(canAbandon)
+    local fresh = not canAbandon and MS:CanStartFresh()
+    StartFreshButton():SetShown(fresh)
     local boss = FocusedBoss(run)
     local wr = WholeRunButton()
     wr:SetShown(boss ~= nil)
     wr:ClearAllPoints()
     if canAbandon then wr:SetPoint("RIGHT", ab, "LEFT", -12, 0)
+    elseif fresh then wr:SetPoint("RIGHT", StartFreshButton(), "LEFT", -12, 0)
     else wr:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", -14, -54) end
     if not boss then return end
     UI.frame.PBLabel:Hide()
@@ -552,6 +605,8 @@ function MS:_DoRefreshOverview()
     end
 
     local dur = self:GetRunDuration(run)
+    -- Another character's run: that character's row is the highlighted one.
+    local owner = self:HistoryOwner(run)
     if focus then run, dur = FightView(run, focus) end
     wipe(_playersBuf)
     for _, p in pairs(run.players) do _ins(_playersBuf, p) end
@@ -569,7 +624,7 @@ function MS:_DoRefreshOverview()
 
     local ctx = { run = run, dur = dur, hasSuffix = hasSuffix, topDps = topDps, topHps = topHps,
                   dpsCellW = dpsCellW, hpsCellW = hpsCellW, count = #players }
-    local yOff, localName = 0, MS:UnitPlayerName("player")
+    local yOff, localName = 0, owner and owner.name or MS:UnitPlayerName("player")
     for idx, p in ipairs(players) do
         local isSelf  = (p.name == MS.ShortName(localName or ""))
         local row = prevRows[idx]

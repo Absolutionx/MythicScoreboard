@@ -30,7 +30,6 @@ local DEATH_Y   = TL.DEATH_Y
 local INT_BASE  = TL.INT_BASE
 local INT_MAXH  = TL.INT_MAXH
 local COMPACT_W = TL.COMPACT_W
-local END_LINE_W = TL.END_LINE_W
 
 
 local function ShowBossTooltip(owner, boss, run)

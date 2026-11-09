@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.9.0
+
+### New for Mythic+
+- **Key upgrades at a glance:** three diamonds show how many levels the key went up: one filled for each of +1, +2 and +3, all hollow for a key that went over time. They appear in the scoreboard's header and next to each key in the run history.
+- **+3, +2 and +1 on the timeline:** the time axis is marked where the key would go up three levels (60% of the timer), two (80%) and one (the timer). A mark turns bronze if the key beat it, and hovering one shows how far inside or over it you finished.
+- **Your rating change:** after a key, the header shows your new rating and what it gained ("Rating 2,845 +18"), and the gain also appears under your rating in your row.
+- **Specializations:** each player's tooltip now shows their spec and role, for example "Holy Paladin · Healer".
+
+### Run history
+- **All your characters in one list:** the history list now shows the runs of every character on your account, newest first, with each character's name in their class colour. Switch between "All characters" and "This character" at the top. Another character's runs show up once that character has logged in with this version.
+- You can view another character's run, with that character's row highlighted, but only that character can delete it.
+- The history list is now wide enough for long dungeon names, so they are no longer cut short.
+
+### Other changes
+- **Start new run:** if you abandon a run while still inside the dungeon, a "Start new run" button appears in its place. It starts a fresh run from that moment, without having to leave and come back in. That's handy when groupmates died on their way in, or took a long time to arrive.
+- The completion marker on the timeline now sits right against the last boss's bar and ends the timeline, drawn to your screen's exact pixels at any UI scale. Time spent in the dungeon after the final boss (looting, waiting to leave) is no longer drawn after it.
+- **New:** `/sb demo` shows a sample finished key, so you can see how keys look without running one. Add 0 to 3 for the upgrade it got (`/sb demo 3`). The sample is never saved.
+
+### Fixes
+- Other addons' windows no longer show through the scoreboard. The history list, Settings and the Stats page's menus now stay above the window but below tooltips, so a tooltip is never covered by them.
+- Long column names and run times on the Stats page (Best, Typical, and "Deaths/run" in some languages) are no longer cut short.
+- WoW Forever: quests only count as completed in a run when you made progress on them during it. Picking up and handing in quests already done no longer adds to the count.
+- A boss fight that the game never reported as ended now closes when the group leaves combat or pulls another boss.
+
 ## 2.8.0
 
 ### Now in your language

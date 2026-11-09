@@ -79,6 +79,7 @@ function MS:RestoreCurrentRun()
         end
     end
     self.itemLevelCache = {}
+    self.specCache = {}
     self:SetRunState(run._suspended and "paused" or "active", run)
     print("|cff00ccff[MythicScoreboard]|r " .. L["Run restored after UI reload."])
 end
