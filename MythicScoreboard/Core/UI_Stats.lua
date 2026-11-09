@@ -19,8 +19,9 @@ local FIGHT_BOT, FIGHT_TOP = UI.FIGHT_BOT, UI.FIGHT_TOP
 --             with its fight lengths on the right
 --   loot      every piece of gear that dropped for you, newest first
 --   compare   two runs of one dungeon side by side (picked from the run list)
+--   keys      (Mythic+) rating key by key, timed rates by dungeon and level
 --
--- Tabs (Dungeons / Loot) and the character filter sit in the header.
+-- Tabs (Dungeons / Keys / Loot) and the character filter sit in the header.
 
 -- ── Layout ─────────────────────────────────────────────────────────────────
 local X0      = PAD_X - 2
@@ -93,13 +94,13 @@ end
 local function Pct(a, b) return b > 0 and _floor(a / b * 100 + 0.5) .. "%" or "-" end
 
 -- ── State ──────────────────────────────────────────────────────────────────
-local view, overview, detail, lootView, controls, compareView
+local view, overview, detail, lootView, controls, compareView, keysView
 -- (In one table, shared with UI_StatsDungeon.lua and UI_StatsLoot.lua.)
 local S = {
     selected  = nil,         -- dungeon name shown in detail, or nil for the overview
     compareA  = nil,         -- runs picked for comparison (archive entries)
     compareB  = nil,
-    tab       = "dungeons",  -- or "loot"
+    tab       = "dungeons",  -- or "keys", "loot"
     multiChar = false,       -- more than one character has runs
 }
 
@@ -525,7 +526,13 @@ local function BuildControls(sbFrame)
 
     c.lootTab = TabButton(c, L["Loot"], "loot")
     c.dunTab = TabButton(c, L["Dungeons"], "dungeons")
-    c.dunTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
+    if MS.Flavor.mythicPlus then
+        c.keysTab = TabButton(c, L["Keys"], "keys")
+        c.keysTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
+        c.dunTab:SetPoint("RIGHT", c.keysTab, "LEFT", -6, 0)
+    else
+        c.dunTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
+    end
     c.Layout = function()
         c.lootTab:ClearAllPoints()
         if cb:IsShown() then c.lootTab:SetPoint("RIGHT", cb, "LEFT", -18, 0)
@@ -557,6 +564,7 @@ function UI.BuildStatsView(sbFrame)
     detail = K.BuildDetail(view)
     lootView = K.BuildLoot(view)
     compareView = K.BuildCompare(view)
+    if K.BuildKeys and MS.Flavor.mythicPlus then keysView = K.BuildKeys(view) end
     controls = BuildControls(sbFrame)
     view:Hide()
     return view
@@ -587,6 +595,7 @@ function UI.RefreshStats(force)
     local items = MS:LootHistory()
     controls.lootTab.SetLabel(#items > 0 and (L["Loot"] .. "  " .. CT(P.ash2, #items)) or L["Loot"])
     controls.dunTab.Refresh(); controls.lootTab.Refresh()
+    if controls.keysTab then controls.keysTab.Refresh() end
     controls.Layout()
     -- Only the character you're on can reset its own stats.
     overview.reset:SetShown(who == "all" or who == MS._charKey)
@@ -609,6 +618,23 @@ function UI.RefreshStats(force)
         parts[#parts + 1] = MS.Plural(stats.quests, "%d quest", "%d quests", CT(P.ivory, stats.quests))
         parts[#parts + 1] = CT(P.bronzeHi, MS.FormatGold(stats.gold))
     end
+    local onKeys = S.tab == "keys" and keysView ~= nil
+    local keyStats = onKeys and MS:KeyStats()
+    if onKeys then
+        -- The Keys tab: keys, how many timed, your rating now.
+        parts = {
+            MS.Plural(keyStats.keys, "%d key", "%d keys", CT(P.ivory, keyStats.keys)),
+            _fmt(L["%s timed"], CT(P.ivory, Pct(keyStats.timed, keyStats.keys))),
+        }
+        local latest
+        for _, list in pairs(keyStats.rating) do
+            local last = list[#list]
+            if last and (not latest or last.at > latest.at) then latest = last end
+        end
+        if latest and keyStats.ratingChars == 1 then
+            parts[#parts + 1] = _fmt(L["Rating %s"], CT(P.ivory, tostring(_floor(latest.v + 0.5))))
+        end
+    end
     f.SublineRun = nil
     f.Subline:SetText(table.concat(parts, "      "))
 
@@ -625,12 +651,15 @@ function UI.RefreshStats(force)
     if S.compareA and not Listed(S.compareA) then S.compareA, S.compareB = nil, nil end
     if S.compareB and not Listed(S.compareB) then S.compareB = nil end
     local onLoot = S.tab == "loot"
-    local comparing = not onLoot and S.selected ~= nil and S.compareA ~= nil and S.compareB ~= nil
-    overview:SetShown(not onLoot and not S.selected)
-    detail:SetShown(not onLoot and S.selected ~= nil and not comparing)
+    local onTable = not onLoot and not onKeys
+    local comparing = onTable and S.selected ~= nil and S.compareA ~= nil and S.compareB ~= nil
+    overview:SetShown(onTable and not S.selected)
+    detail:SetShown(onTable and S.selected ~= nil and not comparing)
     compareView:SetShown(comparing)
     lootView:SetShown(onLoot)
+    if keysView then keysView:SetShown(onKeys) end
     if onLoot then K.FillLoot(lootView, items)
+    elseif onKeys then K.FillKeys(keysView, keyStats)
     elseif comparing then K.FillCompare(compareView, MS:CompareRuns(S.compareA, S.compareB))
     elseif S.selected then K.FillDetail(detail, MS:StatsForDungeon(S.selected), stats)
     else FillOverview(overview, stats) end

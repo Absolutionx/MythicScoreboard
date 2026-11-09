@@ -49,5 +49,6 @@ Core\UI_Scoreboard.lua
 Core\UI_Stats.lua
 Core\UI_StatsDungeon.lua
 Core\UI_StatsLoot.lua
+Core\UI_StatsKeys.lua
 Core\UI.lua
 Core\UI_Minimap.lua

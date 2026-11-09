@@ -194,5 +194,61 @@ zone(WORLD); M.RunTimers(4)
 MS:AbandonRun()
 check("fresh: not offered outside", not MS:CanStartFresh())
 
+-- ── Stats page: the Keys tab ───────────────────────────────────────────────
+if not forever then
+    reset()
+    local function Key(at, lvl, dur, inTime, r0, r1, up)
+        local r = MS.NewRunData()
+        r.dungeonName, r.keystoneLevel, r.keystoneTimeLimit = (lvl % 2 == 0) and "Skyreach" or "Pit of Saron", lvl, 1800
+        r.completed, r.inTime, r.duration, r._wallClockStart = true, inTime, dur, at
+        r.keyUpgrades, r.ratingBefore, r.ratingAfter = up, r0, r1
+        r.players = {}
+        local p = MS.NewPlayerStats(MS.ShortName("Jay"), "SHAMAN", "Player-1")
+        p.mythicScore = r0
+        r.players[p.name] = p
+        return r
+    end
+    MS:ArchiveRun(Key(1000, 10, 1000, true, 2500, 2530, 3))
+    MS:ArchiveRun(Key(2000, 12, 1500, true, 2530, 2550, nil))      -- no count from the game: worked out (+1)
+    MS:ArchiveRun(Key(3000, 12, 2000, false, 2550, 2550, 0))
+    MS:ArchiveRun(Key(4000, 13, 1300, true, 2550, nil, nil))       -- older: only the rating going in
+    local ks = MS:KeyStats()
+    check("keys: counted", ks.keys == 4 and ks.timed == 3, ks.keys .. " " .. ks.timed)
+    local sky
+    for _, d in ipairs(ks.dungeons) do if d.name == "Skyreach" then sky = d end end
+    check("keys: per dungeon", sky and sky.keys == 3 and sky.timed == 2 and sky.bestTimed == 12 and sky.highest == 12)
+    check("keys: average upgrade (3 + 1 + 0)", sky and sky.upN == 3 and sky.upSum == 4, sky and (sky.upSum .. "/" .. sky.upN))
+    check("keys: levels, highest first", ks.levels[1].level == 13 and ks.levels[2].level == 12
+        and ks.levels[2].keys == 2 and ks.levels[2].timed == 1)
+    local pts = select(2, next(ks.rating))
+    check("keys: rating points", pts and #pts == 4 and pts[1].v == 2530 and pts[4].v == 2550 and not pts[4].after)
+    -- The tab itself.
+    MS:ShowScoreboard(); MS.UI.OpenStats(); M.RunTimers(2)
+    local tab = MS.UI.StatsKit.S
+    tab.tab = "keys"; MS.UI.RefreshStats(true)
+    local sub = MS.UI.frame.Subline:GetText() or ""
+    check("keys tab: summary", sub:find("4") and sub:find("75%%") and sub:find("2550"), sub)
+    local diamonds = 0
+    for _, f in ipairs(M.allFrames) do
+        if f._kind == "Button" and f.pt and f._shown ~= false then diamonds = diamonds + 1 end
+    end
+    check("keys tab: a diamond per key", diamonds == 4, diamonds)
+    MS.UI.CloseStats()
+    -- Older archived keys get their details from history, once.
+    reset()
+    local old = Key(5000, 14, 1000, true, 2600, 2621, 3)
+    MythicScoreboardDB.runs = { old }
+    local acc = MythicScoreboardAccountDB
+    MS:ArchiveRuns()
+    local key = MS._charKey
+    local arch = acc.chars[key].archive
+    arch.keysV = nil
+    for _, e in ipairs(arch.runs) do e.up, e.r0, e.r1, e.lim = nil, nil, nil, nil end
+    MS:ArchiveRuns()
+    local e = arch.runs[#arch.runs]
+    check("backfill: from history", e and e.up == 3 and e.r1 == 2621 and e.r0 == 2600 and e.lim == 1800,
+        e and (tostring(e.up) .. " " .. tostring(e.r1)))
+end
+
 io.stdout:write(("features_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

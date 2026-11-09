@@ -73,6 +73,14 @@ function MS:RestoreCurrentRun()
             if b.name == ab.name and b.pullTime == ab.pullTime and not b.killTime then run.activeBoss = b end
         end
     end
+    -- Cleared before the reload: the clear's moment on the game clock (deaths
+    -- after it aren't the run's). Its saved value only holds while the
+    -- computer hasn't restarted; past the clear by now either way.
+    if run.completed then
+        local t = GetTime()
+        local c = tonumber(run._clearedClock)
+        if not c or c > t or elapsed > 0 and c < t - elapsed - 60 then run._clearedClock = t - 10 end
+    end
     if MythicScoreboardDB.petGUIDCache then
         for guid, owner in pairs(MythicScoreboardDB.petGUIDCache) do
             self._petGUIDToOwner[guid] = owner
