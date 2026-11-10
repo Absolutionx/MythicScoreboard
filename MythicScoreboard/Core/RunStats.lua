@@ -179,7 +179,7 @@ local function QuestLog()
                     local ok, v = pcall(C_QuestLog.IsComplete, questID)
                     if ok and type(v) == "boolean" then done = v end
                 end
-                out[questID] = { title = title, done = done }
+                out[questID] = { title = title, done = done, index = i }
             end
         end
     elseif C_QuestLog and C_QuestLog.GetNumQuestLogEntries and C_QuestLog.GetInfo then
@@ -230,12 +230,48 @@ local function OnInfoMessage(msg)
     if type(msg) == "string" and msg:find("%d+/%d+") then lastObjectiveAt = GetTime() end
 end
 
-local function NoteQuest(run, id, title)
+-- What a quest gives when handed in, from your quest log (classic logs read
+-- the selected quest, so the selection is put back after). Counted with the
+-- run as soon as the quest is done in here: you don't have to hand it in.
+local function QuestReward(id, index)
+    local okX, xp, okM, money
+    local XP, Money = rawget(_G, "GetQuestLogRewardXP"), rawget(_G, "GetQuestLogRewardMoney")
+    local Select, Selected = rawget(_G, "SelectQuestLogEntry"), rawget(_G, "GetQuestLogSelection")
+    if index and Select and XP then
+        local prev = Selected and Selected()
+        pcall(Select, index)
+        okX, xp = pcall(XP)
+        if Money then okM, money = pcall(Money) end
+        if prev then pcall(Select, prev) end
+    elseif XP then
+        okX, xp = pcall(XP, id)
+        if Money then okM, money = pcall(Money, id) end
+    end
+    xp = okX and Plain(xp) or nil
+    money = okM and Plain(money) or nil
+    return type(xp) == "number" and xp > 0 and xp or nil, type(money) == "number" and money > 0 and money or nil
+end
+
+-- Quest XP and gold apart from what the dungeon gave: totals of each
+-- quest's reward (questRewards, by the quest's place in the list).
+local function QuestTotals(p)
+    local x, g = 0, 0
+    for _, r in pairs(p.questRewards or {}) do x = x + (r.x or 0); g = g + (r.g or 0) end
+    p.qx = x > 0 and x or nil
+    p.qg = g > 0 and g or nil
+end
+
+local function NoteQuest(run, id, title, xp, money)
     local p = Progress(run)
     p.questIDs = p.questIDs or {}
     if p.questIDs[id] then return false end
-    p.questIDs[id] = true
     p.quests[#p.quests + 1] = title or L["Quest %s"]:format(tostring(id))
+    p.questIDs[id] = #p.quests
+    if xp or money then
+        p.questRewards = p.questRewards or {}
+        p.questRewards[#p.quests] = { x = xp, g = money }
+        QuestTotals(p)
+    end
     return true
 end
 
@@ -247,20 +283,43 @@ local function OnQuestLog()
     local recentLine = GetTime() - lastObjectiveAt <= OBJECTIVE_GRACE
     for id, q in pairs(QuestLog()) do
         if q.done and seen[id] == false and (progressed[id] or recentLine) then
-            if NoteQuest(run, id, q.title) then any = true end
+            if NoteQuest(run, id, q.title, QuestReward(id, q.index)) then any = true end
         end
         seen[id] = q.done
     end
     if any then Changed(run) end
 end
 
--- A quest handed in inside the dungeon (some have their giver there).
-local function OnQuestTurnedIn(questID)
+-- A quest handed in inside the dungeon (some have their giver there). Its
+-- reward also moved your XP bar and purse, which count as the dungeon's:
+-- moved over to the quest's side, at what the game actually gave.
+local function OnQuestTurnedIn(questID, xpReward, moneyReward)
     local run = MS.currentRun
-    if not (run and MS.inDungeon) or not Plain(questID) then return end
+    questID = Plain(questID)
+    if not (run and MS.inDungeon) or not questID then return end
+    xpReward, moneyReward = tonumber(Plain(xpReward)), tonumber(Plain(moneyReward))
+    local p = Progress(run)
     local C_QuestLog = rawget(_G, "C_QuestLog")
     local title = C_QuestLog and C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
-    if NoteQuest(run, questID, Plain(title)) then Changed(run) end
+    NoteQuest(run, questID, Plain(title))
+    local i = p.questIDs and p.questIDs[questID]
+    if type(i) == "number" and ((xpReward or 0) > 0 or (moneyReward or 0) > 0) then
+        p.questRewards = p.questRewards or {}
+        local r = p.questRewards[i] or {}
+        p.questRewards[i] = r
+        if r.inside then return end          -- (already moved over)
+        r.inside = true
+        if (xpReward or 0) > 0 then
+            r.x = xpReward
+            p.xp = (p.xp or 0) - xpReward      -- (the bar may move before or after this)
+        end
+        if (moneyReward or 0) > 0 then
+            r.g = moneyReward
+            p.gold = (p.gold or 0) - moneyReward
+        end
+        QuestTotals(p)
+    end
+    Changed(run)
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────
@@ -299,7 +358,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
             pendingQuests = true
             C_Timer.After(0.5, function() pendingQuests = false; OnQuestLog() end)
         elseif event == "QUEST_TURNED_IN" then
-            OnQuestTurnedIn((...))
+            OnQuestTurnedIn(...)
         elseif event == "QUEST_WATCH_UPDATE" then
             OnQuestProgress((...))
         elseif event == "UI_INFO_MESSAGE" then

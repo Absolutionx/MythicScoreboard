@@ -12,7 +12,8 @@
 --   me       your own numbers: lvl ilvl cls role dps hps dmg heal taken avoid int deaths
 --   group    { {n = name key, c = class} }  everyone else
 --   prog     (Forever) what the run did for you: xp, lv levels, k kills,
---            q quests, g gold in copper, rep { [faction] = amount }
+--            q quests, g gold in copper, rep { [faction] = amount };
+--            qx / qg the XP and gold of quests done in it (apart from xp, g)
 --   (keys)   up levels the key went up (0 over time), lim the timer,
 --            r0 / r1 your rating before and after (r0 alone on older runs)
 --
@@ -209,8 +210,9 @@ function MS:SummarizeRun(run)
     if pr then
         local rep
         for f, n in pairs(pr.rep or {}) do rep = rep or {}; rep[f] = Int(n) end
-        e.prog = { xp = Int(pr.xp), lv = (pr.levels or 0) > 0 and pr.levels or nil, k = pr.kills or 0,
-                   q = #(pr.quests or {}), g = Int(pr.gold), rep = rep }
+        e.prog = { xp = Int(_max(0, pr.xp or 0)), lv = (pr.levels or 0) > 0 and pr.levels or nil, k = pr.kills or 0,
+                   q = #(pr.quests or {}), g = Int(_max(0, pr.gold or 0)), rep = rep,
+                   qx = pr.qx and Int(pr.qx) or nil, qg = pr.qg and Int(pr.qg) or nil }
     end
     -- Your loot, with the boss it came from: a kill in the two minutes
     -- before it dropped. Anything later came from trash.
@@ -551,10 +553,12 @@ local function StatsOverviewNow(self)
         local pg = e.prog
         if pg then
             out.progRuns = out.progRuns + 1
-            out.xp, out.kills = out.xp + (pg.xp or 0), out.kills + (pg.k or 0)
+            local xp = (pg.xp or 0) + (pg.qx or 0)
+            out.xp, out.kills = out.xp + xp, out.kills + (pg.k or 0)
             out.levels, out.quests = out.levels + (pg.lv or 0), out.quests + (pg.q or 0)
-            out.gold = out.gold + (pg.g or 0)
-            d.xp, d.xpRuns = (d.xp or 0) + (pg.xp or 0), (d.xpRuns or 0) + 1
+            out.gold = out.gold + (pg.g or 0) + (pg.qg or 0)
+            d.xp, d.xpRuns = (d.xp or 0) + xp, (d.xpRuns or 0) + 1
+            d.questXP = (d.questXP or 0) + (pg.qx or 0)
             d.xpTime = (d.xpTime or 0) + (e.dur or 0)
         end
         if e.cleared then

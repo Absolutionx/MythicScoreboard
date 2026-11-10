@@ -374,7 +374,14 @@ local function FillOverview(o, stats)
         c.deaths:SetTextColor((d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[1],
             (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[2], (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[3])
         if c.xp then
+            -- XP a run; under it, the split between the dungeon and quests.
             c.xp:SetText(d.xpPerRun and Abbrev(d.xpPerRun) or CT(P.ash2, "-"))
+            local q = d.questXP or 0
+            if not c.xpSplit then
+                c.xpSplit = Text(row, "medium", 8, P.ivory, "CENTER")
+                c.xpSplit:SetPoint("TOP", c.xp, "BOTTOM", 0, -1)
+            end
+            c.xpSplit:SetText((q > 0 and d.xp) and UI.XPSplit(d.xp - q, q, 44, 4) or "")
         else
             c.dps:SetText(d.lastDps and (Abbrev(d.lastDps) .. (d.lastLvl and CT(P.ash, "  L" .. d.lastLvl) or "")) or CT(P.ash2, "-"))
         end

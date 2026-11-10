@@ -128,5 +128,54 @@ check("stats: per dungeon", st.dungeons[1] and st.dungeons[1].xpPerRun == 1400)
 check("gold format", MS.FormatGold(123456) == "12g 34s" and MS.FormatGold(250) == "2s 50c" and MS.FormatGold(7) == "7c")
 check("thousands", MS.FormatThousands(1234567) == "1,234,567" and MS.FormatThousands(999) == "999")
 
+-- Quest XP: counted with the run as soon as the quest is done in here (no
+-- need to hand it in), in its own colour; handed in inside, it isn't counted
+-- twice.
+do
+    local sel = 0
+    GetQuestLogSelection = function() return sel end
+    SelectQuestLogEntry = function(i) sel = i end
+    GetQuestLogRewardXP = function() local q = M.quests[sel]; return q and q.xp or 0 end
+    GetQuestLogRewardMoney = function() local q = M.quests[sel]; return q and q.money or 0 end
+    zone(WORLD); MS:AbandonRun(); M.RunTimers(2)
+    zone(RFC)
+    local r2 = MS.currentRun
+    local p2 = r2.progress
+    M.xp = 100; xp(100)
+    M.quests[#M.quests + 1] = { title = "Rig Wars", id = 501, done = false, xp = 8200, money = 12000 }
+    M.quests[#M.quests + 1] = { title = "Sparklematic", id = 502, done = false, xp = 3100 }
+    M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+    sel = 2
+    for _, id in ipairs({ 501, 502 }) do M.Fire("QUEST_WATCH_UPDATE", id) end
+    M.quests[#M.quests - 1].done, M.quests[#M.quests].done = true, true
+    M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+    check("quest xp: counted when done, not handed in", p2.qx == 11300 and p2.qg == 12000, tostring(p2.qx) .. " " .. tostring(p2.qg))
+    check("quest xp: the log's selection put back", sel == 2, sel)
+    check("quest xp: per quest", p2.questRewards and p2.questRewards[1].x == 8200 and p2.questRewards[2].x == 3100)
+    xp(1100)                                            -- the dungeon: 1,000
+    MS:ShowScoreboard(); M.RunTimers(2)
+    local sub2 = MythicScoreboardFrame.Subline:GetText() or ""
+    check("quest xp: header total", sub2:find("12,300") ~= nil, sub2)
+    check("quest xp: header split bar", sub2:find("WHITE8X8") ~= nil, sub2)
+    -- Rig Wars handed in here: the bar moves by its reward, which stays on the quest side.
+    M.xp = 1100 + 8000; M.Fire("QUEST_TURNED_IN", 501, 8000, 12000); xp(9100)
+    money(M.money + 12000)
+    M.Fire("QUEST_TURNED_IN", 501, 8000, 12000)         -- the same hand-in reported again: once
+    check("quest xp: handed in here, not counted twice", p2.xp == 1000 and p2.qx == 11100,
+        tostring(p2.xp) .. " " .. tostring(p2.qx))
+    check("quest gold: handed in here, not counted twice", p2.gold == 0 and p2.qg == 12000, tostring(p2.gold))
+    for _, b in ipairs({ "Oggleflint", "Taragaman the Hungerer", "Jergosh the Invoker", "Bazzalan" }) do
+        M.Fire("ENCOUNTER_START", 1, b); wait(30); M.Fire("ENCOUNTER_END", 1, b, 1, 5, 1); M.RunTimers(4)
+    end
+    zone(WORLD)
+    local all = MS:ArchiveRuns()
+    local e2 = all[#all]
+    check("quest xp: archived apart", e2.prog and e2.prog.xp == 1000 and e2.prog.qx == 11100 and e2.prog.qg == 12000)
+    local st2 = MS:StatsOverview()
+    local rfc
+    for _, d in ipairs(st2.dungeons) do if d.name == e2.dungeon then rfc = d end end
+    check("quest xp: in the stats", rfc and rfc.questXP == 11100, rfc and rfc.questXP)
+end
+
 io.stdout:write(("runstats_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

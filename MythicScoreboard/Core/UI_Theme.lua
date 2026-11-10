@@ -31,6 +31,8 @@ local P = {
     bronze   = {0.75, 0.54, 0.29},
     bronzeHi = {0.91, 0.72, 0.47},
     gold     = {1.00, 0.82, 0.30},   -- a +3 key
+    xpMob    = {0.61, 0.46, 0.87},   -- XP from the dungeon (the game's XP bar)
+    xpQuest  = {1.00, 0.82, 0.00},   -- XP from quests (the game's quest colour)
     bronzeDk = {0.29, 0.23, 0.16},
     line     = {0.227, 0.188, 0.157},
     verd     = {0.60, 0.68, 0.42},   -- weathered olive: good outcomes
@@ -572,22 +574,60 @@ function UI.SayOnce(what, err) MS:ReportError(what, err) end
 
 -- What a run did for your character (Forever), for a tooltip.
 -- prog: a live run's run.progress, or an archive entry's e.prog.
+-- A flat bar of one colour, in a line of text, w x h pixels.
+local function Swatch(col, w, h)
+    return string.format("|TInterface\\Buttons\\WHITE8X8:%d:%d:0:0:8:8:0:8:0:8:%d:%d:%d|t", h, math.max(1, w),
+        math.floor(col[1] * 255 + 0.5), math.floor(col[2] * 255 + 0.5), math.floor(col[3] * 255 + 0.5))
+end
+UI.Swatch = Swatch
+
+-- XP split two ways as a bar in a line of text: purple for what the dungeon
+-- gave, yellow for quests done in it. Empty when there's no quest XP.
+function UI.XPSplit(mob, quest, w, h)
+    mob, quest = math.max(0, mob or 0), math.max(0, quest or 0)
+    if quest <= 0 or mob + quest <= 0 then return "" end
+    local q = math.max(1, math.floor(w * quest / (mob + quest) + 0.5))
+    return Swatch(P.xpMob, w - q, h) .. Swatch(P.xpQuest, q, h)
+end
+
+-- A run's XP: (from the dungeon, from quests). Live runs and archive
+-- summaries keep it the same way.
+function UI.RunXP(prog)
+    if not prog then return 0, 0 end
+    return math.max(0, prog.xp or 0), math.max(0, prog.qx or 0)
+end
+
 function UI.AddProgressLines(prog, fromArchive)
     if not prog then return end
-    local xp     = prog.xp or 0
+    local mobXP, questXP = UI.RunXP(prog)
     local levels = (fromArchive and prog.lv or prog.levels) or 0
     local kills  = (fromArchive and prog.k or prog.kills) or 0
     local quests = fromArchive and (prog.q or 0) or #(prog.quests or {})
-    local gold   = (fromArchive and prog.g or prog.gold) or 0
+    local gold   = math.max(0, (fromArchive and prog.g or prog.gold) or 0)
     local a, b, c = P.ash[1], P.ash[2], P.ash[3]
-    GameTooltip:AddDoubleLine(L["Experience"], MS.FormatThousands(xp)
+    GameTooltip:AddDoubleLine(L["Experience"], MS.FormatThousands(mobXP + questXP)
         .. (levels > 0 and ("  (" .. MS.Plural(levels, "+%d level", "+%d levels") .. ")") or ""), a, b, c, 1, 1, 1)
+    if questXP > 0 then
+        GameTooltip:AddLine(UI.XPSplit(mobXP, questXP, 200, 6))
+        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpMob, 8, 8) .. " " .. L["From the dungeon"], MS.FormatThousands(mobXP), a, b, c, 1, 1, 1)
+        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpQuest, 8, 8) .. " " .. L["From quests"], MS.FormatThousands(questXP), a, b, c, 1, 1, 1)
+    end
     GameTooltip:AddDoubleLine(L["Mobs killed"], kills, a, b, c, 1, 1, 1)
     GameTooltip:AddDoubleLine(L["Quests completed"], quests, a, b, c, 1, 1, 1)
     if not fromArchive then
-        for _, t in ipairs(prog.quests or {}) do GameTooltip:AddLine("   " .. t, 0.8, 0.8, 0.8) end
+        local rewards = prog.questRewards or {}
+        for i, t in ipairs(prog.quests or {}) do
+            local r = rewards[i]
+            local x = r and r.x
+            GameTooltip:AddDoubleLine("   " .. t, x and _fmt(L["+%s XP"], MS.FormatThousands(x)) or "",
+                0.8, 0.8, 0.8, P.xpQuest[1], P.xpQuest[2], P.xpQuest[3])
+        end
     end
     GameTooltip:AddDoubleLine(L["Gold looted"], MS.FormatGold(gold), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+    local qg = (fromArchive and prog.qg) or prog.qg
+    if (qg or 0) > 0 then
+        GameTooltip:AddDoubleLine("   " .. L["From quests"], MS.FormatGold(qg), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+    end
     local reps = {}
     for f, n in pairs(prog.rep or {}) do reps[#reps + 1] = { f = f, n = n } end
     table.sort(reps, function(x, y) return x.n > y.n end)
