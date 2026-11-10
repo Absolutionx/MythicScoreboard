@@ -284,7 +284,8 @@ local function FillDetail(d, s, stats)
         c.result:SetText(Result(e))
         c.deaths:SetText((e.deaths or 0) > 0 and CT(P.bloodHi, e.deaths) or CT(P.ash, "0"))
         if c.xp then
-            c.xp:SetText(e.prog and MS.FormatThousands(e.prog.xp) or CT(P.ash2, "-"))
+            local mobXP, questXP = UI.RunXP(e.prog)
+            c.xp:SetText(e.prog and MS.FormatThousands(mobXP + questXP) or CT(P.ash2, "-"))
         else
             c.dps:SetText(e.me and Abbrev(e.me.dps) or CT(P.ash2, "-"))
         end

@@ -27,11 +27,11 @@ local X0 = K.X0
 
 local KCOLS = {   -- one row per dungeon (widths add up to LEFT_W)
     { key = "name",    label = LK("Dungeon"),      w = 230, left = true },
-    { key = "keys",    label = LK("Keys"),         w = 64 },
-    { key = "timed",   label = LK("Timed"),        w = 86 },
-    { key = "avg",     label = LK("Avg. upgrade"), w = 110 },
-    { key = "best",    label = LK("Best timed"),   w = 110 },
-    { key = "highest", label = LK("Highest"),      w = 100 },
+    { key = "keys",    label = LK("Keys"),         w = 64,  tip = LK("Keys you've run in this dungeon.") },
+    { key = "timed",   label = LK("Timed"),        w = 86,  tip = LK("How many of them you finished in time.") },
+    { key = "avg",     label = LK("Avg. upgrade"), w = 110, tip = LK("Levels a key went up on average: 0 over time, up to +3 in time.") },
+    { key = "best",    label = LK("Best timed"),   w = 110, tip = LK("The highest key you've finished in time.") },
+    { key = "highest", label = LK("Highest"),      w = 100, tip = LK("The highest key you've run, timed or not.") },
 }
 K.KCOLS = KCOLS
 
@@ -259,9 +259,34 @@ local function BuildKeys(parent)
     k.noRating:SetWidth(620); k.noRating:SetWordWrap(true)
     k.noRating:SetText(L["No rating recorded yet. It's saved with every key from version 2.9 on."])
 
-    -- Per dungeon (left) and per level (right).
-    local dband = Band(k, KCOLS, X0)
+    -- Per dungeon (left) and per level (right). Each column's name, with
+    -- what it counts on hover.
+    local dband = Band(k)
     dband:SetPoint("TOPLEFT", k, "TOPLEFT", 0, -LIST_TOP); dband:SetPoint("TOPRIGHT", k, "TOPRIGHT", 0, -LIST_TOP)
+    local x = X0
+    for _, col in ipairs(KCOLS) do
+        local h = CreateFrame("Frame", nil, dband)
+        h:SetSize(col.w, COL_HDR_H)
+        h:SetPoint("LEFT", dband, "LEFT", x, 0)
+        h:EnableMouse(true)
+        local lbl = Text(h, "medium", 13, P.ash, col.left and "LEFT" or "CENTER")
+        if col.left then lbl:SetPoint("LEFT", h, "LEFT", 0, 0) else lbl:SetPoint("CENTER", h, "CENTER", 0, 0) end
+        lbl:SetText(L[col.label])
+        if col.tip then
+            h:SetScript("OnEnter", function(self)
+                lbl:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
+                GameTooltip:SetOwner(self, "ANCHOR_TOP")
+                GameTooltip:SetText(L[col.label], P.ivory[1], P.ivory[2], P.ivory[3])
+                GameTooltip:AddLine(L[col.tip], P.ash[1], P.ash[2], P.ash[3], true)
+                GameTooltip:Show()
+            end)
+            h:SetScript("OnLeave", function()
+                lbl:SetTextColor(P.ash[1], P.ash[2], P.ash[3])
+                GameTooltip:Hide()
+            end)
+        end
+        x = x + col.w
+    end
     local lvLbl = Text(dband, "medium", 13, P.ash, "LEFT")
     lvLbl:SetPoint("LEFT", dband, "LEFT", RIGHT_X, 0); lvLbl:SetText(L["By level"])
     local tLbl = Text(dband, "medium", 13, P.ash, "RIGHT")

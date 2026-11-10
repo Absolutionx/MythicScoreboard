@@ -372,7 +372,9 @@ local function RefreshHeader(run)
     -- Forever: what the run did for you (the full list is in the tooltip).
     local pr = MS.Flavor.progressStats and run.progress
     if pr then
-        local xp = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(pr.xp)))
+        local mobXP, questXP = UI.RunXP(pr)
+        local xp = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(mobXP + questXP)))
+        if questXP > 0 then xp = xp .. "  " .. UI.XPSplit(mobXP, questXP, 56, 6) end
         if (pr.levels or 0) > 0 then
             xp = xp .. CT(P.verdHi, "  " .. MS.Plural(pr.levels, "+%d level", "+%d levels"))
         end
@@ -380,7 +382,8 @@ local function RefreshHeader(run)
         _ins(parts, MS.Plural(pr.kills or 0, "%d kill", "%d kills", CT(P.ivory, pr.kills or 0)))
         local nq = #(pr.quests or {})
         if nq > 0 then _ins(parts, MS.Plural(nq, "%d quest", "%d quests", CT(P.ivory, nq))) end
-        if (pr.gold or 0) > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(pr.gold))) end
+        local gold = math.max(0, pr.gold or 0) + (pr.qg or 0)
+        if gold > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(gold))) end
     end
     -- (A tighter gap when the line also carries the run's progress.)
     UI.frame.Subline:SetText(table.concat(parts, pr and "    " or "      "))

@@ -1,5 +1,13 @@
 # Changelog
 
+## Next release
+
+### WoW Forever
+- **Quest XP counts with the run:** when you finish a quest's objectives inside a dungeon, its reward XP and gold are added to the run straight away, without waiting for you to hand it in. The XP shows as a two-colour bar in the header, on the "This run" tooltip and under "XP a run" on the Stats page: purple from the dungeon, yellow from quests. The tooltip gives each quest's reward. A quest handed in inside the dungeon isn't counted twice.
+
+### Mythic+
+- The Keys tab's dungeon table now has its column names. Hover one for what it counts.
+
 ## 2.9.1
 
 ### New for Mythic+
