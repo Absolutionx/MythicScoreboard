@@ -4,7 +4,7 @@ local MS = _G["MythicScoreboard"]
 -- TOC is authoritative at runtime; fallback for dev environments.
 -- (GetAddOnMetadata moved to C_AddOns; the old global is gone in current clients.)
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-MS.version = GetMeta and GetMeta("MythicScoreboard", "Version") or "2.9.1"
+MS.version = GetMeta and GetMeta("MythicScoreboard", "Version") or "2.9.2"
 
 -- ── Changes the windows show ───────────────────────────────────────────────
 -- Core code says what changed (MS:Changed("run")); the windows listen

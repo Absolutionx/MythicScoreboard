@@ -392,9 +392,7 @@ local function BuildCompare(parent)
         c.lanes[i] = lane
     end
     c.linkAt, c.linksHideFrom = Pool(function()
-        local l = c:CreateLine(nil, "ARTWORK")
-        l:SetThickness(1)
-        return l
+        return UI.ChartLine(c, 3)
     end)
     c.axis0 = Text(c, "medium", 11, P.ash, "LEFT")
     c.axisEnd = Text(c, "medium", 11, P.ash, "RIGHT")
@@ -456,7 +454,7 @@ local function FillCompare(c, cmp)
             n = n + 1
             local l = c.linkAt(n)
             local col = (r.split or 0) < -0.5 and P.verd or (r.split or 0) > 0.5 and P.bloodHi or P.ash
-            l:SetColorTexture(col[1], col[2], col[3], 0.7)
+            UI.ChartLineColor(l, col, 0.7)
             l:SetStartPoint("TOPLEFT", c, LX(r.a.t), y1)
             l:SetEndPoint("TOPLEFT", c, LX(r.b.t), y2)
         end

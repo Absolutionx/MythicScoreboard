@@ -120,10 +120,15 @@ local function Band(parent, cols, x)
     local lx = x or 0
     band.labels = {}
     for _, c in ipairs(cols or {}) do
-        local lbl = Text(band, "medium", 13, P.ash, c.left and "LEFT" or "CENTER")
-        lbl:SetWidth(c.w - 6)
-        if c.left then lbl:SetPoint("LEFT", band, "LEFT", lx, 0)
-        else lbl:SetPoint("CENTER", band, "LEFT", lx + c.w / 2, 0) end
+        -- Each name in a frame the width of its column. (A label given a
+        -- fixed width of its own didn't show in the game; the names fit
+        -- their columns anyway: header_fit.py checks every language.)
+        local cell = CreateFrame("Frame", nil, band)
+        cell:SetSize(c.w, COL_HDR_H)
+        cell:SetPoint("LEFT", band, "LEFT", lx, 0)
+        local lbl = Text(cell, "medium", 13, P.ash, c.left and "LEFT" or "CENTER")
+        if c.left then lbl:SetPoint("LEFT", cell, "LEFT", 0, 0)
+        else lbl:SetPoint("CENTER", cell, "CENTER", 0, 0) end
         lbl:SetText(L[c.label])
         band.labels[c.key] = lbl
         lx = lx + c.w

@@ -574,6 +574,20 @@ function UI.SayOnce(what, err) MS:ReportError(what, err) end
 
 -- What a run did for your character (Forever), for a tooltip.
 -- prog: a live run's run.progress, or an archive entry's e.prog.
+-- A chart line that stays smooth at any angle: a texture with soft edges,
+-- drawn where it falls rather than snapped to whole pixels (a flat colour
+-- snapped to pixels turns a slope into a staircase of dots).
+function UI.ChartLine(parent, thickness)
+    local l = parent:CreateLine(nil, "ARTWORK")
+    l:SetTexture(MEDIA .. "LineSoft")
+    l:SetThickness(thickness or 4)
+    if l.SetSnapToPixelGrid then l:SetSnapToPixelGrid(false); l:SetTexelSnappingBias(0) end
+    return l
+end
+function UI.ChartLineColor(l, col, a)
+    l:SetVertexColor(col[1], col[2], col[3], a or 1)
+end
+
 -- A flat bar of one colour, in a line of text, w x h pixels.
 local function Swatch(col, w, h)
     return string.format("|TInterface\\Buttons\\WHITE8X8:%d:%d:0:0:8:8:0:8:0:8:%d:%d:%d|t", h, math.max(1, w),
