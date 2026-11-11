@@ -168,6 +168,7 @@ local function OnXPLine(text)
         local mob = MS.MatchFormat(text, fp)
         if mob and mob ~= "" then
             Track(run)
+            if MS.NoteForeverKill then MS:NoteForeverKill(nil, mob) end     -- which wing (Forever.lua)
             local now = GetTime()
             -- Already counted when it died (by name, or a nameless one).
             if Take(seenKills, mob, now) or Take(seenKills, ANY, now) then return end

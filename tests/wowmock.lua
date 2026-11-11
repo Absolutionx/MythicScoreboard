@@ -310,6 +310,8 @@ COMBATLOG_XPGAIN_EXHAUSTION1 = "%s dies, you gain %d experience. (%s exp %s bonu
 FACTION_STANDING_INCREASED = "Your %s reputation has increased by %d."
 
 C_Map = { GetBestMapForUnit = function() return 1 end }
+GetSubZoneText = function() return M.subzone or "" end
+GetMinimapZoneText = function() return M.subzone or "" end
 C_NamePlate = { GetNamePlates = function() return {} end }
 C_TooltipInfo = { GetHyperlink = function() return nil end }
 C_Item = { GetItemInfo = function() return nil end, GetItemQualityByID = function() return 3 end,

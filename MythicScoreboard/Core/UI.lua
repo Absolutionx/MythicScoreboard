@@ -636,6 +636,8 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         DoClearHistory()
     elseif cmd == "killdebug" and MS.KillDebug then
         MS:KillDebug()
+    elseif cmd == "wingdebug" and MS.WingDebug then
+        MS:WingDebug(true)
     else
         MS.Say(L["Unknown command. Type /sb help for a list."])
     end
