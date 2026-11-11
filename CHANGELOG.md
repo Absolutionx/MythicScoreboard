@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.10.1
+
+### WoW Forever
+- **Scarlet Monastery wings are recognised much sooner,** usually on the way in or within the first pull, instead of only at the first boss:
+  - **The door you came in by:** the addon notes where you stood outside before the loading screen. The Library and Graveyard doors are known; the Armory and Cathedral doors are learned the first time you run them.
+  - **The room you're in:** the area name under the minimap.
+  - **The trash you kill:** mobs found in only one wing (a Scarlet Wizard means Cathedral) settle the wing on the first kill. This works for Dire Maul and Blackrock Spire too.
+  - A boss still has the last word if anything disagrees.
+- Leaving one wing and walking into another starts a new run instead of carrying on the old one.
+- **XP tooltip in the in-run frame:** hover the Experience line for the dungeon's XP and the quests' XP, each with its share, and what each quest gave.
+- `/sb wingdebug` shows what the wing check sees, for when a wing isn't recognised.
+
 ## 2.10.0
 
 ### New: the in-run frame

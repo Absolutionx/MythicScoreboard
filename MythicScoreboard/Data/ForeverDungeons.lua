@@ -178,6 +178,81 @@ D.INSTANCE_ALIASES = {
 -- The classic dungeons by instance ID (GetInstanceInfo), for clients in other
 -- languages, where the dungeon's name isn't the English one in DUNGEONS.
 -- Dungeons with wings map to the instance; the wing is found by its bosses.
+-- Wings by the map the game says you're on (C_Map.GetBestMapForUnit): the
+-- four Scarlet Monastery wings share one instance, but each is its own map.
+-- The game names all four just "Scarlet Monastery", so the name can't say.
+-- (warcraft.wiki.gg/wiki/UiMapID; a map the bosses show to be another wing
+-- is learned and wins over this.)
+D.WING_MAPS = {
+    [302] = "Scarlet Monastery: Graveyard", [303] = "Scarlet Monastery: Library",
+    [304] = "Scarlet Monastery: Armory",    [305] = "Scarlet Monastery: Cathedral",
+}
+
+-- Wings by the part of the dungeon you're in (GetSubZoneText), for when
+-- the game has no map for it (WoW Forever: no dungeon maps). English names;
+-- in any language, a part of a wing is learned from the bosses fought there.
+D.WING_ZONES = {
+    ["Chamber of Atonement"] = "Scarlet Monastery: Graveyard",
+    ["Forlorn Cloister"]     = "Scarlet Monastery: Graveyard",
+    ["Honor's Tomb"]         = "Scarlet Monastery: Graveyard",
+    ["Huntsman's Cloister"]  = "Scarlet Monastery: Library",
+    ["Gallery of Treasures"] = "Scarlet Monastery: Library",
+    ["Athenaeum"]            = "Scarlet Monastery: Library",
+    ["Training Grounds"]     = "Scarlet Monastery: Armory",
+    ["Footman's Armory"]     = "Scarlet Monastery: Armory",
+    ["Crusader's Armory"]    = "Scarlet Monastery: Armory",
+    ["Hall of Champions"]    = "Scarlet Monastery: Armory",
+    ["Chapel Gardens"]       = "Scarlet Monastery: Cathedral",
+    ["Crusader's Chapel"]    = "Scarlet Monastery: Cathedral",
+}
+
+-- Wings by the door you walked in through: where you last stood outside,
+-- on the zone's map (x, y from 0 to 1). The four Scarlet Monastery doors are
+-- side by side in Tirisfal Glades (map 1420). These two were measured in
+-- game on the Forever client (as in the Forever Dungeon Journal addon); the
+-- others, and any door in another language's client, are learned from the
+-- bosses fought inside.
+D.WING_DOORS = {
+    { map = 1420, x = 0.8535, y = 0.3239, wing = "Scarlet Monastery: Library" },
+    { map = 1420, x = 0.8480, y = 0.3037, wing = "Scarlet Monastery: Graveyard" },
+}
+
+-- Wings by the trash you kill: mobs found in only one wing (by NPC ID, or
+-- by English name). Mobs shared by two wings (Scarlet Myrmidon, Defender,
+-- Chaplain and Monk; Scarshield trash) are left out, so they never choose.
+-- Classic NPC IDs, as collected by the Forever Dungeon Journal addon.
+D.WING_TRASH = {
+    ["Scarlet Monastery: Graveyard"] = { [4283] = "Scarlet Sentry", [4293] = "Scarlet Scryer",
+        [4306] = "Scarlet Torturer", [4308] = "Unfettered Spirit", [6426] = "Anguished Dead",
+        [6427] = "Haunting Phantasm" },
+    ["Scarlet Monastery: Library"] = { [4287] = "Scarlet Gallant", [4288] = "Scarlet Beastmaster",
+        [4291] = "Scarlet Diviner", [4296] = "Scarlet Adept", [4304] = "Scarlet Tracking Hound" },
+    ["Scarlet Monastery: Armory"] = { [4286] = "Scarlet Soldier", [4289] = "Scarlet Evoker",
+        [4290] = "Scarlet Guardsman", [4292] = "Scarlet Protector", [4297] = "Scarlet Conjuror" },
+    ["Scarlet Monastery: Cathedral"] = { [4294] = "Scarlet Sorcerer", [4300] = "Scarlet Wizard",
+        [4301] = "Scarlet Centurion", [4302] = "Scarlet Champion", [4303] = "Scarlet Abbot" },
+    ["Dire Maul: East"] = { [13022] = "Whip Lasher", [13276] = "Wildspawn Imp",
+        [11461] = "Warpwood Guardian", [11462] = "Warpwood Treant", [11464] = "Warpwood Tangler",
+        [11465] = "Warpwood Stomper", [13021] = "Warpwood Crusher", [13196] = "Phase Lasher",
+        [13197] = "Fel Lash", [11451] = "Wildspawn Satyr", [11452] = "Wildspawn Rogue",
+        [11453] = "Wildspawn Trickster", [11454] = "Wildspawn Betrayer", [11455] = "Wildspawn Felsworn",
+        [11456] = "Wildspawn Shadowstalker", [11457] = "Wildspawn Hellcaller" },
+    ["Dire Maul: West"] = { [11458] = "Petrified Treant", [11459] = "Ironbark Protector",
+        [11469] = "Eldreth Seether", [11470] = "Eldreth Sorcerer", [11471] = "Eldreth Apparition",
+        [11472] = "Eldreth Spirit", [11473] = "Eldreth Spectre", [11475] = "Eldreth Phantasm",
+        [11480] = "Arcane Aberration", [11483] = "Mana Remnant", [11484] = "Residual Monstrosity" },
+    ["Dire Maul: North"] = { [11441] = "Gordok Brute", [11444] = "Gordok Mage-Lord",
+        [11445] = "Gordok Captain", [11448] = "Gordok Warlock", [11450] = "Gordok Reaver",
+        [13036] = "Gordok Mastiff" },
+    ["Upper Blackrock Spire"] = { [9096] = "Rage Talon Dragonspawn", [9818] = "Blackhand Summoner",
+        [9819] = "Blackhand Veteran" },
+    ["Lower Blackrock Spire"] = { [9197] = "Spirestone Battle Mage", [9198] = "Spirestone Mystic",
+        [9199] = "Spirestone Enforcer", [9200] = "Spirestone Reaver", [9201] = "Spirestone Ogre Magus",
+        [9239] = "Smolderthorn Mystic", [9240] = "Smolderthorn Shadow Priest",
+        [9241] = "Smolderthorn Headhunter", [9259] = "Firebrand Grunt", [9261] = "Firebrand Darkweaver",
+        [9264] = "Firebrand Pyromancer" },
+}
+
 D.INSTANCE_IDS = {
     [389] = "Ragefire Chasm",    [43]  = "Wailing Caverns",  [36]  = "The Deadmines",
     [33]  = "Shadowfang Keep",   [48]  = "Blackfathom Deeps", [34]  = "The Stockade",

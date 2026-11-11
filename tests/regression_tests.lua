@@ -374,6 +374,112 @@ if forever then
     uiMap = 305; zone(SM)
     check("wing: known from the map's name", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral",
         MS:RunTitle(MS.currentRun))
+    -- Each wing's own map, known first time (a fresh account).
+    MS:AbandonRun(); zone(WORLD)
+    local learnedMaps = MythicScoreboardAccountDB.wingMaps
+    MythicScoreboardAccountDB.wingMaps = {}
+    for map, wing in pairs({ [302] = "Graveyard", [303] = "Library", [304] = "Armory" }) do
+        uiMap = map; zone(SM)
+        check("wing: map " .. map .. " is the " .. wing, MS:RunTitle(MS.currentRun) == "Scarlet Monastery: " .. wing,
+            MS:RunTitle(MS.currentRun))
+        MS:AbandonRun(); zone(WORLD)
+    end
+    MythicScoreboardAccountDB.wingMaps = learnedMaps
+    -- No map at all (WoW Forever has no dungeon maps): the part of the
+    -- dungeon you're in says which wing.
+    uiMap = nil
+    M.subzone = "Huntsman's Cloister"; zone(SM)
+    check("wing: from the subzone", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    M.subzone = ""; zone(SM)
+    check("wing: no subzone yet, not known", MS.currentRun.wingName == nil, MS.currentRun.wingName)
+    M.subzone = "Chapel Gardens"; M.Fire("ZONE_CHANGED_INDOORS"); M.RunTimers(5)
+    check("wing: known on walking in", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    -- A part of a wing the table doesn't name (another language): learned
+    -- from the boss fought there.
+    M.subzone = "Salle des Chasseurs"; zone(SM)
+    wait(30); kill("Houndmaster Loksey")
+    check("wing: unnamed part learned", MythicScoreboardAccountDB.wingZones["Salle des Chasseurs"] == "Scarlet Monastery: Library")
+    MS:AbandonRun(); zone(WORLD)
+    zone(SM)
+    check("wing: learned part known next time", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    M.subzone = nil
+    -- No map and no room name inside (WoW Forever): the door you walked in
+    -- by. Two doors are known; another is learned from its bosses.
+    local px, py = 0, 0
+    C_Map.GetPlayerMapPosition = function() return { GetXY = function() return px, py end } end
+    local function walkIn(x, y)
+        M.instance = WORLD; uiMap, px, py = 1420, x, y
+        M.Fire("ZONE_CHANGED_NEW_AREA"); M.Tick()       -- standing at the door
+        uiMap = nil; zone(SM)
+    end
+    walkIn(0.8536, 0.3240)
+    check("wing: the Library door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8481, 0.3035)
+    check("wing: the Graveyard door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8620, 0.3150)
+    check("wing: an unknown door, not guessed", MS.currentRun.wingName == nil, MS.currentRun.wingName)
+    wait(30); kill("Herod")
+    check("wing: its boss says", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Armory", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8622, 0.3152)
+    check("wing: the learned door, next time", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Armory", MS:RunTitle(MS.currentRun))
+    -- A door near a known one is a guess: the room you walk into corrects it.
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8536, 0.3240)
+    M.subzone = "Chapel Gardens"; M.Fire("ZONE_CHANGED_INDOORS"); M.RunTimers(5)
+    check("wing: the room overrules the door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral", MS:RunTitle(MS.currentRun))
+    M.subzone = nil; M.Fire("ZONE_CHANGED_INDOORS"); M.RunTimers(5)
+    check("wing: and stays", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8622, 0.3152)
+    -- Out, then in by another door: a new run, not the Armory one.
+    zone(WORLD)
+    walkIn(0.8536, 0.3240)
+    check("wing: another door, another run", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library"
+        and #MS.currentRun.bosses == 0, MS:RunTitle(MS.currentRun))
+    -- The first wing-only trash killed says which wing: by name (the XP or
+    -- "dies" line) or by NPC ID (UNIT_DIED); shared trash doesn't vote.
+    rawset(_G, "UNITDIESOTHER", "%s dies.")
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8536, 0.3240)                                   -- the Library door...
+    M.Fire("CHAT_MSG_COMBAT_HOSTILE_DEATH", "Scarlet Myrmidon dies.")
+    check("wing: shared trash, no change", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    M.Fire("CHAT_MSG_COMBAT_HOSTILE_DEATH", "Scarlet Wizard dies.")
+    check("wing: Cathedral trash overrules the door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral",
+        MS:RunTitle(MS.currentRun))
+    M.subzone = "Huntsman's Cloister"; M.Fire("ZONE_CHANGED_INDOORS"); M.RunTimers(5)
+    check("wing: trash outranks a room", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral", MS:RunTitle(MS.currentRun))
+    M.subzone = nil
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8700, 0.3400)
+    M.Fire("UNIT_DIED", "Creature-0-1-189-1-4283-0000AAAA")
+    check("wing: by NPC ID", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8700, 0.3400)
+    check("wing: the door learned from trash", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    MythicScoreboardAccountDB.wingDoors = {}
+    -- Out, then in by a door nobody knows yet: still not the paused run.
+    zone(WORLD)
+    walkIn(0.8700, 0.3400)
+    check("wing: an unknown door, a new run", MS.currentRun.wingName == nil and #MS.currentRun.bosses == 0,
+        MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    C_Map.GetPlayerMapPosition = nil
+    wait(300)                                          -- that walk-in is long past
+    -- The map not known yet on the way in (the loading screen): asked again
+    -- once you're there.
+    MS:AbandonRun(); zone(WORLD)
+    uiMap = nil; zone(SM)
+    check("wing: not known while the map isn't", MS.currentRun.wingName == nil, MS.currentRun.wingName)
+    uiMap = 305; M.Fire("ZONE_CHANGED_INDOORS"); M.RunTimers(5)
+    check("wing: known once the map is", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral",
+        MS:RunTitle(MS.currentRun))
     -- A wrong guess gives way to the bosses.
     wait(30); kill("Houndmaster Loksey")
     check("wing: bosses overrule the map", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library",

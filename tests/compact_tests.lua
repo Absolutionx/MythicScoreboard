@@ -74,6 +74,17 @@ else
     check("Forever: experience, with the quest", shown("15,132") ~= nil, shown("1%d,"))
     at(480)                                     -- 24:40: both bosses down
     check("Forever: the clock stops at the last boss", shown("^24:20$") ~= nil)
+    -- Hovering the XP: a tooltip at the mouse with dungeon and quest XP.
+    local found
+    for _, w in ipairs(M.allFrames) do
+        if w._shown and w._parent == frame() and w._kind == "Frame" and w.Fire then
+            GameTooltip._text = nil
+            w:Fire("OnEnter")
+            if (GameTooltip._text or ""):find("^Experience") then found = true end
+            w:Fire("OnLeave")
+        end
+    end
+    check("Forever: XP tooltip on hover", found)
     local tall = frame()._h
     slash("compact compact")
     check("Forever compact: shorter than detailed", frame()._h < tall, frame()._h .. " vs " .. tall)

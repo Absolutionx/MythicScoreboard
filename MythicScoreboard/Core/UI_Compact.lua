@@ -389,6 +389,7 @@ local function Deaths(run, y)
     local hov = Piece("dhover", function()
         local h = CreateFrame("Frame", nil, f)
         h:EnableMouse(true)
+        if h.SetMouseClickEnabled then h:SetMouseClickEnabled(false) end
         h:SetScript("OnEnter", Safe(function(self)
             local r = self.run
             if not r or DeathCount(r) == 0 then return end
@@ -424,6 +425,44 @@ local function PaceStrip(run, bosses, y)
 end
 
 -- Forever: what the run did for you.
+-- Hover areas: they show a tooltip but let clicks and drags through to the
+-- frame (so it still moves and clicks wherever you grab it).
+local function HoverArea(key, onEnter)
+    return Piece(key, function()
+        local h = CreateFrame("Frame", nil, f)
+        h:EnableMouse(true)
+        if h.SetMouseClickEnabled then h:SetMouseClickEnabled(false) end
+        h:SetScript("OnEnter", Safe(onEnter))
+        h:SetScript("OnLeave", GameTooltip_Hide)
+        return h
+    end)
+end
+
+-- The run's XP, split: from the dungeon's mobs and from quests, with each
+-- quest's reward. At the mouse.
+local function XPTooltip(self)
+    local pr = self.run and self.run.progress
+    if not pr then return end
+    local mobXP, questXP = UI.RunXP(pr)
+    local total = mobXP + questXP
+    local function Pct(n) return total > 0 and _fmt("  |cff9a9080%d%%|r", _floor(n * 100 / total + 0.5)) or "" end
+    local a, b, c = P.ash[1], P.ash[2], P.ash[3]
+    GameTooltip:SetOwner(self, "ANCHOR_CURSOR")
+    GameTooltip:SetText(L["Experience"] .. "  " .. MS.FormatThousands(total), 1, 1, 1)
+    if questXP > 0 then GameTooltip:AddLine(UI.XPSplit(mobXP, questXP, 200, 6)) end
+    GameTooltip:AddDoubleLine(UI.Swatch(P.xpMob, 8, 8) .. " " .. L["From the dungeon"],
+        MS.FormatThousands(mobXP) .. Pct(mobXP), a, b, c, 1, 1, 1)
+    GameTooltip:AddDoubleLine(UI.Swatch(P.xpQuest, 8, 8) .. " " .. L["From quests"],
+        MS.FormatThousands(questXP) .. Pct(questXP), a, b, c, 1, 1, 1)
+    local rewards = pr.questRewards or {}
+    for i, t in ipairs(pr.quests or {}) do
+        local x = rewards[i] and rewards[i].x
+        GameTooltip:AddDoubleLine("    " .. t, x and _fmt(L["+%s XP"], MS.FormatThousands(x)) or "",
+            0.8, 0.8, 0.8, P.xpQuest[1], P.xpQuest[2], P.xpQuest[3])
+    end
+    GameTooltip:Show()
+end
+
 local function Progress(run, y)
     local pr = run.progress
     if not pr then return y end
@@ -438,6 +477,9 @@ local function Progress(run, y)
     local qw = total > 0 and _floor(w * questXP / total + 0.5) or 0
     local mob = Bar("xmob", P.xpMob); Place(mob, PAD, y); mob:SetSize(_max(1, w - qw), 5)
     if qw > 0 then local q = Bar("xq", P.xpQuest); Place(q, PAD + w - qw, y); q:SetSize(qw, 5) end
+    local hov = HoverArea("xhover", XPTooltip)               -- the label, the number and the bar
+    hov.run = run
+    Place(hov, PAD, y + 20); hov:SetSize(w, 28)
     y = y - 12
     local col = w / 3
     local cells = {
@@ -475,6 +517,11 @@ local function RunCells(run, bosses, y)
         OneLine(l, col - 4, 10); l:SetText(c[1])
         local v = FS("rcv" .. i, "semibold", 14, P.ivory, "LEFT"); Place(v, PAD + (i - 1) * col, y - 13)
         OneLine(v, col - 4, 13); v:SetText(c[2])
+        if c[1] == L["Experience"] then
+            local hov = HoverArea("rchover", XPTooltip)
+            hov.run = run
+            Place(hov, PAD + (i - 1) * col, y + 2); hov:SetSize(col, 32)
+        end
     end
     return y - 34
 end

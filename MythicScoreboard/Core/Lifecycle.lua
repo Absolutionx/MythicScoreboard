@@ -108,6 +108,12 @@ local function SamePlace(self, run)
         local here = CurrentUiMap()
         if here and here ~= run.uiMapID then return false end
     end
+    -- No map (WoW Forever): the door you came in by, or the room you're in.
+    if self.ForeverSameDoor and self:ForeverSameDoor(run) == false then return false end
+    if run.wingName and self.ForeverWingHere then
+        local wing = self:ForeverWingHere(run.dungeonName)
+        if wing and wing ~= run.wingName then return false end
+    end
     return true
 end
 

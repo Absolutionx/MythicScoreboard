@@ -339,7 +339,7 @@ local LIVE = {
     run    = { "_carry", "_carryDur", "_lastDur", "_seq", "_pendingFinalize", "_combatEndedAt", "_clearedClock", "activeBoss",
                "_active", "_suspended", "startTime", "endTime", "_bossTotal",
                "_baselinePending", "_deathBase", "_offline", "_savedAt",
-               "_shown", "_resultTime", "_pullFrom", "lastPull", "_fdjKey", "_fdjPlace" },       -- (the last two: from 2.9.2, no longer kept)
+               "_shown", "_resultTime", "_pullFrom", "lastPull", "_fdjKey", "_fdjPlace", "_wingBy" },       -- (the last two: from 2.9.2, no longer kept)
     boss   = { "_before", "_session", "_tries", "_named", "_diedAt" },
     player = { "_lastDeathTime", "_lastRecapID" },
 }
