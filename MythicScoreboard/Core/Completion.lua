@@ -15,8 +15,10 @@
 local _max = math.max
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
-local IsSecret = _G["MythicScoreboard"].IsSecret
+-- Waits (seconds) for the game to settle before acting:
+local OPEN_DELAY        = 0.5    -- the window, once a run is cleared or saved
+local CLEAR_CHECK_DELAY = 1.5    -- the clear check, after a kill (loot, experience lines)
+local KEY_SAVE_LIMIT    = 3      -- a finished key is saved by then, every criterion in or not
 
 local Readable = _G["MythicScoreboard"].ReadableValue
 
@@ -89,7 +91,7 @@ function MS:MarkCleared(run, at)
     run.clearedAt = at
     run._clearedClock = GetTime()
     self:SaveCurrentRun()
-    C_Timer.After(0.5, function()
+    C_Timer.After(OPEN_DELAY, function()
         if MS:GetAutoOpenOnComplete() then MS:ShowScoreboard() end
     end)
 end
@@ -100,9 +102,10 @@ end
 -- trash, a long pull after the last boss). The meter is read once combat
 -- ends, since its numbers can be hidden until then.
 function MS:CheckClearedAfterKill(killedBoss)
-    C_Timer.After(1.5, function()
-        local run = MS.currentRun
-        if not MS.inDungeon or not run or run.completed then return end
+    local run = self.currentRun
+    if not run then return end
+    self:AfterForRun(run, CLEAR_CHECK_DELAY, function()
+        if not MS.inDungeon or run.completed then return end
         if MS:IsRunCleared(run, killedBoss) then
             MS:MarkCleared(run, killedBoss and killedBoss.killTime)
         end
@@ -227,6 +230,8 @@ function MS:OnKeyCompleted(totalTimeMs, onTime)
     run.deathPenaltySeconds = self:KeyDeathPenalty() or run.deathPenaltySeconds
 
     local elapsed = totalTimeMs and totalTimeMs > 0 and totalTimeMs / 1000 or nil
+    -- The key's own result time: the run's times go onto its clock when saved.
+    run._resultTime = elapsed ~= nil
     if not elapsed then elapsed = GetWorldElapsedTime and select(2, GetWorldElapsedTime(1)) end
     if not (elapsed and elapsed > 0) then elapsed = GetTime() - run.startTime end
     run.duration = elapsed
@@ -240,11 +245,11 @@ function MS:OnKeyCompleted(totalTimeMs, onTime)
     run.completed = true
     run.inTime    = inTime
     -- Saved once SCENARIO_CRITERIA_UPDATE says every criterion is done, or
-    -- after 3 seconds regardless.
+    -- after KEY_SAVE_LIMIT seconds regardless.
     run._pendingFinalize = true
     self:SaveCurrentRun()
-    C_Timer.After(3, function()
-        if MS.currentRun == run and run._pendingFinalize then MS:FinalizeKey(run) end
+    self:AfterForRun(run, KEY_SAVE_LIMIT, function()
+        if run._pendingFinalize then MS:FinalizeKey(run) end
     end)
 end
 
@@ -303,18 +308,14 @@ function MS:CommitRun(outcome)
     self:_BackfillSyntheticInterrupts(run)
 
     local before = self:BestKeyTime(run.dungeonName, run.keystoneLevel)
+    if run._resultTime then MS.ToResultClock(run) end
     self:_CommitRunToHistory(run)
     self:_AnnouncePB(run, before)
     self:ClearSavedActiveRun()
     self.displayRun = nil
     self:SetRunState("none")
     self:Changed("run")
-    if outcome.show then C_Timer.After(0.5, function() MS:ShowScoreboard() end) end
-end
-
--- Older name, kept for anything that still calls it.
-function MS:EndRun(completed, inTime)
-    self:CommitRun({ completed = completed, inTime = inTime })
+    if outcome.show then C_Timer.After(OPEN_DELAY, function() MS:ShowScoreboard() end) end
 end
 
 -- Drops the current run without saving: the placeholder made while waiting

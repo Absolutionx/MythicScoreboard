@@ -1,4 +1,4 @@
--- usage: lua5.1 stats_poll_test.lua DIR TOC
+-- usage: lua5.1 stats_poll_tests.lua DIR TOC
 -- During a live run the meter poll refreshes the window every 2s. With the
 -- Stats page open that must not touch its rows (it re-anchors the row under
 -- the mouse, which closes its tooltip).

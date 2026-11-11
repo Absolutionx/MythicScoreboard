@@ -49,14 +49,14 @@ local function Thousands(n)
     return B and B(n) or tostring(n)
 end
 
--- How a key went, as a colour: gold for +3, bronze for +2, white for +1,
--- red over time.
+-- How a key went, as a medal: gold for +3, silver for +2, bronze for +1,
+-- red over time. (In time with the upgrade unknown: at least +1.)
 local function UpgradeColor(e)
     local up = tonumber(e.up)
-    if not up then return e.inTime and P.ivory or P.bloodHi end
+    if not up then return e.inTime and P.bronze or P.bloodHi end
     if up >= 3 then return P.gold end
-    if up == 2 then return P.bronze end
-    if up == 1 then return P.ivory end
+    if up == 2 then return P.silver end
+    if up == 1 then return P.bronze end
     return P.bloodHi
 end
 

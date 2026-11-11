@@ -7,8 +7,11 @@
 -- The combat log is blocked inside instances, so each number comes from
 -- something the game still shows:
 --   xp, levels   your XP bar, read whenever it changes
---   kills        "<mob> dies, you gain N experience." in chat: kills that
---                gave you XP (none for grey mobs, or at max level)
+--   kills        hostile mobs seen alive, then dead: on their nameplates,
+--                your target, focus or mouseover, or your group's targets;
+--                and "<mob> dies, you gain N experience." in chat, for a kill
+--                none of those showed (the two are matched, so a kill seen
+--                both ways counts once)
 --   quests       quests seen incomplete in your log during the run, that
 --                the game said made progress in here, then
 --                complete (not ones already done: the log loads in pieces
@@ -22,11 +25,8 @@ local MS = _G["MythicScoreboard"]
 local L = MS.L
 if not MS.Flavor.progressStats then return end
 
-local IsSecret = _G["MythicScoreboard"].IsSecret
-local function Plain(v)
-    if v == nil or IsSecret(v) then return nil end
-    return v
-end
+local Plain = MS.ReadableValue
+local _fmt = string.format
 
 local function Progress(run)
     run.progress = run.progress or { xp = 0, levels = 0, kills = 0, quests = {}, gold = 0, rep = {} }
@@ -91,67 +91,195 @@ local function OnMoney()
 end
 
 -- ── Chat lines ─────────────────────────────────────────────────────────────
--- A localized line like "%s dies, you gain %d experience." as a pattern for
--- its start, up to the first number (the rest varies: rested, group bonus).
-local function Escape(s) return (s:gsub("([%%%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")) end
-local function Prefix(fmt)
-    if type(fmt) ~= "string" then return nil end
-    local cut = fmt:find("%d", 1, true) or fmt:find("%1$d", 1, true) or fmt:find("%2$d", 1, true)
-    local head = cut and fmt:sub(1, cut - 1) or fmt
-    local p = Escape(head)
-    p = p:gsub("%%%%s", "(.-)"):gsub("%%%%%d%%%$s", "(.-)")
-    return "^" .. p
-end
-
--- A full line with a name and an amount, either order.
-local function Pattern(fmt)
-    if type(fmt) ~= "string" then return nil end
-    local p = Escape(fmt)
-    p = p:gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
-    p = p:gsub("%%%%(%d)%%%$s", "(.+)"):gsub("%%%%(%d)%%%$d", "(%%d+)")
-    local swapped = (fmt:find("%2$s", 1, true) or 99) < (fmt:find("%1$d", 1, true) or 0)
-    return "^" .. p, swapped
-end
-
+-- Kill lines ("%s dies, you gain %d experience.") are matched up to the
+-- first number (what follows varies: rested, group bonus); reputation lines
+-- give the faction and the amount, in the format's order.
 local KILL_PATTERNS, REP_PATTERNS = {}, {}
 local function BuildPatterns()
     wipe(KILL_PATTERNS); wipe(REP_PATTERNS)
     for _, g in ipairs({ "COMBATLOG_XPGAIN_FIRSTPERSON", "COMBATLOG_XPGAIN_FIRSTPERSON_GROUP",
                          "COMBATLOG_XPGAIN_FIRSTPERSON_RAID", "COMBATLOG_XPGAIN_EXHAUSTION1",
                          "COMBATLOG_XPGAIN_EXHAUSTION1_GROUP", "COMBATLOG_XPGAIN_EXHAUSTION1_RAID" }) do
-        local p = Prefix(rawget(_G, g))
-        if p then KILL_PATTERNS[#KILL_PATTERNS + 1] = p end
+        local fp = MS.FormatPattern(rawget(_G, g), "prefix")
+        if fp then KILL_PATTERNS[#KILL_PATTERNS + 1] = fp end
     end
     for _, g in ipairs({ "FACTION_STANDING_INCREASED", "FACTION_STANDING_INCREASED_BONUS",
                          "FACTION_STANDING_INCREASED_DOUBLE_BONUS", "FACTION_STANDING_INCREASED_ACH_BONUS" }) do
-        local p, swapped = Pattern(rawget(_G, g))
-        if p then REP_PATTERNS[#REP_PATTERNS + 1] = { p, swapped } end
+        local fp = MS.FormatPattern(rawget(_G, g), "start")
+        if fp then REP_PATTERNS[#REP_PATTERNS + 1] = fp end
     end
 end
 MS._RunStatsPatterns = BuildPatterns       -- for tests
 
+-- ── Kills ──────────────────────────────────────────────────────────────────
+-- The XP line comes only for kills that gave XP. Every kill (grey mobs, at
+-- max level too) is also seen on the enemies the game shows: a hostile mob
+-- seen alive, then dead. Each mob (by GUID) counts once, and the XP line is
+-- matched by name to a kill seen in the last few seconds, either way round,
+-- so a kill seen both ways counts once.
+local MATCH_SECONDS = 5
+local alive, counted = {}, {}          -- [guid] = true
+local seenKills, xpKills = {}, {}      -- [mob name] = { times }, not yet matched
+local trackRun
+
+local function Track(run)
+    if trackRun == run then return end
+    trackRun = run
+    wipe(alive); wipe(counted); wipe(seenKills); wipe(xpKills)
+end
+
+-- Takes the oldest entry for the name, if one is recent enough.
+local function Take(list, name, now)
+    local t = list[name]
+    if not t then return false end
+    while t[1] and now - t[1] > MATCH_SECONDS do table.remove(t, 1) end
+    if not t[1] then list[name] = nil; return false end
+    table.remove(t, 1)
+    return true
+end
+-- Takes the oldest recent entry under any name (a nameplate whose name the
+-- game hides: matched to whichever XP line came with it).
+local ANY = "\0any"
+local function TakeAny(list, now)
+    local best, bestT
+    for name, t in pairs(list) do
+        while t[1] and now - t[1] > MATCH_SECONDS do table.remove(t, 1) end
+        if t[1] and (not bestT or t[1] < bestT) then best, bestT = name, t[1] end
+    end
+    if best then return Take(list, best, now) end
+    return false
+end
+local function Put(list, name, now)
+    local t = list[name] or {}
+    list[name] = t
+    t[#t + 1] = now
+end
+
+local function CountKill(run, name)
+    if name then MS:NoteMobDied(name) end
+    Progress(run).kills = Progress(run).kills + 1
+    Changed(run)
+end
+
 local function OnXPLine(text)
     local run = MS.currentRun
     if not (run and MS.inDungeon) or type(Plain(text)) ~= "string" then return end
-    for _, p in ipairs(KILL_PATTERNS) do
-        local mob = text:match(p)
+    for _, fp in ipairs(KILL_PATTERNS) do
+        local mob = MS.MatchFormat(text, fp)
         if mob and mob ~= "" then
-            MS:NoteMobDied(mob)
-            Progress(run).kills = Progress(run).kills + 1
-            Changed(run)
+            Track(run)
+            local now = GetTime()
+            -- Already counted when it died (by name, or a nameless one).
+            if Take(seenKills, mob, now) or Take(seenKills, ANY, now) then return end
+            Put(xpKills, mob, now)
+            CountKill(run, mob)
             return
         end
     end
 end
 
+-- Yes/no from the game: true or 1 (older APIs), never a hidden value.
+local function Yes(v) v = Plain(v); return v ~= nil and v ~= false and v ~= 0 end
+local function Flag(fn, unit) return fn ~= nil and Yes(fn(unit)) end
+
+-- /sb killdebug: says in chat what each enemy looked like, to find out why
+-- a kill wasn't counted.
+local debugKills = false
+local debugSaid = {}
+local function Debug(key, ...)
+    if not debugKills then return end
+    if key then
+        if debugSaid[key] then return end
+        debugSaid[key] = true
+    end
+    MS.Say("|cff9aa0a6kills:|r " .. _fmt(...))
+end
+function MS:KillDebug()
+    debugKills = not debugKills
+    wipe(debugSaid)
+    MS.Say("Kill debug " .. (debugKills and "on" or "off"))
+    if debugKills then
+        local run = MS.currentRun
+        Debug(nil, "run %s, in dungeon %s, listening %s", tostring(run ~= nil), tostring(MS.inDungeon),
+            tostring(MS._RunStatsListening and MS._RunStatsListening()))
+    end
+end
+
+-- Who the unit is: its GUID, or, when the game hides that, its nameplate
+-- (the same mob for as long as the plate is up).
+local function UnitKey(unit)
+    local raw = UnitGUID(unit)
+    local guid = MS.Readable(raw)
+    if guid then
+        if not (guid:find("^Creature") or guid:find("^Vehicle")) then   -- players, pets
+            Debug("kind" .. (guid:match("^%a+") or "?"), "%s: not a creature (%s)", unit, guid:match("^%a+") or "?")
+            return nil
+        end
+        return guid
+    end
+    if unit:find("^nameplate") then return "plate:" .. unit end
+    Debug("noguid" .. unit, "%s: no readable GUID (%s)", unit, MS.IsSecret(raw) and "hidden" or type(raw))
+end
+
+-- A unit the game shows: a hostile mob is remembered alive, and counted
+-- once when seen dead. A corpse never seen alive isn't counted (it may have
+-- died before you came), nor one someone outside the group killed.
+local function CheckUnit(unit)
+    local run = MS.currentRun
+    if not (run and MS.inDungeon) or type(unit) ~= "string" then return end
+    if not (UnitExists and Yes(UnitExists(unit))) then return end
+    local key = UnitKey(unit)
+    if not key or counted[key] then return end
+    Track(run)
+    local name = MS.Readable(UnitName(unit))
+    if not Flag(UnitIsDead, unit) then
+        if alive[key] then return end
+        local hostile = UnitCanAttack ~= nil and Yes(UnitCanAttack("player", unit))
+        local theirs = Flag(UnitPlayerControlled, unit)
+        if hostile and not theirs then
+            alive[key] = true
+            Debug(nil, "%s alive (%s)", tostring(name), unit)
+        else
+            Debug("skip" .. key, "%s skipped: hostile %s, player's %s", tostring(name), tostring(hostile), tostring(theirs))
+        end
+        return
+    end
+    if not alive[key] then
+        Debug("corpse" .. key, "%s dead, never seen alive (%s)", tostring(name), unit)
+        return
+    end
+    counted[key], alive[key] = true, nil
+    if Flag(UnitIsTapDenied, unit) then Debug(nil, "%s dead, someone else's", tostring(name)); return end
+    local now = GetTime()
+    -- Already counted from its XP line: by name, or any one when the name is hidden.
+    if (name and Take(xpKills, name, now)) or (not name and TakeAny(xpKills, now)) then
+        Debug(nil, "%s dead, already counted (XP)", tostring(name)); return
+    end
+    Put(seenKills, name or ANY, now)
+    Debug(nil, "%s dead: counted", tostring(name))
+    CountKill(run, name)
+end
+-- A nameplate going to another mob: the old one's "plate:" key is done with.
+local function PlateReset(unit)
+    if type(unit) ~= "string" then return end
+    local k = "plate:" .. unit
+    alive[k], counted[k] = nil, nil
+end
+
+-- Everything the game shows right now (after a fight, in case an event was missed).
+local function CheckAll()
+    for i = 1, 40 do CheckUnit("nameplate" .. i) end
+    CheckUnit("target"); CheckUnit("focus"); CheckUnit("mouseover")
+    for i = 1, 4 do CheckUnit("party" .. i .. "target") end
+end
+MS._RunStatsCheckUnit = CheckUnit          -- for tests
+
 local function OnRepLine(text)
     local run = MS.currentRun
     if not (run and MS.inDungeon) or type(Plain(text)) ~= "string" then return end
-    for _, pp in ipairs(REP_PATTERNS) do
-        local a, b = text:match(pp[1])
-        if a and b then
-            local faction, amount = a, b
-            if pp[2] or tonumber(a) then faction, amount = b, a end
+    for _, fp in ipairs(REP_PATTERNS) do
+        local faction, amount = MS.MatchFormat(text, fp)
+        if faction and amount then
             amount = tonumber(amount)
             if amount and amount > 0 then
                 local rep = Progress(run).rep
@@ -323,11 +451,55 @@ local function OnQuestTurnedIn(questID, xpReward, moneyReward)
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────
-local frame = CreateFrame("Frame")
+local function OnEvent(event, ...)
+    if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
+        -- PLAYER_LEVEL_UP comes before the bar shows the new level: read a moment later.
+        C_Timer.After(event == "PLAYER_LEVEL_UP" and 0.5 or 0, OnXP)
+    elseif event == "PLAYER_MONEY" then
+        OnMoney()
+    elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
+        OnXPLine((...))
+    elseif event == "UNIT_HEALTH" then
+        CheckUnit((...))
+    elseif event == "NAME_PLATE_UNIT_ADDED" then
+        PlateReset((...)); CheckUnit((...))
+    elseif event == "NAME_PLATE_UNIT_REMOVED" then
+        CheckUnit((...)); PlateReset((...))
+    elseif event == "UNIT_TARGET" then
+        local unit = ...
+        if type(unit) == "string" then CheckUnit(unit .. "target") end
+    elseif event == "PLAYER_TARGET_CHANGED" then
+        CheckUnit("target")
+    elseif event == "PLAYER_FOCUS_CHANGED" then
+        CheckUnit("focus")
+    elseif event == "UPDATE_MOUSEOVER_UNIT" then
+        CheckUnit("mouseover")
+    elseif event == "PLAYER_REGEN_ENABLED" then
+        CheckAll()
+    elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
+        OnRepLine((...))
+    elseif event == "QUEST_LOG_UPDATE" then
+        if pendingQuests then return end           -- fires in bursts: read once
+        pendingQuests = true
+        C_Timer.After(0.5, function() pendingQuests = false; OnQuestLog() end)
+    elseif event == "QUEST_TURNED_IN" then
+        OnQuestTurnedIn(...)
+    elseif event == "QUEST_WATCH_UPDATE" then
+        OnQuestProgress((...))
+    elseif event == "UI_INFO_MESSAGE" then
+        OnInfoMessage(select(2, ...))
+    end
+end
+
+-- Listened for only while a run is recording.
 local EVENTS = { "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "CHAT_MSG_COMBAT_XP_GAIN",
                  "CHAT_MSG_COMBAT_FACTION_CHANGE", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN",
-                 "QUEST_WATCH_UPDATE", "UI_INFO_MESSAGE" }
+                 "QUEST_WATCH_UPDATE", "UI_INFO_MESSAGE",
+                 "UNIT_HEALTH", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_TARGET",
+                 "PLAYER_TARGET_CHANGED", "PLAYER_FOCUS_CHANGED", "UPDATE_MOUSEOVER_UNIT",
+                 "PLAYER_REGEN_ENABLED" }
 local listening = false
+MS._RunStatsListening = function() return listening end
 MS:WatchRunState(function(state)
     local want = state == "active"
     if want == listening then return end
@@ -336,36 +508,10 @@ MS:WatchRunState(function(state)
         if #KILL_PATTERNS == 0 then BuildPatterns() end
         Baseline(); QuestBaseline()
         if MS.currentRun then Progress(MS.currentRun) end
-        for _, ev in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, ev) end
+        for _, ev in ipairs(EVENTS) do MS:On(ev, OnEvent) end
     else
-        for _, ev in ipairs(EVENTS) do pcall(frame.UnregisterEvent, frame, ev) end
+        for _, ev in ipairs(EVENTS) do MS:Off(ev, OnEvent) end
     end
-end)
-
-frame:SetScript("OnEvent", function(_, event, ...)
-    local ok, err = pcall(function(...)
-        if event == "PLAYER_XP_UPDATE" or event == "PLAYER_LEVEL_UP" then
-            -- PLAYER_LEVEL_UP comes before the bar shows the new level: read a moment later.
-            C_Timer.After(event == "PLAYER_LEVEL_UP" and 0.5 or 0, OnXP)
-        elseif event == "PLAYER_MONEY" then
-            OnMoney()
-        elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
-            OnXPLine((...))
-        elseif event == "CHAT_MSG_COMBAT_FACTION_CHANGE" then
-            OnRepLine((...))
-        elseif event == "QUEST_LOG_UPDATE" then
-            if pendingQuests then return end           -- fires in bursts: read once
-            pendingQuests = true
-            C_Timer.After(0.5, function() pendingQuests = false; OnQuestLog() end)
-        elseif event == "QUEST_TURNED_IN" then
-            OnQuestTurnedIn(...)
-        elseif event == "QUEST_WATCH_UPDATE" then
-            OnQuestProgress((...))
-        elseif event == "UI_INFO_MESSAGE" then
-            OnInfoMessage(select(2, ...))
-        end
-    end, ...)
-    if not ok then MS:ReportError("Run stats", err) end
 end)
 
 -- ── Shown as ───────────────────────────────────────────────────────────────

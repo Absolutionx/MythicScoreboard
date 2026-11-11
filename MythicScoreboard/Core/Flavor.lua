@@ -5,7 +5,6 @@
 -- about a trait (MS.Flavor.twoPartNames), never which client it's on.
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 local LK = MS.LK      -- a label kept in English, translated where it is shown
 
 MS.Flavor = {

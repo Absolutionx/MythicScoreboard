@@ -43,7 +43,7 @@ MythicScoreboardDB, MythicScoreboardAccountDB = nil, nil
 login()
 playRun(true, true)
 playRun(false)
-local me = MS._charKey
+local me = MS:CharKey()
 check("character key", me and me:find("@"), me)
 local acc = MythicScoreboardAccountDB
 check("account store made", acc and acc.chars and acc.chars[me])

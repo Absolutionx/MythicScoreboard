@@ -73,6 +73,37 @@ check("dash for missing", shownText("^|c%x+%-|r$") ~= nil or shownText("%-") ~= 
 local lines = 0
 for _, w in ipairs(M.allFrames) do if w._kind == "Line" and w._shown then lines = lines + 1 end end
 check("a line per shared boss", lines == 3, lines)
+-- Each run has its own times under its bar.
+local zeros = 0
+for _, w in ipairs(M.allFrames) do if w._shown and w._kind == "FontString" and w._text == "0:00" then zeros = zeros + 1 end end
+check("each run's bar starts at 0:00", zeros >= 2, zeros)
+check("each run's end time under its bar", shownText("^50:00$") ~= nil and shownText("^1:01:54$") ~= nil or shownText("^61:54$") ~= nil,
+    tostring(shownText("^50:00$")))
+-- Each kill's time at its block: the first run's above its bar, the
+-- second's below (the lines joining them run in between).
+local function label(txt)
+    for _, w in ipairs(M.allFrames) do
+        if w._shown and w._kind == "FontString" and w._text == txt and w._at
+                and (w._at[1] == "TOP" or w._at[1] == "BOTTOM") and w._at[3] == "TOPLEFT" then return w end
+    end
+end
+local k1, k2 = label("17:57"), label("15:00")
+check("kill times on both bars", k1 ~= nil and k2 ~= nil)
+check("first run's times above, second's below", k1 and k1._at[1] == "BOTTOM" and k2 and k2._at[1] == "TOP",
+    (k1 and k1._at[1] or "?") .. "/" .. (k2 and k2._at[1] or "?"))
+check("a kill time crowding the end time is left out", label("49:10") == nil)
+-- A kill logged after the run ended stays inside the window.
+new.bosses[4].t = 3900   -- past both runs' ends (3000 and 3714)
+UI.RefreshStats(true); M.RunTimers(2)
+local right = 0
+for _, w in ipairs(M.allFrames) do
+    if w._shown and w._kind == "Texture" and w._at and w._at[1] == "TOPLEFT" and type(w._at[4]) == "number" then
+        right = math.max(right, w._at[4] + (w._w or 0))
+    end
+end
+check("bars stay inside the window", right <= UI.FRAME_W - 10, right)
+new.bosses[4].t = 2950
+UI.RefreshStats(true); M.RunTimers(2)
 for _, p in ipairs(M.printed) do if p:lower():find("error") then check("no errors", false, p) end end
 
 -- 3. Back returns to the dungeon with nothing picked.

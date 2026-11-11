@@ -35,7 +35,7 @@ local function oldRun(at, dur, cleared, boss)
              completed = cleared, bosses = { { name = boss, pullTime = 10, killTime = 60 } }, players = {} }
 end
 MythicScoreboardDB.runs = { oldRun(5000 + 2400 + 300, 900, true, "Bazzalan"), oldRun(5000, 2400, false, "Oggleflint") }
-MythicScoreboardAccountDB.chars[MS._charKey].archive = nil
+MythicScoreboardAccountDB.chars[MS:CharKey()].archive = nil
 local runs = MS:ArchiveRuns()
 check("old split runs joined", #runs == 1 and runs[1].cleared and #runs[1].bosses == 2, #runs)
 check("joined time spans both", runs[1].dur == 2400 + 300 + 900, runs[1].dur)

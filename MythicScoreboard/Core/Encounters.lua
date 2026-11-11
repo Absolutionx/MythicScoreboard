@@ -7,33 +7,42 @@ local _floor, _min = math.floor, math.min
 local _ins = table.insert
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
-local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local function Now(run) return MS:GetRunDuration(run) end
+
+-- Code that wants to know when a boss fight starts or ends (Forever.lua uses
+-- it to tell which wing a run is in): fn(run, boss).
+local fightWatchers = {}
+function MS:OnBossFight(fn) fightWatchers[#fightWatchers + 1] = fn end
+local function FightChanged(run, boss)
+    for i = 1, #fightWatchers do fightWatchers[i](run, boss) end
+end
 
 -- ── Enemy forces ───────────────────────────────────────────────────────────
 -- The isWeightedProgress scenario criterion, as a completion %.
 local function GetEnemyForcesPercent()
     if not (C_Scenario and C_Scenario.GetStepInfo) then return nil end
     local ok1, _, _, numCriteria = pcall(C_Scenario.GetStepInfo)
-    if not ok1 or not numCriteria or numCriteria <= 0 then return nil end
+    numCriteria = ok1 and MS.ReadableNumber(numCriteria)
+    if not numCriteria or numCriteria <= 0 then return nil end
 
     for i = 1, numCriteria do
         local ok2, info = pcall(C_ScenarioInfo.GetCriteriaInfo, i)
-        if ok2 and info and info.isWeightedProgress then
-            if info.completed then return 100 end
-            local curValue = info.quantity    or 0
-            local maxValue = info.totalQuantity or 0
+        -- Each field read through Readable*: a value the game hides is skipped.
+        if ok2 and type(info) == "table" and MS.ReadableValue(info.isWeightedProgress) then
+            if MS.ReadableValue(info.completed) then return 100 end
+            local curValue = MS.ReadableNumber(info.quantity) or 0
+            local maxValue = MS.ReadableNumber(info.totalQuantity) or 0
             if maxValue <= 0 then return nil end
             -- quantityString may be "42%": strip the suffix for the raw count.
-            if info.quantityString and info.quantityString ~= "" then
-                local stripped = tonumber(info.quantityString:sub(1, -2))
+            local qs = MS.Readable(info.quantityString)
+            if qs then
+                local stripped = tonumber(qs:sub(1, -2))
                 if stripped then curValue = stripped end
             end
             local pct = (curValue / maxValue) * 100
             pct = _floor(pct * 100 + 0.5) / 100
-            return _min(100, pct)
+            return _min(100, pct), curValue, maxValue
         end
     end
     return nil
@@ -43,11 +52,12 @@ end
 function MS:AllCriteriaComplete()
     if not (C_Scenario and C_Scenario.GetStepInfo) then return false end
     local ok, _, _, numCriteria = pcall(C_Scenario.GetStepInfo)
-    if not (ok and numCriteria and numCriteria > 0) then return false end
+    numCriteria = ok and MS.ReadableNumber(numCriteria)
+    if not (numCriteria and numCriteria > 0) then return false end
     local done = 0
     for i = 1, numCriteria do
         local ok2, info = pcall(C_ScenarioInfo.GetCriteriaInfo, i)
-        if ok2 and info and info.completed then done = done + 1 end
+        if ok2 and type(info) == "table" and MS.ReadableValue(info.completed) then done = done + 1 end
     end
     return done >= numCriteria
 end
@@ -62,13 +72,41 @@ end
 
 function MS:UpdateEnemyForcesProgress()
     if not self.currentRun then return end
-    local pct = GetEnemyForcesPercent()
+    local pct, count, total = GetEnemyForcesPercent()
     if pct ~= nil then
         self.currentRun.currentPct = pct
+        self.currentRun.forcesCount, self.currentRun.forcesTotal = count, total
     elseif (self.currentRun.keystoneLevel or 0) > 0
             and self.currentRun.currentPct == nil then
         self.currentRun.currentPct = 0
     end
+end
+
+-- What the last pack was worth: enemy forces when combat began and again
+-- once it ended (a moment later: the count can trail the last kill). Each
+-- mob's own value is hidden from addons in Midnight, so a pull is only
+-- known once it's over. A wipe or a reset pack comes to nothing and leaves
+-- the last value as it was.
+local PULL_SETTLE = 1.0
+function MS:NotePullStart()
+    local run = self.currentRun
+    if not (run and (run.keystoneLevel or 0) > 0) then return end
+    self:UpdateEnemyForcesProgress()
+    run._pullFrom = run.currentPct
+end
+function MS:NotePullEnd()
+    local run = self.currentRun
+    if not (run and run._pullFrom) then return end
+    self:AfterForRun(run, PULL_SETTLE, function()
+        if not run._pullFrom then return end
+        MS:UpdateEnemyForcesProgress()
+        local gained = (run.currentPct or 0) - run._pullFrom
+        run._pullFrom = nil
+        if gained >= 0.01 then
+            run.lastPull = _floor(gained * 100 + 0.5) / 100
+            MS:Changed("run")
+        end
+    end)
 end
 
 -- ── Bosses ─────────────────────────────────────────────────────────────────
@@ -106,6 +144,7 @@ function MS:BossPull(bossName, dungeonEncounterId)
     if self.NoteFightStart then self:NoteFightStart(boss) end
     self:SnapshotBossProgress(boss, true)
     if self.ResolveBossIcon then self:ResolveBossIcon(boss) end
+    FightChanged(run, boss)
     self:SaveCurrentRun()
 end
 
@@ -138,6 +177,7 @@ local function LateEnd(self, run, bossName, dungeonEncounterId, field)
             end
             NoteEncounter(b, dungeonEncounterId)
             if self.NoteFightEnd then self:NoteFightEnd(b) end
+            FightChanged(run, b)
             self:SaveCurrentRun()
             return b
         end
@@ -153,6 +193,7 @@ local function EndFight(self, bossName, dungeonEncounterId, field, at)
     NoteEncounter(boss, dungeonEncounterId)
     if run.activeBoss == boss then run.activeBoss = nil end
     if self.NoteFightEnd then self:NoteFightEnd(boss) end
+    FightChanged(run, boss)
     self:SaveCurrentRun()
     return boss
 end
@@ -241,18 +282,13 @@ function MS:RecordDeathEvent(who)
     local lost = level > 0 and self.KeyDeathPenalty and self:KeyDeathPenalty()
     if lost then
         run.deathPenaltySeconds = lost
-    elseif level >= 12 then
-        run.deathPenaltySeconds = (run.deathPenaltySeconds or 0) + 15
-    elseif level >= 4 then
-        run.deathPenaltySeconds = (run.deathPenaltySeconds or 0) + 5
+    elseif level > 0 then
+        run.deathPenaltySeconds = (run.deathPenaltySeconds or 0) + MS.DeathPenaltyFor(level)
     end
     self:SaveCurrentRun()
 end
 
-local function Plain(v)
-    if v == nil or IsSecret(v) then return nil end
-    return v
-end
+local Plain = MS.ReadableValue
 
 -- The killing blow and the two hits before it, copied off a death recap.
 local function RecapHits(recapID)
@@ -302,7 +338,13 @@ function MS.KillingBlow(events)
 end
 
 -- Deaths are polled (UNIT_DIED through the combat log is blocked in Midnight).
-local _deadUnits = MS._deadUnits
+-- Who has been seen dead, by GUID (a unit token like party2 can move to
+-- someone else when the group changes), so each death counts once. Forgotten
+-- whenever the run stops recording.
+local _deadUnits = {}
+MS:WatchRunState(function(state)
+    if state ~= "active" then wipe(_deadUnits) end
+end)
 
 local function PollDeaths()
     if not MS.inDungeon then return end
@@ -313,12 +355,14 @@ local function PollDeaths()
         -- Skip mind-controlled mobs temporarily showing as players in the roster.
         if UnitIsPlayer(unit) then
             local dead = UnitIsDeadOrGhost(unit)
-            if dead and not _deadUnits[unit] then
-                _deadUnits[unit] = true
+            local who = MS.Readable(UnitGUID(unit)) or unit
+            if MS.IsSecret(dead) then dead = _deadUnits[who] end   -- hidden: as last seen
+            if dead and not _deadUnits[who] then
+                _deadUnits[who] = true
                 local p = MS:PlayerForUnit(unit)
                 if p and not MS:IsDupDeath(p, now) then MS:RecordDeathEvent(p) end
-            elseif not dead and _deadUnits[unit] then
-                _deadUnits[unit] = nil
+            elseif not dead and _deadUnits[who] then
+                _deadUnits[who] = nil
             end
         end
     end

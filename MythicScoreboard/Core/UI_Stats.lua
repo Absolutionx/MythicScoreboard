@@ -1,4 +1,4 @@
-local _floor, _max, _min = math.floor, math.max, math.min
+local _floor, _max = math.floor, math.max
 local _fmt = string.format
 
 local MS = _G["MythicScoreboard"]
@@ -8,8 +8,7 @@ local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local P, PAD_X, HDR_H, COL_HDR_H, FRAME_W = UI.P, UI.PAD_X, UI.HDR_H, UI.COL_HDR_H, UI.FRAME_W
 local Text, Solid, Btn, Tint, Art, Box = UI.Text, UI.Solid, UI.Btn, UI.Tint, UI.Art, UI.Box
-local VGrad, MakeScrollFrame, ClassHex, CT, DN, Abbrev = UI.VGrad, UI.MakeScrollFrame, UI.ClassHex, UI.CT, UI.DN, UI.Abbrev
-local FIGHT_BOT, FIGHT_TOP = UI.FIGHT_BOT, UI.FIGHT_TOP
+local MakeScrollFrame, ClassHex, CT, DN, Abbrev = UI.MakeScrollFrame, UI.ClassHex, UI.CT, UI.DN, UI.Abbrev
 
 -- Stats page: your run history across every dungeon, from the archive
 -- (Archive.lua). It takes the place of the table and timeline while open.
@@ -180,16 +179,7 @@ local function TwoClick(btn, setArmed, action)
     btn.IsArmed = function() return armed end
 end
 
-local function Pool(make)
-    local items = {}
-    return function(i)
-        if not items[i] then items[i] = make(i) end
-        items[i]:Show()
-        return items[i]
-    end, function(from)
-        for i = from, #items do items[i]:Hide() end
-    end
-end
+local Pool = UI.Pool
 
 -- ── Overview ───────────────────────────────────────────────────────────────
 local function RecentStrip(row)
@@ -610,7 +600,7 @@ function UI.RefreshStats(force)
     if controls.keysTab then controls.keysTab.Refresh() end
     controls.Layout()
     -- Only the character you're on can reset its own stats.
-    overview.reset:SetShown(who == "all" or who == MS._charKey)
+    overview.reset:SetShown(who == "all" or who == MS:CharKey())
     local f = UI.frame
     f.DungeonName:SetText(L["Your stats"])
     f.SetBadge(nil)

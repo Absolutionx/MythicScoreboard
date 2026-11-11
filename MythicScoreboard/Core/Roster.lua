@@ -14,11 +14,7 @@ local IsSecret = _G["MythicScoreboard"].IsSecret
 
 -- ── Readable values ────────────────────────────────────────────────────────
 -- A value the addon may read and store: present, not secret, a non-empty string.
-local function Readable(v)
-    if v == nil or IsSecret(v) or type(v) ~= "string" or v == "" then return nil end
-    return v
-end
-MS.Readable = Readable
+local Readable = MS.Readable
 
 -- Readable GUID for a unit, or nil.
 local function UnitGUIDReadable(unit)
@@ -231,7 +227,11 @@ function MS:EnsurePlayer(unit)
             local realm = (not MS.Flavor.twoPartNames) and Readable(second)
                 or (GetRealmName and Readable(GetRealmName()))
             local alt = key .. "-" .. ((realm and realm:gsub("[%s']", "")) or (guid and guid:sub(-4)) or "2")
-            if run.players[alt] then alt = alt .. "-" .. ((guid and guid:sub(-4)) or tostring(#run.players)) end
+            if run.players[alt] then
+                local n = 2
+                while run.players[alt .. "-" .. n] do n = n + 1 end
+                alt = alt .. "-" .. ((guid and guid:sub(-4)) or tostring(n))
+            end
             key = alt
         end
         p = MS.NewPlayerStats(key, cls, guid)

@@ -216,6 +216,61 @@ MS.EventTime = EventTime
 local function Tenth(t) return _floor(t * 10 + 0.5) / 10 end
 MS.Tenth = Tenth
 
+-- ── A finished key's two clocks ────────────────────────────────────────────
+-- During a key everything is timed by the game's dungeon timer, which jumps
+-- forward on each death (the time it costs). The key's result (its time, in
+-- time or not) leaves that out. So a saved key is put on the result's clock:
+-- each moment, less what the deaths before it cost. Then the bosses, deaths
+-- and the end of the run all line up with the key's time. The scoreboard
+-- shows the game's timer while the key runs; this is done once, on saving.
+-- A function from the game's timer to the result's clock for this run (each
+-- death so far costs what the key's deaths cost), or nil when no death has
+-- cost anything. cap: nothing past it (the key's own time).
+function MS.ResultTimeFn(run, cap)
+    if (run.keystoneLevel or 0) <= 0 then return nil end
+    local deaths, count = {}, 0
+    for _, p in pairs(run.players or {}) do
+        count = count + (p.deaths or 0)
+        for _, de in ipairs(p.deathEvents or {}) do deaths[#deaths + 1] = EventTime(de) end
+    end
+    if #deaths == 0 then return nil end
+    table.sort(deaths)
+    -- What one death cost: the game's total over the deaths, else the rule.
+    local lost = tonumber(run.deathPenaltySeconds)
+    local each = (lost and lost > 0 and count > 0) and lost / count
+        or (MS.DeathPenaltyFor and MS.DeathPenaltyFor(run.keystoneLevel)) or 0
+    if each <= 0 then return nil end
+    return function(t)
+        if type(t) ~= "number" then return t end
+        local n = 0
+        for _, d in ipairs(deaths) do
+            if d <= t then n = n + 1 else break end
+        end
+        t = _max(0, t - n * each)
+        return cap and _min(t, cap) or t
+    end
+end
+
+function MS.ToResultClock(run)
+    if type(run) ~= "table" or run.resultClock or (run.keystoneLevel or 0) <= 0 then return end
+    run.resultClock = true
+    local F = MS.ResultTimeFn(run, tonumber(run.duration))
+    if not F then return end
+    for _, b in ipairs(run.bosses or {}) do
+        b.pullTime, b.killTime, b.wipeTime = F(b.pullTime), F(b.killTime), F(b.wipeTime)
+    end
+    for _, p in pairs(run.players or {}) do
+        for _, de in ipairs(p.deathEvents or {}) do
+            if type(de) == "table" then de.time = F(de.time) end
+        end
+        local ints = p.interruptEvents
+        for i, e in ipairs(ints or {}) do
+            if type(e) == "table" then e.time = F(e.time) else ints[i] = F(e) end
+        end
+        for _, l in ipairs(p.loot or {}) do l.t = F(l.t) end
+    end
+end
+
 local SYNTH_INTERRUPT_MIN_WINDOW = 2
 
 -- The meter gives each player's interrupt count but not when they happened.
@@ -283,7 +338,8 @@ end
 local LIVE = {
     run    = { "_carry", "_carryDur", "_lastDur", "_seq", "_pendingFinalize", "_combatEndedAt", "_clearedClock", "activeBoss",
                "_active", "_suspended", "startTime", "endTime", "_bossTotal",
-               "_baselinePending", "_deathBase", "_offline", "_savedAt" },
+               "_baselinePending", "_deathBase", "_offline", "_savedAt",
+               "_shown", "_resultTime", "_pullFrom", "lastPull", "_fdjKey", "_fdjPlace" },       -- (the last two: from 2.9.2, no longer kept)
     boss   = { "_before", "_session", "_tries", "_named", "_diedAt" },
     player = { "_lastDeathTime", "_lastRecapID" },
 }

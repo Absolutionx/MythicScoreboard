@@ -1,7 +1,4 @@
-local _abs    = math.abs
-local _ceil   = math.ceil
 local _floor  = math.floor
-local _huge   = math.huge
 local _max    = math.max
 local _min    = math.min
 local _fmt    = string.format
@@ -13,22 +10,17 @@ local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, Btn, ClassColor, ClassHex, DN = UI.Abbrev, UI.Art, UI.Btn, UI.ClassColor, UI.ClassHex, UI.DN
-local FIGHT_BOT, FIGHT_TOP, FRAME_W, MEDIA, P, PAD_X = UI.FIGHT_BOT, UI.FIGHT_TOP, UI.FRAME_W, UI.MEDIA, UI.P, UI.PAD_X
-local Solid, TL_H, Text, Tint, VGrad, WIPE_BOT = UI.Solid, UI.TL_H, UI.Text, UI.Tint, UI.VGrad, UI.WIPE_BOT
-local WIPE_TOP = UI.WIPE_TOP
+local ClassHex, DN = UI.ClassHex, UI.DN
+local MEDIA, P = UI.MEDIA, UI.P
+local Tint = UI.Tint
 
 -- Run timeline, part 2: the boss fights. Their blocks on the track, the
 -- medallions above (labels measured, then placed), and the boss tooltip.
 -- Called from BuildTimeline (UI_Timeline.lua) through UI.TL.
 
-local TL_L      = PAD_X
 local TL = UI.TL                     -- shared by the timeline's files
 local TRACK_Y, TRACK_H = TL.TRACK_Y, TL.TRACK_H
 local MED_R, MED_ROWS  = TL.MED_R, TL.MED_ROWS
-local DEATH_Y   = TL.DEATH_Y
-local INT_BASE  = TL.INT_BASE
-local INT_MAXH  = TL.INT_MAXH
 local COMPACT_W = TL.COMPACT_W
 
 

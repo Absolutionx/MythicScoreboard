@@ -1,4 +1,4 @@
--- usage: lua5.1 fixes_tests.lua DIR TOC
+-- usage: lua5.1 regression_tests.lua DIR TOC
 -- The 2.7 review fixes: clear detection from the journal, death recaps,
 -- hidden GUIDs, one death clock, history clearing, personal bests, settings.
 table.unpack = table.unpack or unpack
@@ -177,6 +177,7 @@ if not forever then
     check("key: official time", saved and math.abs(saved.duration - 1500.25) < 0.01, saved and saved.duration)
     check("key: in time", saved and saved.inTime == true)
     check("key: time lost from the game", saved and saved.deathPenaltySeconds == 30, saved and saved.deathPenaltySeconds)
+    check("key: saved on the result's clock", saved and saved.resultClock == true)
 
     -- Loot from the chest, after the run was saved, reaches the Stats page.
     local item = "|cnIQ4:|Hitem:12345::::::::80:::::|h[Chest Thing]|h|r"
@@ -223,6 +224,41 @@ if not forever then
     C_ChallengeMode = nil
 end
 
+-- A finished key on its result's clock: the game's timer jumped 15 s at each
+-- death, the key's time leaves that out.
+do
+    local function Run()
+        return { dungeonName = "Windrunner Spire", keystoneLevel = 15, completed = true, inTime = true,
+            duration = 1774, deathPenaltySeconds = 30, _wallClockStart = 5000,
+            bosses = { { name = "Emberdawn", pullTime = 300, killTime = 400 },
+                       { name = "Restless Heart", pullTime = 1700, killTime = 1810 } },
+            players = { A = { name = "A", deaths = 2, deathEvents = { { time = 350 }, { time = 1000 } },
+                              interruptEvents = { 100, 1200 }, loot = { { t = 1812 } } } } }
+    end
+    local r = Run()
+    MS.ToResultClock(r)
+    local b1, b2 = r.bosses[1], r.bosses[2]
+    check("result clock: before any death, unchanged", b1.pullTime == 300)
+    check("result clock: after one death, 15 s less", b1.killTime == 385, b1.killTime)
+    check("result clock: after two, 30 s less", b2.pullTime == 1670 and b2.killTime == 1774, b2.killTime)
+    check("result clock: deaths too", r.players.A.deathEvents[1].time == 335 and r.players.A.deathEvents[2].time == 970)
+    check("result clock: interrupts", r.players.A.interruptEvents[1] == 100 and r.players.A.interruptEvents[2] == 1170)
+    check("result clock: nothing past the key's end", r.players.A.loot[1].t == 1774)
+    MS.ToResultClock(r)
+    check("result clock: once only", r.bosses[2].pullTime == 1670)
+
+    -- Keys saved before: put on it once, the Stats page copy too.
+    MythicScoreboardDB = { dataVersion = 5, runs = { Run() } }
+    MS:RunMigrations()
+    check("result clock: saved keys corrected", MythicScoreboardDB.runs[1].bosses[2].killTime == 1774)
+    local arch = { v = 6, runs = { { at = 5000, dungeon = "Windrunner Spire", key = 15, dur = 1774,
+        bosses = { { n = "Emberdawn", t = 400, d = 100, m = 1000 }, { n = "Restless Heart", t = 1810, d = 110 } } } } }
+    MS:MigrateArchive(arch)
+    local xb = arch.runs[1].bosses
+    check("result clock: Stats page kill times", xb[1].t == 385 and xb[2].t == 1774, xb[2].t)
+    check("result clock: fight length and DPS", xb[1].d == 85 and xb[1].m == math.floor(1000 * 100 / 85 + 0.5), xb[1].m)
+end
+
 -- Loot saved twice by 2.9.0 (a groupmate's addon copy) is cleaned up once.
 do
     local item = function(fields) return { link = "|cnIQ4:|Hitem:" .. fields .. "|h[X]|h|r", t = 0 } end
@@ -238,7 +274,7 @@ do
     local arch = { v = 5, runs = { { at = 1, dungeon = "Skyreach", dur = 1000,
         loot = { { l = a1.link, t = 0 }, { l = a2.link, t = 2 } } } } }
     MS:MigrateArchive(arch)
-    check("dedupe: Stats page copy too", #arch.runs[1].loot == 1 and arch.v == 6)
+    check("dedupe: Stats page copy too", #arch.runs[1].loot == 1 and arch.v == MS.ARCHIVE_VERSION)
 end
 
 -- 10. Two players with one name (retail, another realm) stay two rows.
@@ -325,6 +361,49 @@ if forever then
     -- Back in the same wing after a pause: the run carries on.
     zone(WORLD); zone(SM)
     check("wing: same wing resumes", MS:RunState() == "active" and #MythicScoreboardDB.runs == 1, #MythicScoreboardDB.runs)
+    -- The Library's map was remembered: walking in there again, the wing
+    -- is known before any boss.
+    MS:AbandonRun(); zone(WORLD)
+    uiMap = 302; zone(SM)
+    check("wing: known from its map on the way in", #MS.currentRun.bosses == 0
+        and MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    -- A map the game names after its wing: known the first time.
+    local gi = C_Map.GetMapInfo
+    C_Map.GetMapInfo = function(id) return id == 305 and { name = "Cathedral" } or nil end
+    uiMap = 305; zone(SM)
+    check("wing: known from the map's name", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Cathedral",
+        MS:RunTitle(MS.currentRun))
+    -- A wrong guess gives way to the bosses.
+    wait(30); kill("Houndmaster Loksey")
+    check("wing: bosses overrule the map", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library",
+        MS:RunTitle(MS.currentRun))
+    check("wing: a map with two wings isn't trusted", MythicScoreboardAccountDB.wingMaps[305] == "Scarlet Monastery: Library"
+        or MythicScoreboardAccountDB.wingMaps[305] == false)
+    -- Looking at a saved run changes nothing saved: not the run, not the maps.
+    local function Dump(t, seen)
+        if type(t) ~= "table" then return tostring(t) end
+        seen = seen or {}
+        if seen[t] then return "<loop>" end
+        seen[t] = true
+        local keys = {}
+        for k in pairs(t) do keys[#keys + 1] = tostring(k) end
+        table.sort(keys)
+        local out = {}
+        for _, k in ipairs(keys) do
+            local v = t[k]; if v == nil then v = t[tonumber(k)] end
+            out[#out + 1] = k .. "=" .. Dump(v, seen)
+        end
+        return "{" .. table.concat(out, ",") .. "}"
+    end
+    local saved = MythicScoreboardDB.runs[1]
+    saved.uiMapID = 999
+    local before, mapsBefore = Dump(saved), Dump(MythicScoreboardAccountDB.wingMaps)
+    MS:ForeverDungeon(saved); MS:ForeverDefsFor(saved); MS:ForeverCanDetectClear(saved)
+    MS:ForeverBossProgress(saved); MS:RunTitle(saved)
+    check("wing: viewing a saved run leaves it as saved", Dump(saved) == before)
+    check("wing: viewing a saved run learns no maps", Dump(MythicScoreboardAccountDB.wingMaps) == mapsBefore)
+    C_Map.GetMapInfo = gi
     C_Map.GetBestMapForUnit = gm
 
     -- Blackrock Spire: one instance, two halves with their own names.
@@ -421,5 +500,5 @@ if not forever then
     C_ChallengeMode = nil
 end
 
-io.stdout:write(("fixes_tests: %d passed, %d failed\n"):format(passes, fails))
+io.stdout:write(("regression_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

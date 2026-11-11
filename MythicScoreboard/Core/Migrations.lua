@@ -16,7 +16,7 @@ local _floor, _max = math.floor, math.max
 local _ins, _rem, _sort = table.insert, table.remove, table.sort
 
 local SPLIT_GAP = 30 * 60   -- same window a paused run gets now
-local function Int(n) return _floor((tonumber(n) or 0) + 0.5) end
+local Int = MS.Round
 
 -- ── Split runs (before 2.5) ────────────────────────────────────────────────
 -- Two forms of the same repair: archive summaries and full history runs.
@@ -273,6 +273,14 @@ local CHAR_STEPS = {
             for _, p in pairs(r.players or {}) do DedupeLoot(p.loot) end
         end
     end,
+    -- 6 (2.9.3): finished keys on their result's clock (RunModel.lua,
+    -- MS.ToResultClock): their bosses died after the key ended, by about
+    -- what the deaths cost.
+    function(db)
+        for _, r in ipairs(db.runs) do
+            if r.completed and (r.keystoneLevel or 0) > 0 and (r.duration or 0) > 0 then MS.ToResultClock(r) end
+        end
+    end,
 }
 MS.DATA_VERSION = #CHAR_STEPS
 
@@ -366,8 +374,37 @@ local ARCHIVE_STEPS = {
     [6] = function(a)
         for _, e in ipairs(a.runs) do DedupeLoot(e.loot) end
     end,
+    -- 7 (2.9.3): keys still in history put their boss times on the result's
+    -- clock (the character's step 6 above did the full runs): each kill's
+    -- time and fight length, and your DPS in it, from the corrected run.
+    [7] = function(a)
+        for _, run in ipairs(MythicScoreboardDB and MythicScoreboardDB.runs or {}) do
+            if run.resultClock then
+                local kills = {}
+                for _, b in ipairs(run.bosses or {}) do
+                    if b.killTime then kills[#kills + 1] = b end
+                end
+                for _, x in ipairs(a.runs) do
+                    if x.key and x.at == run._wallClockStart and x.dungeon == run.dungeonName
+                            and #(x.bosses or {}) == #kills then
+                        for i, xb in ipairs(x.bosses) do
+                            local b = kills[i]
+                            if xb.n == b.name then
+                                xb.t = Int(b.killTime)
+                                local d = b.pullTime and b.killTime > b.pullTime and _floor(b.killTime - b.pullTime) or nil
+                                if d and d > 0 then
+                                    if xb.m and xb.d and xb.d > 0 then xb.m = Int(xb.m * xb.d / d) end
+                                    xb.d = d
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end,
 }
-MS.ARCHIVE_VERSION = 6
+MS.ARCHIVE_VERSION = 7
 
 -- ── Running them ───────────────────────────────────────────────────────────
 function MS:MigrateArchive(a)

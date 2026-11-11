@@ -1,15 +1,12 @@
-local _floor, _max, _min = math.floor, math.max, math.min
-local _fmt = string.format
+local _max, _min = math.max, math.min
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
-local LK = MS.LK      -- a label kept in English, translated where it is shown
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local P, PAD_X, HDR_H, COL_HDR_H, FRAME_W = UI.P, UI.PAD_X, UI.HDR_H, UI.COL_HDR_H, UI.FRAME_W
-local Text, Solid, Btn, Tint, Art, Box = UI.Text, UI.Solid, UI.Btn, UI.Tint, UI.Art, UI.Box
-local VGrad, MakeScrollFrame, ClassHex, CT, DN, Abbrev = UI.VGrad, UI.MakeScrollFrame, UI.ClassHex, UI.CT, UI.DN, UI.Abbrev
-local FIGHT_BOT, FIGHT_TOP = UI.FIGHT_BOT, UI.FIGHT_TOP
+local P, COL_HDR_H, FRAME_W = UI.P, UI.COL_HDR_H, UI.FRAME_W
+local Text = UI.Text
+local MakeScrollFrame, CT = UI.MakeScrollFrame, UI.CT
 
 -- Stats page, part 3: the Loot tab, every piece of gear that dropped for you,
 -- newest first. Built and filled from UI_Stats.lua through UI.StatsKit.
@@ -46,13 +43,11 @@ end
 
 -- Item names can arrive a moment after they're asked for.
 local waitingForItems = false
-local itemFrame = CreateFrame("Frame")
-itemFrame:SetScript("OnEvent", function()
+MS:On("GET_ITEM_INFO_RECEIVED", function()
     if not waitingForItems then return end
     waitingForItems = false
     C_Timer.After(0.3, function() if UI.statsOpen and S.tab == "loot" then UI.RefreshStats(true) end end)
 end)
-pcall(itemFrame.RegisterEvent, itemFrame, "GET_ITEM_INFO_RECEIVED")
 
 local function MakeLootRow(parent)
     local row = CreateFrame("Frame", nil, parent)

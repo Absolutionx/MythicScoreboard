@@ -43,7 +43,7 @@ playRun("Ragefire Chasm", 900, { cleared = true, bosses = { "Oggleflint" } })
 playRun("The Deadmines", 1500, { cleared = false })
 local a = MS._ArchiveStore()
 check("archive created", a and #a.runs == 2, a and #a.runs)
-MythicScoreboardAccountDB.chars[MS._charKey].archive = nil   -- pretend it never existed
+MythicScoreboardAccountDB.chars[MS:CharKey()].archive = nil   -- pretend it never existed
 local seeded = MS:ArchiveRuns()
 check("seeded from history", #seeded == 2, #seeded)
 check("seeded oldest first", seeded[1].dungeon == "Ragefire Chasm" and seeded[2].dungeon == "The Deadmines")

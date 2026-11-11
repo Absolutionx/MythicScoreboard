@@ -1,8 +1,19 @@
 #!/bin/bash
-# Builds MythicScoreboard-<version>.zip (version from the TOC) in dist/.
+# Builds dist/MythicScoreboard-<version>.zip from a commit (HEAD by default),
+# never from files on disk, so what ships is exactly what's in git.
+# Usage: tools/package.sh [ref]
+set -e
 cd "$(dirname "$0")/.."
-ver=$(grep -m1 "^## Version:" MythicScoreboard/MythicScoreboard.toc | sed 's/## Version: *//' | tr -d '\r')
+ref="${1:-HEAD}"
+if [ "$ref" = HEAD ] && [ -n "$(git status --porcelain -- MythicScoreboard)" ]; then
+  echo "MythicScoreboard/ has uncommitted changes: commit them first (they wouldn't be in the zip)." >&2
+  exit 1
+fi
+v1=$(git show "$ref:MythicScoreboard/MythicScoreboard.toc" | grep -m1 "^## Version:" | sed 's/## Version: *//' | tr -d '\r')
+v2=$(git show "$ref:MythicScoreboard/MythicScoreboard_Forever.toc" | grep -m1 "^## Version:" | sed 's/## Version: *//' | tr -d '\r')
+[ "$v1" = "$v2" ] || { echo "The TOCs disagree on the version ($v1 vs $v2): run tools/bump.sh" >&2; exit 1; }
 mkdir -p dist
-rm -f "dist/MythicScoreboard-$ver.zip"
-zip -qr "dist/MythicScoreboard-$ver.zip" MythicScoreboard -x '*/.*'
-echo "dist/MythicScoreboard-$ver.zip"
+out="dist/MythicScoreboard-$v1.zip"
+rm -f "$out"
+git archive --format=zip -o "$out" "$ref" MythicScoreboard
+echo "$out"

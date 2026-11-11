@@ -1,22 +1,20 @@
 local _abs    = math.abs
 local _floor  = math.floor
-local _huge   = math.huge
 local _max    = math.max
 local _min    = math.min
 local _fmt    = string.format
 local _ins    = table.insert
-local _rem    = table.remove
 local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, Btn, BuildTimeline, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.BuildTimeline, UI.CELL_FONT_SIZE
-local CLASS_ICON_COORDS, COLS, CT, ClassColor, ComputeColumnAnchors = UI.CLASS_ICON_COORDS, UI.COLS, UI.CT, UI.ClassColor, UI.ComputeColumnAnchors
-local DN, DiffShort, FRAME_W, GetRole, GetTimelineDuration, HGrad = UI.DN, UI.DiffShort, UI.FRAME_W, UI.GetRole, UI.GetTimelineDuration, UI.HGrad
-local Outline, P, PAD_X, ROLE_ICON_COORDS, ROLE_ICON_TEX, ROW_H = UI.Outline, UI.P, UI.PAD_X, UI.ROLE_ICON_COORDS, UI.ROLE_ICON_TEX, UI.ROW_H
-local ScoreColor, SetFont, Solid, SplitAbbrev, Text, Tint = UI.ScoreColor, UI.SetFont, UI.Solid, UI.SplitAbbrev, UI.Text, UI.Tint
+local Art, Btn, BuildTimeline = UI.Art, UI.Btn, UI.BuildTimeline
+local COLS, CT = UI.COLS, UI.CT
+local DiffShort, FRAME_W, GetRole, GetTimelineDuration = UI.DiffShort, UI.FRAME_W, UI.GetRole, UI.GetTimelineDuration
+local P, ROW_H = UI.P, UI.ROW_H
+local SetFont, Text, Tint = UI.SetFont, UI.Text, UI.Tint
 
 -- Scoreboard: the header line, the table's layout and sorting, the timeline
 -- slot, and the refresh. The rows themselves: UI_ScoreboardRows.lua.
@@ -53,7 +51,8 @@ UI.overviewRows, UI.sortState, UI.colHdrLabels = overviewRows, sortState, colHdr
 
 -- ── Rows: UI_ScoreboardRows.lua ───────────────────────────────────────────
 local Rows = UI.Rows
-local AcquireRow, ReleaseRow, FillRow = Rows.AcquireRow, Rows.ReleaseRow, Rows.FillRow
+local MakeRow, FillRow = Rows.MakeRow, Rows.FillRow
+local rowAt, rowsHideFrom          -- the player rows, by line (UI.Pool), once the window exists
 local RateOf, COL_RENDERERS = Rows.RateOf, Rows.COL_RENDERERS
 
 local function FightEnd(run, boss)
@@ -286,21 +285,23 @@ local function Thousands(n)
     return B and B(n) or tostring(n)
 end
 
-local function RefreshHeader(run)
-    if not run then
-        UI.frame.DungeonName:SetText(L["Dungeon Scoreboard"])
-        UI.frame.SetBadge(nil)
-        UI.frame.Subline:SetText(L["No runs yet. Enter a dungeon you track and the scoreboard fills in as you play."])
-        UI.frame.SublineRun = nil
-        UI.frame.PBLabel:Hide()
-        UI.frame.LayoutAffixIcons(0)
-        if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
-        if UI.frame.AbandonBtn then UI.frame.AbandonBtn:Hide() end
-        StartFreshButton():SetShown(MS:CanStartFresh())
-        return
-    end
+-- ── Header ─────────────────────────────────────────────────────────────────
+-- The title, badge, the line under them, affixes and the buttons on the
+-- right, for the run shown (or the empty state).
 
-    local isMPlus = (run.keystoneLevel or 0) > 0
+local function HeaderEmpty()
+    UI.frame.DungeonName:SetText(L["Dungeon Scoreboard"])
+    UI.frame.SetBadge(nil)
+    UI.frame.Subline:SetText(L["No runs yet. Enter a dungeon you track and the scoreboard fills in as you play."])
+    UI.frame.SublineRun = nil
+    UI.frame.PBLabel:Hide()
+    UI.frame.LayoutAffixIcons(0)
+    if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
+    if UI.frame.AbandonBtn then UI.frame.AbandonBtn:Hide() end
+    StartFreshButton():SetShown(MS:CanStartFresh())
+end
+
+local function HeaderTitle(run, isMPlus)
     local title = UI.frame.DungeonName
     title:SetText(MS:RunTitle(run))
     SetFont(title, "title", 24)
@@ -309,8 +310,71 @@ local function RefreshHeader(run)
     if isMPlus then UI.frame.SetBadge("+" .. run.keystoneLevel, true)
     elseif not MS.Flavor.difficulties then UI.frame.SetBadge(nil)
     else UI.frame.SetBadge(DiffShort(run), false) end
+end
 
-    -- Subline: [mode]  [time]  [result]  [deaths]
+-- The run's result: in time and by how much, cleared, or how it stands.
+local function ResultPart(run, isMPlus, dur, limit)
+    if run.completed then
+        if isMPlus and limit and limit > 0 then
+            local diff = _abs(limit - dur)
+            local res
+            if run.inTime then res = CT(P.verd, _fmt(L["In time, %s to spare"], MS:FormatTime(diff)))
+            else res = CT(P.avoid, _fmt(L["Over time by %s"], MS:FormatTime(diff))) end
+            return res .. "  " .. UI.Pips(MS:RunUpgrades(run), 13)
+        elseif isMPlus then
+            return (run.inTime and CT(P.verd, L["In time"]) or CT(P.avoid, L["Over time"]))
+                .. "  " .. UI.Pips(MS:RunUpgrades(run), 13)
+        else
+            return CT(P.verd, L["Cleared"])
+        end
+    else
+        local text, col = UI.RunResult(run)    -- in progress, paused, finished or abandoned
+        return CT(col, text)
+    end
+end
+
+-- Forever: how many bosses are down (of how many), and the level range.
+local function BossProgressParts(parts, run)
+    local killed, total = MS:ForeverBossProgress(run)
+    if total then
+        _ins(parts, _fmt(L["%s of %s bosses"], CT(P.ivory, killed), CT(P.ivory, total)))
+    else
+        local n = 0
+        for _, b in ipairs(run.bosses or {}) do if b.killTime then n = n + 1 end end
+        _ins(parts, MS.Plural(n, "%d boss killed", "%d bosses killed"))
+    end
+    local lo, hi = MS:ForeverLevelRange(run)
+    if lo then _ins(parts, _fmt(L["Levels %d-%d"], lo, hi)) end
+end
+
+local function DeathsPart(run, isMPlus)
+    local deaths = 0
+    for _, p in pairs(run.players or {}) do deaths = deaths + (p.deaths or 0) end
+    if deaths == 0 then return L["No deaths"] end
+    local s = MS.Plural(deaths, "%d death", "%d deaths")
+    local penalty = run.deathPenaltySeconds or 0
+    if isMPlus and penalty > 0 then s = s .. ", -" .. MS:FormatTime(penalty) end
+    return CT(P.blood, s)
+end
+
+-- Forever: what the run did for you (the full list is in the tooltip).
+local function ProgressParts(parts, pr)
+    local mobXP, questXP = UI.RunXP(pr)
+    local xp = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(mobXP + questXP)))
+    if questXP > 0 then xp = xp .. "  " .. UI.XPSplit(mobXP, questXP, 56, 6) end
+    if (pr.levels or 0) > 0 then
+        xp = xp .. CT(P.verdHi, "  " .. MS.Plural(pr.levels, "+%d level", "+%d levels"))
+    end
+    _ins(parts, xp)
+    _ins(parts, MS.Plural(pr.kills or 0, "%d kill", "%d kills", CT(P.ivory, pr.kills or 0)))
+    local nq = #(pr.quests or {})
+    if nq > 0 then _ins(parts, MS.Plural(nq, "%d quest", "%d quests", CT(P.ivory, nq))) end
+    local gold = math.max(0, pr.gold or 0) + (pr.qg or 0)
+    if gold > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(gold))) end
+end
+
+-- The line under the title: [mode]  [time]  [result]  [bosses]  [deaths]  [rating]  [progress]
+local function HeaderSubline(run, isMPlus)
     local parts = {}
     local dur = MS:GetRunDuration(run)
     local limit = tonumber(run.keystoneTimeLimit)
@@ -320,48 +384,9 @@ local function RefreshHeader(run)
     else
         _ins(parts, CT(P.ivory, MS:FormatTime(dur)))
     end
-
-    if run.completed then
-        if isMPlus and limit and limit > 0 then
-            local diff = _abs(limit - dur)
-            local res
-            if run.inTime then res = CT(P.verd, _fmt(L["In time, %s to spare"], MS:FormatTime(diff)))
-            else res = CT(P.avoid, _fmt(L["Over time by %s"], MS:FormatTime(diff))) end
-            _ins(parts, res .. "  " .. UI.Pips(MS:RunUpgrades(run), 13))
-        elseif isMPlus then
-            _ins(parts, (run.inTime and CT(P.verd, L["In time"]) or CT(P.avoid, L["Over time"]))
-                .. "  " .. UI.Pips(MS:RunUpgrades(run), 13))
-        else
-            _ins(parts, CT(P.verd, L["Cleared"]))
-        end
-    else
-        local text, col = UI.RunResult(run)    -- in progress, paused, finished or abandoned
-        _ins(parts, CT(col, text))
-    end
-
-    if MS.Flavor.bossProgress and not isMPlus then
-        local killed, total = MS:ForeverBossProgress(run)
-        if total then
-            _ins(parts, _fmt(L["%s of %s bosses"], CT(P.ivory, killed), CT(P.ivory, total)))
-        else
-            local n = 0
-            for _, b in ipairs(run.bosses or {}) do if b.killTime then n = n + 1 end end
-            _ins(parts, MS.Plural(n, "%d boss killed", "%d bosses killed"))
-        end
-        local lo, hi = MS:ForeverLevelRange(run)
-        if lo then _ins(parts, _fmt(L["Levels %d-%d"], lo, hi)) end
-    end
-
-    local deaths = 0
-    for _, p in pairs(run.players or {}) do deaths = deaths + (p.deaths or 0) end
-    if deaths == 0 then
-        _ins(parts, L["No deaths"])
-    else
-        local s = MS.Plural(deaths, "%d death", "%d deaths")
-        local penalty = run.deathPenaltySeconds or 0
-        if isMPlus and penalty > 0 then s = s .. ", -" .. MS:FormatTime(penalty) end
-        _ins(parts, CT(P.blood, s))
-    end
+    _ins(parts, ResultPart(run, isMPlus, dur, limit))
+    if MS.Flavor.bossProgress and not isMPlus then BossProgressParts(parts, run) end
+    _ins(parts, DeathsPart(run, isMPlus))
     -- Your rating after a key, and what it gained.
     if isMPlus and run.completed and (run.ratingAfter or 0) > 0 then
         local r = _fmt(L["Rating %s"], CT(P.ivory, Thousands(run.ratingAfter)))
@@ -369,29 +394,14 @@ local function RefreshHeader(run)
         if gain > 0 then r = r .. " " .. CT(P.verdHi, "+" .. gain) end
         _ins(parts, r)
     end
-    -- Forever: what the run did for you (the full list is in the tooltip).
     local pr = MS.Flavor.progressStats and run.progress
-    if pr then
-        local mobXP, questXP = UI.RunXP(pr)
-        local xp = _fmt(L["%s XP"], CT(P.ivory, MS.FormatThousands(mobXP + questXP)))
-        if questXP > 0 then xp = xp .. "  " .. UI.XPSplit(mobXP, questXP, 56, 6) end
-        if (pr.levels or 0) > 0 then
-            xp = xp .. CT(P.verdHi, "  " .. MS.Plural(pr.levels, "+%d level", "+%d levels"))
-        end
-        _ins(parts, xp)
-        _ins(parts, MS.Plural(pr.kills or 0, "%d kill", "%d kills", CT(P.ivory, pr.kills or 0)))
-        local nq = #(pr.quests or {})
-        if nq > 0 then _ins(parts, MS.Plural(nq, "%d quest", "%d quests", CT(P.ivory, nq))) end
-        local gold = math.max(0, pr.gold or 0) + (pr.qg or 0)
-        if gold > 0 then _ins(parts, CT(P.bronzeHi, MS.FormatGold(gold))) end
-    end
+    if pr then ProgressParts(parts, pr) end
     -- (A tighter gap when the line also carries the run's progress.)
     UI.frame.Subline:SetText(table.concat(parts, pr and "    " or "      "))
     UI.frame.SublineRun = pr and run or nil
+end
 
-    UI.frame.PBLabel:SetShown(MS:IsPersonalBest(run))
-
-    -- Affixes
+local function HeaderAffixes(run, isMPlus)
     local affixIDs = {}
     for _, af in ipairs(run.affixes or {}) do _ins(affixIDs, af.id or af) end
     if #affixIDs == 0 and isMPlus and run == MS.currentRun and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
@@ -407,7 +417,10 @@ local function RefreshHeader(run)
         end
     end
     UI.frame.LayoutAffixIcons(count)
+end
 
+-- Abandon / Start new run / Whole run, on the right. Returns the boss in focus.
+local function HeaderButtons(run)
     -- The run in progress can be abandoned by hand.
     local ab = AbandonButton()
     local canAbandon = run == MS.currentRun and not run.completed
@@ -422,7 +435,11 @@ local function RefreshHeader(run)
     if canAbandon then wr:SetPoint("RIGHT", ab, "LEFT", -12, 0)
     elseif fresh then wr:SetPoint("RIGHT", StartFreshButton(), "LEFT", -12, 0)
     else wr:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", -14, -54) end
-    if not boss then return end
+    return boss
+end
+
+-- A boss fight in focus: the line under the title is about that fight.
+local function FightSubline(run, boss)
     UI.frame.PBLabel:Hide()
     local result = MS.FightResult(boss)
     local isWipe = MS.FightLost(boss)
@@ -449,6 +466,17 @@ local function RefreshHeader(run)
     UI.frame.SublineRun = nil
 end
 
+local function RefreshHeader(run)
+    if not run then return HeaderEmpty() end
+    local isMPlus = (run.keystoneLevel or 0) > 0
+    HeaderTitle(run, isMPlus)
+    HeaderSubline(run, isMPlus)
+    UI.frame.PBLabel:SetShown(MS:IsPersonalBest(run))
+    HeaderAffixes(run, isMPlus)
+    local boss = HeaderButtons(run)
+    if boss then FightSubline(run, boss) end
+end
+
 local function BossSig(r)
     if not r or not r.bosses then return "" end
     local last, icons = 0, 0
@@ -464,7 +492,7 @@ local function BossSig(r)
         deaths = deaths + #(p.deathEvents or {})
         kicks  = kicks + #(p.interruptEvents or {})
     end
-    return table.concat({ #r.bosses, last, icons, MS._portraitRev or 0, tostring(r.completed),
+    return table.concat({ #r.bosses, last, icons, MS:PortraitRevision(), tostring(r.completed),
         tostring(r.keystoneTimeLimit), deaths, _floor(kicks / 8), tostring(FocusedBoss(r)) }, ":")
 end
 
@@ -577,7 +605,7 @@ function MS:_DoRefreshOverview()
     local runSeq  = run and (run._seq or 0) or -1
     local focus   = run and FocusedBoss(run)
     local focusSig = focus and (tostring(focus) .. (focus.stats and "+" or "")) or ""
-    local lootRev = MS._lootRev or 0
+    local lootRev = MS:LootRevision()
     if drawn.done and run == drawn.run and focusSig == drawn.focus and runSeq == drawn.seq
             and sortState.key == drawn.sortKey and sortState.dir == drawn.sortDir and lootRev == drawn.loot then
         return
@@ -585,18 +613,19 @@ function MS:_DoRefreshOverview()
     drawn.done, drawn.run, drawn.focus, drawn.seq = true, run, focusSig, runSeq
     drawn.sortKey, drawn.sortDir, drawn.loot = sortState.key, sortState.dir, lootRev
 
-    -- Rows are reused in place between refreshes. Handing them back to the
-    -- pool and re-anchoring them every poll swapped out the row under the
-    -- mouse, which closed its tooltip.
-    local prevRows = {}
-    for i, r in ipairs(overviewRows) do prevRows[i] = r end
-    wipe(overviewRows)
-    local function ReleaseFrom(i)
-        for k = i, #prevRows do ReleaseRow(prevRows[k]) end
+    -- Each line keeps its row between refreshes, moved only if its place
+    -- changed: swapping rows under the mouse every poll closed its tooltip.
+    if not rowAt then
+        rowAt, rowsHideFrom = UI.Pool(function()
+            local row = MakeRow(content)
+            row:SetSize(FRAME_W - 2, ROW_H)
+            return row
+        end)
     end
+    wipe(overviewRows)
 
     if not run then
-        ReleaseFrom(1)
+        rowsHideFrom(1)
         if not UI.frame._emptyLbl then
             UI.frame._emptyLbl = Text(content, "regular", 14, P.ash, "CENTER")
             UI.frame._emptyLbl:SetPoint("TOP", content, "TOP", 0, -90)
@@ -630,27 +659,19 @@ function MS:_DoRefreshOverview()
     local yOff, localName = 0, owner and owner.name or MS:UnitPlayerName("player")
     for idx, p in ipairs(players) do
         local isSelf  = (p.name == MS.ShortName(localName or ""))
-        local row = prevRows[idx]
-        if row and row._nameFs then
-            prevRows[idx] = nil                 -- kept: don't release it below
-            if row._y ~= yOff then
-                row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
-            end
-        else
-            row = AcquireRow(content)
-            row:SetSize(FRAME_W - 2, ROW_H)
+        local row = rowAt(idx)
+        if row._y ~= yOff then
+            row:ClearAllPoints()
             row:SetPoint("TOPLEFT", content, "TOPLEFT", 0, yOff)
+            row._y = yOff
         end
-        row._y = yOff
 
         FillRow(row, idx, p, isSelf, ctx)
 
         yOff = yOff - ROW_H
-        _ins(overviewRows, row)
+        overviewRows[idx] = row
     end
-    for k = 1, #players do prevRows[k] = nil end
-    for k, r in pairs(prevRows) do ReleaseRow(r) end   -- rows no longer needed (and the empty label)
+    rowsHideFrom(#players + 1)
     if UI.frame._emptyLbl then UI.frame._emptyLbl:Hide() end
 
     content:SetHeight(_max(60, _abs(yOff)))

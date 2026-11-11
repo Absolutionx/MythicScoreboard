@@ -1,21 +1,15 @@
 local _abs    = math.abs
 local _ceil   = math.ceil
 local _floor  = math.floor
-local _huge   = math.huge
 local _max    = math.max
 local _min    = math.min
-local _fmt    = string.format
-local _ins    = table.insert
-local _rem    = table.remove
-local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, Btn, ClassColor, ClassHex, DN = UI.Abbrev, UI.Art, UI.Btn, UI.ClassColor, UI.ClassHex, UI.DN
-local FIGHT_BOT, FIGHT_TOP, FRAME_W, MEDIA, P, PAD_X = UI.FIGHT_BOT, UI.FIGHT_TOP, UI.FRAME_W, UI.MEDIA, UI.P, UI.PAD_X
-local Solid, TL_H, Text, Tint, VGrad, WIPE_BOT = UI.Solid, UI.TL_H, UI.Text, UI.Tint, UI.VGrad, UI.WIPE_BOT
+local FIGHT_BOT, FIGHT_TOP, FRAME_W, P, PAD_X = UI.FIGHT_BOT, UI.FIGHT_TOP, UI.FRAME_W, UI.P, UI.PAD_X
+local Tint, VGrad, WIPE_BOT = UI.Tint, UI.VGrad, UI.WIPE_BOT
 local WIPE_TOP = UI.WIPE_TOP
 
 -- Run timeline: track, boss medallions, deaths and interrupts.
@@ -34,11 +28,6 @@ local TL_L      = PAD_X
 local TL_TRACKW = FRAME_W - 2 - PAD_X * 2
 local TL = UI.TL                     -- shared with UI_TimelineLayout.lua
 local TRACK_Y, TRACK_H = TL.TRACK_Y, TL.TRACK_H
-local MED_R, MED_ROWS  = TL.MED_R, TL.MED_ROWS
-local DEATH_Y   = TL.DEATH_Y
-local INT_BASE  = TL.INT_BASE
-local INT_MAXH  = TL.INT_MAXH
-local COMPACT_W = TL.COMPACT_W
 
 -- Screen pixels. The window's UI units are only screen pixels at one UI
 -- scale; at any other, a 2-unit line is 1.3 or 2.6 pixels and gaps come out
@@ -160,6 +149,7 @@ end
 
 -- Builds the static chrome of the timeline strip once (title, legend).
 local function BuildTimelineChrome(strip)
+    local Solid, Art, Text = UI.Solid, UI.Art, UI.Text   -- made once, not pooled
     -- Same stone as the rest of the frame: only a light tint, the frame's
     -- grain repeated on top, and a soft shadow under the divider so the
     -- timeline reads as recessed into the slab rather than a separate panel.
@@ -205,7 +195,7 @@ local function BuildTimelineChrome(strip)
             return b end },
         { L["Boss"], function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, FIGHT_BOT, FIGHT_TOP); return t end },
     }
-    local anchor, anchorPt, gap = strip, "TOPRIGHT", -20
+    local anchor, gap = strip, -20
     for _, it in ipairs(items) do
         local lbl = Text(strip, "regular", 12, P.ash)
         lbl:SetText(it[1])
@@ -315,22 +305,12 @@ end
 -- function below. What they share is set up once per redraw in the context:
 -- the canvas, the time-to-x scale, pooled pieces and the drawing helpers,
 -- and where the run ends on screen.
-local function NewContext(strip, run, totalDur)
-    -- One canvas for the life of the window; its pieces are reused.
-    local cv = strip._canvas
-    if not cv then
-        cv = CreateFrame("Frame", nil, strip)
-        cv:SetAllPoints(strip)
-        cv:SetFrameLevel(strip:GetFrameLevel() + 1)
-        strip._canvas = cv
-        strip._pools = NewPools()
-    end
-    cv:Show()
-    local pools = strip._pools
-    StartPools(pools)
-
-    -- Same calls as the shared helpers, drawing from the pools.
-    local Solid0, Art0, Text0, Btn0 = Solid, Art, Text, Btn
+-- The drawing calls (Solid, Art, Tex, Mask, Text, Btn), taking pieces from
+-- the pools before making new ones. Made once per canvas.
+local function PooledMakers(pools)
+    -- The plain constructors are reached only from here, so a drawing step
+    -- can't make a piece outside the pools by mistake.
+    local Solid0, Art0, Text0, Btn0 = UI.Solid, UI.Art, UI.Text, UI.Btn
     -- Flat colour pieces (blocks, the completion line) snap their edges to
     -- the screen's pixels, so the whole-pixel gaps between them stay exact.
     local function Snap(t)
@@ -388,26 +368,48 @@ local function NewContext(strip, run, totalDur)
         b:EnableMouse(true)
         return b
     end
+    return { Solid = Solid, Art = Art, Tex = Tex, Mask = Mask, Text = Text, Btn = Btn }
+end
 
-    if not (totalDur and totalDur > 0) then return nil end
-
-    local px = PixelSize()
-    local W  = TrackW(px)
+-- Where the run ends on screen.
+--   compSec   : the moment the run was finished (completion marker)
+--   visualEnd : how far the drawn segments go
+--   clampT    : Mythic+ only. The final ENCOUNTER_END can be logged after
+--               the key completed; clamp to the key time so the bar, the
+--               spare time and the header all agree.
+--   endLineL  : the completion line's left edge
+local function WhereRunEnds(run, isMPlus, live, X, W, px)
     local END_LINE_W, END_GAP = END_LINE_PX * px, END_GAP_PX * px
-    local isMPlus = (run.keystoneLevel or 0) > 0
-    -- Only the run in progress (or paused) is drawn live. A saved run that
-    -- wasn't cleared is finished too: drawn still, to where it ended.
-    local live = not run.completed and run == MS.currentRun
-
-    -- Whole screen pixels from the track's start, so block edges are crisp
-    -- and gaps come out exact.
-    local function X(t) return TL_L + _floor(_max(0, _min(1, t / totalDur)) * W / px + 0.5) * px end
-    local endLineL          -- left edge of the completion line, once known
-
-    local function At(region, point, x, y)
-        region:SetPoint(point, cv, "BOTTOMLEFT", x, y)
+    local keyLimit = tonumber(run.keystoneTimeLimit)
+    if keyLimit and keyLimit <= 0 then keyLimit = nil end
+    local compSec, visualEnd, clampT, endLineL
+    if run.completed then
+        local runEnd = run.duration
+        if isMPlus and runEnd then
+            compSec, visualEnd, clampT = runEnd, runEnd, runEnd
+        else
+            compSec = ClearedEnd(run)
+            visualEnd = compSec
+        end
+        if compSec and compSec <= 0 then compSec = nil end
+        if visualEnd and visualEnd <= 0 then visualEnd = nil end
+        if compSec then
+            endLineL = EndsOnKill(run, compSec) and (X(compSec) + END_GAP)
+                                                 or (X(compSec) - END_LINE_W / 2)
+            endLineL = _min(endLineL, TL_L + W - END_LINE_W)
+        end
+    elseif not live then
+        local runEnd = MS:GetRunDuration(run)
+        if runEnd and runEnd > 0 then visualEnd = runEnd end
     end
+    return keyLimit, compSec, visualEnd, clampT, endLineL
+end
 
+-- Drawing helpers the steps share (segments, their hover areas, labels in
+-- the bar, deaths in a span), added to the context.
+local function AddDrawHelpers(c)
+    local cv, run, X, At, px, endLineL = c.cv, c.run, c.X, c.At, c.px, c.endLineL
+    local Solid, Art, Tex, Text, Btn = c.Solid, c.Art, c.Tex, c.Text, c.Btn
     local function Weather(x, w, sub)
         local grit = Art(cv, "Grit", "ARTWORK", sub, true)
         grit:SetBlendMode("MOD")
@@ -496,45 +498,56 @@ local function NewContext(strip, run, totalDur)
         return n
     end
 
-    local keyLimit = tonumber(run.keystoneTimeLimit)
-    if keyLimit and keyLimit <= 0 then keyLimit = nil end
+    c.Seg, c.SegButton, c.InBarText, c.CountDeaths, c.Weather = Seg, SegButton, InBarText, CountDeaths, Weather
+end
 
-    -- Where the run ends on screen.
-    --   compSec   : the moment the run was finished (completion marker)
-    --   visualEnd : how far the drawn segments go
-    --   clampT    : Mythic+ only. The final ENCOUNTER_END can be logged after
-    --               the key completed; clamp to the key time so the bar, the
-    --               spare time and the header all agree.
-    local compSec, visualEnd, clampT
-    if run.completed then
-        local runEnd = run.duration
-        if isMPlus and runEnd then
-            compSec, visualEnd, clampT = runEnd, runEnd, runEnd
-        else
-            compSec = ClearedEnd(run)
-            visualEnd = compSec
-        end
-        if compSec and compSec <= 0 then compSec = nil end
-        if visualEnd and visualEnd <= 0 then visualEnd = nil end
-        if compSec then
-            endLineL = EndsOnKill(run, compSec) and (X(compSec) + END_GAP)
-                                                 or (X(compSec) - END_LINE_W / 2)
-            endLineL = _min(endLineL, TL_L + W - END_LINE_W)
-        end
-    elseif not live then
-        local runEnd = MS:GetRunDuration(run)
-        if runEnd and runEnd > 0 then visualEnd = runEnd end
+local function NewContext(strip, run, totalDur)
+    -- One canvas for the life of the window; its pieces are reused.
+    local cv = strip._canvas
+    if not cv then
+        cv = CreateFrame("Frame", nil, strip)
+        cv:SetAllPoints(strip)
+        cv:SetFrameLevel(strip:GetFrameLevel() + 1)
+        strip._canvas = cv
+        strip._pools = NewPools()
+    end
+    cv:Show()
+    local pools = strip._pools
+    StartPools(pools)
+
+    local mk = strip._makers
+    if not mk then mk = PooledMakers(pools); strip._makers = mk end
+    local Solid, Art, Tex, Mask, Text, Btn = mk.Solid, mk.Art, mk.Tex, mk.Mask, mk.Text, mk.Btn
+
+    if not (totalDur and totalDur > 0) then return nil end
+
+    local px = PixelSize()
+    local W  = TrackW(px)
+    local END_LINE_W = END_LINE_PX * px
+    local isMPlus = (run.keystoneLevel or 0) > 0
+    -- Only the run in progress (or paused) is drawn live. A saved run that
+    -- wasn't cleared is finished too: drawn still, to where it ended.
+    local live = not run.completed and run == MS.currentRun
+
+    -- Whole screen pixels from the track's start, so block edges are crisp
+    -- and gaps come out exact.
+    local function X(t) return TL_L + _floor(_max(0, _min(1, t / totalDur)) * W / px + 0.5) * px end
+    local keyLimit, compSec, visualEnd, clampT, endLineL = WhereRunEnds(run, isMPlus, live, X, W, px)
+
+    local function At(region, point, x, y)
+        region:SetPoint(point, cv, "BOTTOMLEFT", x, y)
     end
 
-    return {
+    local c = {
         cv = cv, run = run, totalDur = totalDur, W = W, isMPlus = isMPlus, live = live, X = X, At = At,
         Solid = Solid, Art = Art, Tex = Tex, Mask = Mask, Text = Text, Btn = Btn,
-        Seg = Seg, SegButton = SegButton, InBarText = InBarText, CountDeaths = CountDeaths, Weather = Weather,
         keyLimit = keyLimit, compSec = compSec, visualEnd = visualEnd, clampT = clampT, endLineL = endLineL,
         px = px, endLineW = END_LINE_W,
         -- Mythic+: the times for +3, +2 and +1 (marked on the axis).
         thresholds = (isMPlus and keyLimit) and { { 3, keyLimit * 0.6 }, { 2, keyLimit * 0.8 }, { 1, keyLimit } } or nil,
     }
+    AddDrawHelpers(c)
+    return c
 end
 
 -- Each step takes what it needs from the context.

@@ -134,7 +134,7 @@ end
 -- 12. /reload mid-run: the saved run comes back and keeps going.
 reset(); zone(RFC)
 MS.currentRun.players[next(MS.currentRun.players)].damageDone = 4242
-MS._saveDirty = true; MS:FlushSave()
+MS:FlushSave()
 MS.currentRun, MS.inDungeon = nil, false              -- what a reload wipes
 M.Fire("ADDON_LOADED", "MythicScoreboard"); zone(RFC)
 local restored = 0
@@ -143,7 +143,7 @@ check("reload inside restores run", MS:RunState() == "active" and restored == 1,
 
 -- 13. /reload while paused outside: still paused, resumes on return.
 M.dead.player = true; zone(WORLD); M.dead.player = nil
-MS._saveDirty = true; MS:FlushSave()
+MS:FlushSave()
 MS.currentRun, MS.inDungeon = nil, false
 M.Fire("ADDON_LOADED", "MythicScoreboard"); zone(WORLD)
 check("reload while paused stays paused", MS:RunState() == "paused", MS:RunState())

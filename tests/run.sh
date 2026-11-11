@@ -4,10 +4,10 @@
 #        UPDATE_GOLDEN=1 tests/run.sh   to re-record the scenario goldens
 cd "$(dirname "$0")"
 ADDON=../MythicScoreboard
-SUITES="meter_tests lifecycle_tests archive_tests stats_ui_tests history_tests stats_poll_test
-        hover_tests stats_manage_tests history_repair_tests fight_tests clear_tests account_tests
-        wc_layout_test compare_tests perf_tests migrations_tests layout_tests fixes_tests runstats_tests slice_tests pool_tests locale_tests pixel_tests openfight_tests layering_tests features_tests $EXTRA"
+# Every *_tests.lua here, plus $EXTRA.
+SUITES="$(ls *_tests.lua | sed 's/\.lua$//') $EXTRA"
 fail=0
+tmp=$(mktemp); trap 'rm -f "$tmp"' EXIT
 for f in $SUITES; do
   for t in MythicScoreboard_Forever.toc MythicScoreboard.toc; do
     out=$(timeout 120 lua5.1 $f.lua $ADDON $t 2>&1); rc=$?
@@ -16,12 +16,15 @@ for f in $SUITES; do
 done
 for pair in MythicScoreboard_Forever.toc:golden_forever.txt MythicScoreboard.toc:golden_retail.txt; do
   toc=${pair%%:*}; gold=${pair##*:}
-  lua5.1 scenario.lua $ADDON $toc > /tmp/msb_scenario.txt 2>&1
-  if [ -n "$UPDATE_GOLDEN" ]; then cp /tmp/msb_scenario.txt $gold
-  elif ! diff -q /tmp/msb_scenario.txt $gold >/dev/null; then
-    fail=1; echo "== scenario ($toc) differs from $gold"; diff /tmp/msb_scenario.txt $gold | head -20
+  lua5.1 scenario.lua $ADDON $toc > "$tmp" 2>&1
+  if [ -n "$UPDATE_GOLDEN" ]; then cp "$tmp" $gold
+  elif ! diff -q "$tmp" $gold >/dev/null; then
+    fail=1; echo "== scenario ($toc) differs from $gold"; diff "$tmp" $gold | head -20
   fi
 done
+if command -v luacheck >/dev/null; then
+  out=$(cd .. && luacheck MythicScoreboard -q --no-color 2>&1) || { fail=1; echo "== luacheck"; echo "$out" | tail -15; }
+else echo "(luacheck not installed: skipped)"; fi
 out=$(python3 header_fit.py $ADDON 2>&1) || { fail=1; echo "== header_fit"; echo "$out" | tail -15; }
 [ $fail -eq 0 ] && echo "ALL PASS"
 exit $fail

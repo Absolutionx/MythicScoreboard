@@ -1,4 +1,4 @@
--- usage: lua5.1 wc_layout_test.lua DIR TOC   (boss medallions never overlap)
+-- usage: lua5.1 wc_layout_tests.lua DIR TOC   (boss medallions never overlap)
 table.unpack = table.unpack or unpack
 local M = dofile("wowmock.lua")
 M.LoadTOC(arg[1], arg[2])

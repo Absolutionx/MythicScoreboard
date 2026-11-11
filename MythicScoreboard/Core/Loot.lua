@@ -74,17 +74,18 @@ local function InstanceHere()
 end
 
 -- Notes where a run was saved, for its late loot (History.lua calls this).
-function MS:NoteCommittedHere() self._lastCommittedIn = InstanceHere() end
+local _savedIn          -- the instance the last run was saved in
+function MS:NoteCommittedHere() _savedIn = InstanceHere() end
 
 local LEFT_GRACE = 15     -- seconds: loot already on its way as you leave
 function MS:_LootTargetRun()
     if self.currentRun then return self.currentRun end
-    local r = self._lastCommittedRun
-    if not (r and self._lastCommittedAt) then return nil end
-    local age = GetTime() - self._lastCommittedAt
+    local r, at = self:LastSavedRun()
+    if not (r and at) then return nil end
+    local age = GetTime() - at
     if age >= LATE_WINDOW then return nil end
     local here = InstanceHere()
-    if here ~= nil and here == self._lastCommittedIn then return r end
+    if here ~= nil and here == _savedIn then return r end
     if age < LEFT_GRACE then return r end
     return nil
 end
@@ -95,7 +96,8 @@ end
 -- by the item itself.
 local function ItemID(istr) return istr and istr:match("^item:(%d+)") end
 
-MS._lootRev = 0
+local _lootRev = 0          -- goes up whenever any run's loot changes
+function MS:LootRevision() return _lootRev end
 local _recent = {}
 
 function MS:RecordLoot(playerName, link, source)
@@ -141,7 +143,7 @@ function MS:RecordLoot(playerName, link, source)
         self:ArchiveLateLoot(run, entry)
     end
     run._seq = (run._seq or 0) + 1
-    self._lootRev = self._lootRev + 1
+    _lootRev = _lootRev + 1
     if run == self.currentRun then self:SaveCurrentRun() end
     self:Changed("loot")
 
@@ -174,55 +176,39 @@ end
 
 -- ── Chat parsing ────────────────────────────────────────────────────────
 
--- Turn a localized GlobalString like "%s receives loot: %s." into a pattern.
-local function ToPattern(fmt)
-    if type(fmt) ~= "string" then return nil end
-    local p = fmt:gsub("([%%%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
-    p = p:gsub("%%%%s", "(.+)"):gsub("%%%%d", "(%%d+)")
-    p = p:gsub("%%%%(%d)%%%$s", "(.+)"):gsub("%%%%(%d)%%%$d", "(%%d+)")
-    -- Some languages put the item before the player ("%2$s ... %1$s").
-    local i1, i2 = fmt:find("%1$s", 1, true), fmt:find("%2$s", 1, true)
-    return "^" .. p .. "$", (i1 and i2 and i2 < i1) or false
-end
-
 local OTHER_PATTERNS, SELF_PATTERNS = {}, {}
 local function BuildPatterns()
     wipe(OTHER_PATTERNS); wipe(SELF_PATTERNS)
     for _, g in ipairs({ "LOOT_ITEM_MULTIPLE", "LOOT_ITEM_PUSHED_MULTIPLE",
                          "LOOT_ITEM_BONUS_ROLL_MULTIPLE", "LOOT_ITEM",
                          "LOOT_ITEM_PUSHED", "LOOT_ITEM_BONUS_ROLL" }) do
-        local pat, swapped = ToPattern(_G[g])
-        if pat then _ins(OTHER_PATTERNS, { pat, swapped }) end
+        local fp = MS.FormatPattern(rawget(_G, g))
+        if fp then _ins(OTHER_PATTERNS, fp) end
     end
     for _, g in ipairs({ "LOOT_ITEM_SELF_MULTIPLE", "LOOT_ITEM_PUSHED_SELF_MULTIPLE",
                          "LOOT_ITEM_BONUS_ROLL_SELF_MULTIPLE", "LOOT_ITEM_SELF",
                          "LOOT_ITEM_PUSHED_SELF", "LOOT_ITEM_BONUS_ROLL_SELF" }) do
-        local pat = ToPattern(_G[g])
-        if pat then _ins(SELF_PATTERNS, pat) end
+        local fp = MS.FormatPattern(rawget(_G, g))
+        if fp then _ins(SELF_PATTERNS, fp) end
     end
 end
 
 function MS:_ParseLootMessage(text)
     if type(text) ~= "string" or Secret(text) then return nil end
-    for _, pat in ipairs(SELF_PATTERNS) do
-        local item = text:match(pat)
+    for _, fp in ipairs(SELF_PATTERNS) do
+        local item = MS.MatchFormat(text, fp)
         if item then return MS:UnitPlayerName("player"), item end
     end
-    for _, pp in ipairs(OTHER_PATTERNS) do
-        local who, item = text:match(pp[1])
-        if pp[2] then who, item = item, who end
+    -- "%s receives loot: %s.": the player, then the item (in the format's
+    -- order, even where a language writes them the other way round).
+    for _, fp in ipairs(OTHER_PATTERNS) do
+        local who, item = MS.MatchFormat(text, fp)
         if who and item then return who, item end
     end
     return nil
 end
 
 -- ── Events ──────────────────────────────────────────────────────────────
-
-local frame = CreateFrame("Frame")
-for _, ev in ipairs({ "PLAYER_LOGIN", "ENCOUNTER_LOOT_RECEIVED", "CHAT_MSG_LOOT",
-                     "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED" }) do
-    pcall(frame.RegisterEvent, frame, ev)      -- (not every client has every event)
-end
 
 local _infoRefreshPending = false
 
@@ -231,7 +217,7 @@ local function OnLootMessage(text)
     if who and item then MS:RecordLoot(who, item, "chat") end
 end
 
-frame:SetScript("OnEvent", function(_, event, ...)
+local function OnEvent(event, ...)
     if event == "PLAYER_LOGIN" then
         BuildPatterns()
         if C_ChatInfo and C_ChatInfo.RegisterAddonMessagePrefix then
@@ -262,11 +248,15 @@ frame:SetScript("OnEvent", function(_, event, ...)
         _infoRefreshPending = true
         C_Timer.After(0.3, function()
             _infoRefreshPending = false
-            MS._lootRev = (MS._lootRev or 0) + 1
+            _lootRev = _lootRev + 1
             MS:Changed("loot")
         end)
     end
-end)
+end
+for _, ev in ipairs({ "PLAYER_LOGIN", "ENCOUNTER_LOOT_RECEIVED", "CHAT_MSG_LOOT",
+                     "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED" }) do
+    MS:On(ev, OnEvent)
+end
 
 -- ── Removing a piece of loot by hand ───────────────────────────────────────
 -- /sb removeloot [item]: gear that isn't a run's (the Great Vault, a quest
@@ -301,7 +291,7 @@ function MS:RemoveLootItem(link)
         if (e.at or 0) >= since then Strip(e.loot) end
     end
     if self.BumpStats then self.BumpStats() end
-    self._lootRev = (self._lootRev or 0) + 1
+    _lootRev = _lootRev + 1
     self:Changed("loot")
     return n
 end
