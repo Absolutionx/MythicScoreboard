@@ -5,7 +5,6 @@
 -- Mythic+. The dungeons themselves are described in Forever.lua.
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 local LK = MS.LK      -- a label kept in English, translated where it is shown
 
 local F = MS.Flavor

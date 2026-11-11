@@ -4,7 +4,7 @@ local MS = _G["MythicScoreboard"]
 -- TOC is authoritative at runtime; fallback for dev environments.
 -- (GetAddOnMetadata moved to C_AddOns; the old global is gone in current clients.)
 local GetMeta = (C_AddOns and C_AddOns.GetAddOnMetadata) or GetAddOnMetadata
-MS.version = GetMeta and GetMeta("MythicScoreboard", "Version") or "2.9.2"
+MS.version = GetMeta and GetMeta("MythicScoreboard", "Version") or "dev"   -- from the TOC (tools/bump.sh)
 
 -- ── Changes the windows show ───────────────────────────────────────────────
 -- Core code says what changed (MS:Changed("run")); the windows listen
@@ -25,7 +25,7 @@ function MS:ReportError(what, err)
     local msg = tostring(err)
     if said[msg] then return end
     said[msg] = true
-    print("|cffff4444[MythicScoreboard]|r " .. tostring(what) .. " error: " .. msg)
+    MS.Warn(tostring(what) .. " error: " .. msg)
 end
 
 -- ── Midnight's hidden values ───────────────────────────────────────────────
@@ -35,8 +35,8 @@ end
 local issecret = issecretvalue
 MS.HasSecrets = issecret ~= nil
 function MS.IsSecret(v) return issecret ~= nil and v ~= nil and issecret(v) or false end
--- v, or nil when it's hidden. (MS.Readable, in Roster.lua, is for names: a
--- non-empty string or nil.)
+-- v, or nil when it's hidden. (Util.lua has MS.Readable for names and
+-- MS.ReadableNumber for numbers.)
 function MS.ReadableValue(v)
     if v == nil or (issecret ~= nil and issecret(v)) then return nil end
     return v

@@ -1,4 +1,4 @@
--- usage: lua5.1 features_tests.lua DIR TOC
+-- usage: lua5.1 keys_history_tests.lua DIR TOC
 -- 2.9: key upgrades (+1/+2/+3), your rating change, specializations, the
 -- timeline's upgrade thresholds, and every character's runs in history.
 table.unpack = table.unpack or unpack
@@ -121,7 +121,7 @@ MythicScoreboardDB.runs = {
     { dungeonName = "Mine A", _wallClockStart = 1000, duration = 100, players = {}, bosses = {} },
 }
 MS:MirrorHistory()
-local key = MS._charKey
+local key = MS:CharKey()
 check("mirrored account-wide", key and MythicScoreboardAccountDB.chars[key].history == MythicScoreboardDB.runs)
 MythicScoreboardAccountDB.chars["Alt@Realm"] = { name = "Alt", class = "MAGE", history = {
     { dungeonName = "Alt run", _wallClockStart = 1500, duration = 100, players = {}, bosses = {} },
@@ -240,7 +240,7 @@ if not forever then
     MythicScoreboardDB.runs = { old }
     local acc = MythicScoreboardAccountDB
     MS:ArchiveRuns()
-    local key = MS._charKey
+    local key = MS:CharKey()
     local arch = acc.chars[key].archive
     arch.keysV = nil
     for _, e in ipairs(arch.runs) do e.up, e.r0, e.r1, e.lim = nil, nil, nil, nil end
@@ -250,5 +250,5 @@ if not forever then
         e and (tostring(e.up) .. " " .. tostring(e.r1)))
 end
 
-io.stdout:write(("features_tests: %d passed, %d failed\n"):format(passes, fails))
+io.stdout:write(("keys_history_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

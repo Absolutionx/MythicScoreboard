@@ -12,14 +12,17 @@
 --   5. deaths the meter knows about that the death poll missed
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 local IsSecret = _G["MythicScoreboard"].IsSecret
 local _ins = table.insert
 local Readable = MS.Readable
 local ShortName = MS.ShortName
 
-MS._petGUIDToOwner = MS._petGUIDToOwner or {}
-MS._petNameToOwner = MS._petNameToOwner or {}
+-- Whose pet is whose: pet GUID -> owner's name, and pet name -> owner's
+-- name (when a pet's GUID can't be read). Kept across a /reload (Persist.lua).
+local _petGUIDToOwner, _petNameToOwner = {}, {}
+function MS:NotePetOwner(guid, ownerName) _petGUIDToOwner[guid] = ownerName end
+function MS:PetOwners() return _petGUIDToOwner end
+function MS:ForgetPets() wipe(_petGUIDToOwner); wipe(_petNameToOwner) end
 
 local TYPE = {   -- Enum.DamageMeterType
     damage = 0, healing = 2, interrupts = 5, dispels = 6,
@@ -33,10 +36,7 @@ local function Overall()
 end
 
 -- A number the addon may store, or nil.
-local function Num(v)
-    if v == nil or IsSecret(v) then return nil end
-    return tonumber(v)
-end
+local Num = MS.ReadableNumber
 
 -- ── Hidden data ────────────────────────────────────────────────────────────
 -- True while the game hides the meter's numbers (Midnight's combat
@@ -77,11 +77,11 @@ function MS:RebuildPetGUIDCache()
             local owner = self:UnitPlayerName(ownerUnit)
             local guid = MS.UnitGUIDReadable(petUnit)
             if owner and guid and (guid:find("^Pet%-") or guid:find("^Creature%-")) then
-                self._petGUIDToOwner[guid] = ShortName(owner)
+                _petGUIDToOwner[guid] = ShortName(owner)
             end
             local petName = Readable(UnitName(petUnit))
             if owner and petName then
-                self._petNameToOwner[petName] = ShortName(owner)
+                _petNameToOwner[petName] = ShortName(owner)
             end
         end
     end
@@ -148,20 +148,20 @@ function MS:PetOwnerForSource(src, run)
         local petUnit = i == 0 and "pet" or (prefix .. i .. "pet")
         if UnitExists(petUnit) and MS.UnitGUIDReadable(petUnit) == guid then
             local p = self:PlayerForUnit(i == 0 and "player" or (prefix .. i), run)
-            if p then self._petGUIDToOwner[guid] = p.name; return p end
+            if p then _petGUIDToOwner[guid] = p.name; return p end
         end
     end
     -- 2. A pet seen earlier (it may have died or been dismissed).
-    if not self._petGUIDToOwner[guid] then self:RebuildPetGUIDCache() end
-    local owner = self._petGUIDToOwner[guid] and self:PlayerByName(self._petGUIDToOwner[guid], run)
+    if not _petGUIDToOwner[guid] then self:RebuildPetGUIDCache() end
+    local owner = _petGUIDToOwner[guid] and self:PlayerByName(_petGUIDToOwner[guid], run)
     if owner then return owner end
     -- 3. The pet's tooltip, which names its owner.
     owner = OwnerFromTooltip(self, guid, run)
-    if owner then self._petGUIDToOwner[guid] = owner.name; return owner end
+    if owner then _petGUIDToOwner[guid] = owner.name; return owner end
     -- 4. A pet name seen on a group member's pet.
-    local byName = Readable(src.name) and self._petNameToOwner[src.name]
+    local byName = Readable(src.name) and _petNameToOwner[src.name]
     owner = byName and self:PlayerByName(byName, run)
-    if owner then self._petGUIDToOwner[guid] = owner.name end
+    if owner then _petGUIDToOwner[guid] = owner.name end
     return owner
 end
 
@@ -287,6 +287,25 @@ local function TakeBaseline(self, run, damage, duration)
 end
 
 -- One read of each stat type. Returns true when the numbers were read.
+-- What the scoreboard shows of the run, in one string: a reading that
+-- changes none of it isn't counted as a change, so the rows aren't redrawn
+-- (and a tooltip over one stays put) while nothing happens.
+local SHOWN = { "damageDone", "dps", "healingDone", "hps", "damageTaken", "avoidableDamageTaken", "interrupts",
+                "dispels", "deaths", "itemLevel", "mythicScore", "specID", "role", "left", "level" }
+local _sigParts = {}
+local function Shown(run)
+    wipe(_sigParts)
+    _sigParts[1] = #(run.bosses or {})
+    for name, p in pairs(run.players or {}) do
+        _sigParts[#_sigParts + 1] = name
+        for _, f in ipairs(SHOWN) do _sigParts[#_sigParts + 1] = tostring(p[f]) end
+    end
+    return table.concat(_sigParts, "|")
+end
+
+-- Reads the meter into the run. True when it could be read (the clock in
+-- the header moves on either way); the run counts as changed only when what
+-- the scoreboard shows did.
 function MS:SnapshotFromDamageMeter()
     local run = self.currentRun
     if not run then return end
@@ -311,7 +330,11 @@ function MS:SnapshotFromDamageMeter()
     self:CaptureFightStats(run, true)
 
     self:PopulateAll()
-    self:SaveCurrentRun()
+    local shown = Shown(run)
+    if shown ~= run._shown then
+        run._shown = shown
+        self:SaveCurrentRun()
+    end
     return true
 end
 

@@ -1,0 +1,11 @@
+# For CurseForge / the BigWigs packager, if releases are ever automated.
+# tools/package.sh builds the same zip by hand.
+package-as: MythicScoreboard
+ignore:
+  - tests
+  - tools
+  - dist
+  - .github
+  - .luacheckrc
+  - CHANGELOG.md
+  - README.md

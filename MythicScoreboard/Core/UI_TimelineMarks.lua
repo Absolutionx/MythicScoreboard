@@ -6,17 +6,15 @@ local _max    = math.max
 local _min    = math.min
 local _fmt    = string.format
 local _ins    = table.insert
-local _rem    = table.remove
 local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, Btn, ClassColor, ClassHex, DN = UI.Abbrev, UI.Art, UI.Btn, UI.ClassColor, UI.ClassHex, UI.DN
-local FIGHT_BOT, FIGHT_TOP, FRAME_W, MEDIA, P, PAD_X = UI.FIGHT_BOT, UI.FIGHT_TOP, UI.FRAME_W, UI.MEDIA, UI.P, UI.PAD_X
-local Solid, TL_H, Text, Tint, VGrad, WIPE_BOT = UI.Solid, UI.TL_H, UI.Text, UI.Tint, UI.VGrad, UI.WIPE_BOT
-local WIPE_TOP = UI.WIPE_TOP
+local Abbrev, ClassColor, ClassHex, DN = UI.Abbrev, UI.ClassColor, UI.ClassHex, UI.DN
+local FIGHT_BOT, FIGHT_TOP, P, PAD_X = UI.FIGHT_BOT, UI.FIGHT_TOP, UI.P, UI.PAD_X
+local TL_H, Tint, VGrad = UI.TL_H, UI.Tint, UI.VGrad
 
 -- Run timeline, part 3: everything marked on it besides the bosses. The tail
 -- of the run, the key timer, the completion line, deaths, interrupts, and
@@ -26,11 +24,9 @@ local WIPE_TOP = UI.WIPE_TOP
 local TL_L      = PAD_X
 local TL = UI.TL                     -- shared by the timeline's files
 local TRACK_Y, TRACK_H = TL.TRACK_Y, TL.TRACK_H
-local MED_R, MED_ROWS  = TL.MED_R, TL.MED_ROWS
 local DEATH_Y   = TL.DEATH_Y
 local INT_BASE  = TL.INT_BASE
 local INT_MAXH  = TL.INT_MAXH
-local COMPACT_W = TL.COMPACT_W
 local SegmentLabelFor = TL.SegmentLabelFor
 
 
@@ -181,7 +177,7 @@ end
 -- ── Completion marker: a line from the track down to the axis, with ──
 -- ── the finishing time printed on the axis itself ────────────────────
 local function DrawCompletion(c)
-    local cv, run, W, isMPlus, X, At = c.cv, c.run, c.W, c.isMPlus, c.X, c.At
+    local cv, run, W, isMPlus, At = c.cv, c.run, c.W, c.isMPlus, c.At
     local Solid, Art, Text, Btn, keyLimit, compSec = c.Solid, c.Art, c.Text, c.Btn, c.keyLimit, c.compSec
     if compSec then
         -- Finished on a boss kill: END_GAP past that boss's block (NewContext).
@@ -395,7 +391,7 @@ local function DrawInterrupts(c)
                     GameTooltip:AddLine(" ")
                     local rows = {}
                     for name, w in pairs(b.who) do _ins(rows, { name = name, n = w.n, class = w.class }) end
-                    _sort(rows, function(a, c) return a.n > c.n end)
+                    _sort(rows, function(p, q) return p.n > q.n end)
                     for _, r in ipairs(rows) do
                         GameTooltip:AddDoubleLine("|cff" .. ClassHex(r.class) .. r.name .. "|r", r.n, 1, 1, 1, 1, 1, 1)
                     end

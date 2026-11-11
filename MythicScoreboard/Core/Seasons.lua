@@ -5,6 +5,17 @@ local MS = _G["MythicScoreboard"]
 
 MS.MYTHIC_PLUS = 8            -- difficulty ID of a Mythic+ keystone run
 
+-- Time a death costs a key, by key level, used only when the game doesn't
+-- say (C_ChallengeMode.GetDeathCount missing, or its number hidden). The
+-- game's own figure always wins. (The War Within rules: 5 s, 15 s from +12.)
+MS.DEATH_PENALTY = { { level = 12, seconds = 15 }, { level = 4, seconds = 5 } }
+function MS.DeathPenaltyFor(level)
+    for _, step in ipairs(MS.DEATH_PENALTY) do
+        if (level or 0) >= step.level then return step.seconds end
+    end
+    return 0
+end
+
 -- M+ time limits, for when the game doesn't give one (see MS:KnownTimeLimit).
 -- Keyed by the dungeon's English name: on other languages these are skipped
 -- and the game's own numbers are used.

@@ -4,12 +4,12 @@
 -- medallion shows. In order:
 --   1. the journal's creature icon (retail: saved per encounter)
 --   2. a model ID learned from the journal or in play (below)
---   3. Forever's bundled table (Core/BossPortraits.lua, via Forever.lua)
+--   3. Forever's bundled table (Data/BossPortraits.lua, via Forever.lua)
 -- and nil when there's nothing: the medallion shows a crest.
 --
 -- Main source: the game's Encounter Journal, read on entering an instance.
 -- WoW Forever has no journal for its dungeons and uses the bundled table in
--- Core/BossPortraits.lua instead (see MS:ForeverBossArt in Core/Forever.lua).
+-- Data/BossPortraits.lua instead (see MS:ForeverBossArt in Core/Forever.lua).
 --
 -- As a last resort the game is asked for a boss's model ID whenever the addon
 -- gets a look at it: encounter start, target, mouseover, nameplate, corpse.
@@ -19,7 +19,6 @@
 -- from its own model. No artwork ships with the addon.
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local Secret = IsSecret
@@ -44,8 +43,10 @@ local function Safe(fn, ...)
     return v
 end
 
+local _portraitRev = 0     -- goes up whenever a portrait is learned
+function MS:PortraitRevision() return _portraitRev end
 local function Changed()
-    MS._portraitRev = (MS._portraitRev or 0) + 1
+    _portraitRev = _portraitRev + 1
     MS:Changed("portraits")
 end
 
@@ -320,10 +321,8 @@ function MS:BossPortrait(boss, run)
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────
-local frame = CreateFrame("Frame")
 local _activeEncounter
-pcall(frame.RegisterEvent, frame, "PLAYER_ENTERING_WORLD")
-pcall(frame.RegisterEvent, frame, "ZONE_CHANGED_NEW_AREA")
+local OnEvent   -- below
 -- Targets, mouse-overs and nameplates are only looked at during a run.
 local RUN_EVENTS = { "ENCOUNTER_START", "ENCOUNTER_END", "INSTANCE_ENCOUNTER_ENGAGE_UNIT",
                      "PLAYER_TARGET_CHANGED", "UPDATE_MOUSEOVER_UNIT",
@@ -334,7 +333,7 @@ MS:WatchRunState(function(state)
     if want == listening then return end
     listening = want
     for _, ev in ipairs(RUN_EVENTS) do
-        if want then pcall(frame.RegisterEvent, frame, ev) else frame:UnregisterEvent(ev) end
+        if want then MS:On(ev, OnEvent) else MS:Off(ev, OnEvent) end
     end
 end)
 
@@ -373,11 +372,13 @@ local function OnRunEvent(event, ...)
     end
 end
 
-frame:SetScript("OnEvent", function(_, event, ...)
+function OnEvent(event, ...)
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
         C_Timer.After(2, ScanSoon)
         return
     end
     if not MS.inDungeon then return end
-    pcall(OnRunEvent, event, ...)
-end)
+    pcall(OnRunEvent, event, ...)   -- best effort: a portrait not learned isn't worth a chat line
+end
+MS:On("PLAYER_ENTERING_WORLD", OnEvent)
+MS:On("ZONE_CHANGED_NEW_AREA", OnEvent)

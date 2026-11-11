@@ -13,7 +13,7 @@ local IsSecret = _G["MythicScoreboard"].IsSecret
 local inspectQueue   = {}
 local inspectPending = nil
 local INSPECT_DELAY  = 0.5
-local inspectFrame   = nil
+local listening      = false   -- INSPECT_READY, from the first inspect on
 
 local function Later(fn) C_Timer.After(INSPECT_DELAY, fn) end
 
@@ -45,10 +45,9 @@ function MS.SpecLabel(specID, class)
 end
 
 local function EnsureInspectFrame()
-    if inspectFrame then return end
-    inspectFrame = CreateFrame("Frame")
-    inspectFrame:RegisterEvent("INSPECT_READY")
-    inspectFrame:SetScript("OnEvent", function(_, event, guid)
+    if listening then return end
+    listening = true
+    MS:On("INSPECT_READY", function(event, guid)
         if event ~= "INSPECT_READY" or not inspectPending then return end
         -- The GUID can be hidden in Midnight: compare only a readable one.
         local targetUnit = MS:UnitForGUID(MS.Readable(guid))
@@ -61,7 +60,7 @@ local function EnsureInspectFrame()
                 MS.itemLevelCache = MS.itemLevelCache or {}
                 MS.itemLevelCache[name] = il
                 local p = MS:PlayerByName(name)
-                if p then p.itemLevel = il end
+                if p then p.itemLevel = il; MS:SaveCurrentRun() end
                 MS:Changed("run")
             end
         end
@@ -71,7 +70,7 @@ local function EnsureInspectFrame()
             if id then
                 MS.specCache[name] = id
                 local p = MS:PlayerByName(name)
-                if p and p.specID ~= id then p.specID = id; MS:Changed("run") end
+                if p and p.specID ~= id then p.specID = id; MS:SaveCurrentRun(); MS:Changed("run") end
             end
         end
         ClearInspectPlayer()

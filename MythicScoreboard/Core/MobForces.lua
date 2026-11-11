@@ -32,7 +32,7 @@ local function AddForcesToTooltip(tooltip, tooltipData)
     if not UnitCanAttack("player", "mouseover") then return end
 
     -- Call API with the literal "mouseover" token — no taint
-    local count, countPercent, countPercentString =
+    local _, _, countPercentString =
         C_ScenarioInfo.GetUnitCriteriaProgressValues("mouseover")
 
     tooltip:AddLine(" ")
@@ -118,45 +118,54 @@ local function RefreshAllNameplates()
     end
 end
 
--- ── Event frame ───────────────────────────────────────────────────────────────
-
-local frame = CreateFrame("Frame")
-frame:RegisterEvent("PLAYER_ENTERING_WORLD")
-frame:RegisterEvent("ZONE_CHANGED_NEW_AREA")
-frame:RegisterEvent("CHALLENGE_MODE_START")
-frame:RegisterEvent("SCENARIO_CRITERIA_UPDATE")
+-- ── Events ──────────────────────────────────────────────────────────────────
+local OnEvent   -- below
 
 -- Nameplates are watched only inside a key.
 local watching = false
+local refreshPending = false
 local function Watch()
     local want = IsInMythicPlus()
     if want == watching then return end
     watching = want
     if want then
-        frame:RegisterEvent("NAME_PLATE_UNIT_ADDED")
-        frame:RegisterEvent("NAME_PLATE_UNIT_REMOVED")
+        MS:On("NAME_PLATE_UNIT_ADDED", OnEvent)
+        MS:On("NAME_PLATE_UNIT_REMOVED", OnEvent)
         RefreshAllNameplates()
     else
-        frame:UnregisterEvent("NAME_PLATE_UNIT_ADDED")
-        frame:UnregisterEvent("NAME_PLATE_UNIT_REMOVED")
+        MS:Off("NAME_PLATE_UNIT_ADDED", OnEvent)
+        MS:Off("NAME_PLATE_UNIT_REMOVED", OnEvent)
         ClearAll()
     end
 end
 
-frame:SetScript("OnEvent", function(_, event, unit)
+function OnEvent(event, unit)
     if event == "NAME_PLATE_UNIT_ADDED" then
         UpdateNameplateLabel(unit)
     elseif event == "NAME_PLATE_UNIT_REMOVED" then
         ClearNameplateLabel(unit)
     elseif event == "SCENARIO_CRITERIA_UPDATE" then
-        if watching and IsNameplateEnabled() then RefreshAllNameplates() end
+        -- Fires on every kill; a mob's count doesn't change, so the plates
+        -- are looked at again at most once a second (for counts that weren't
+        -- known yet when they appeared).
+        if watching and IsNameplateEnabled() and not refreshPending then
+            refreshPending = true
+            C_Timer.After(1, function()
+                refreshPending = false
+                if watching and IsNameplateEnabled() then RefreshAllNameplates() end
+            end)
+        end
     else
         -- Zone change or key start: nameplate tokens are reused across zones.
         ClearAll()
         watching = nil
         Watch()
     end
-end)
+end
+for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "CHALLENGE_MODE_START",
+                      "SCENARIO_CRITERIA_UPDATE" }) do
+    MS:On(ev, OnEvent)
+end
 
 HookTooltip()
 

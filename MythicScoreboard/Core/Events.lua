@@ -5,7 +5,6 @@
 -- Encounters.lua. Loading saved data: Bootstrap.lua.
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local MYTHIC_PLUS = MS.MYTHIC_PLUS
@@ -27,13 +26,10 @@ end
 
 -- An unfinished key ends (reset, or the group gone): saved as it stands.
 local function EndUnfinishedKey()
-    if MS.inDungeon then MS:FinishRun(false, false) else MS:EndRun(false, false) end
+    if MS.inDungeon then MS:FinishRun(false, false) else MS:CommitRun({ completed = false }) end
 end
 
-local function ResetPetCaches()
-    wipe(MS._petGUIDToOwner)
-    if MS._petNameToOwner then wipe(MS._petNameToOwner) end
-end
+local function ResetPetCaches() MS:ForgetPets() end
 
 -- ── Handlers ───────────────────────────────────────────────────────────────
 local H = {}
@@ -81,17 +77,20 @@ function H.CHALLENGE_MODE_RESET()
     if MS.inDungeon then
         MS:FinishRun(false, false)
     elseif MS.currentRun and not MS.currentRun.completed then
-        wipe(MS._deadUnits)
-        MS:EndRun(false, false)
+        MS:CommitRun({ completed = false })
     end
 end
 
 function H.PLAYER_REGEN_ENABLED()
-    if MS.inDungeon and MS.OnCombatEnded then MS:OnCombatEnded() end
+    if MS.inDungeon then
+        MS:OnCombatEnded()
+        MS:NotePullEnd()
+    end
 end
 function H.PLAYER_REGEN_DISABLED()
     local run = MS.currentRun
     if run then run._combatEndedAt = nil end
+    if MS.inDungeon then MS:NotePullStart() end
 end
 
 -- encounterID is the dungeonEncounterID (as in EJ_GetEncounterInfoByIndex's
@@ -146,7 +145,7 @@ function H.UNIT_PET(ownerUnit)
                     and type(petGUID) == "string"
                     and (petGUID:find("^Pet%-") or petGUID:find("^Creature%-")) then
                 local ownerName = MS:UnitPlayerName(ownerUnit)
-                if ownerName then MS._petGUIDToOwner[petGUID] = MS.ShortName(ownerName) end
+                if ownerName then MS:NotePetOwner(petGUID, MS.ShortName(ownerName)) end
             end
         end
     end
@@ -155,44 +154,18 @@ function H.UNIT_PET(ownerUnit)
     C_Timer.After(1.5, function() MS:RebuildPetGUIDCache() end)
 end
 
-MS.EventHandlers = H        -- Bootstrap.lua adds ADDON_LOADED
 
 -- ── Registration ───────────────────────────────────────────────────────────
 -- COMBAT_LOG_EVENT_UNFILTERED and DAMAGE_METER_COMBAT_SESSION_UPDATED are
 -- blocked in Midnight instances; damage is polled via C_DamageMeter instead.
-local frame = CreateFrame("Frame")
-local EVENTS = {
-    "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA", "PLAYER_LEAVING_WORLD", "PLAYER_LOGOUT",
-    "PLAYER_DIFFICULTY_CHANGED",
-    "CHALLENGE_MODE_START", "CHALLENGE_MODE_COMPLETED", "CHALLENGE_MODE_RESET",
-    "ENCOUNTER_START", "ENCOUNTER_END", "PLAYER_REGEN_ENABLED", "PLAYER_REGEN_DISABLED",
-    "PLAYER_DEAD", "GROUP_ROSTER_UPDATE",
-    "UNIT_PET",
-    "SCENARIO_CRITERIA_UPDATE",
-}
-
-local function RegisterAllEvents()
-    for _, ev in ipairs(EVENTS) do pcall(frame.RegisterEvent, frame, ev) end
+-- (MS:On, in Util.lua, reports a handler's error once and carries on.)
+for event, fn in pairs(H) do
+    if event:find("^CHALLENGE_MODE_") then
+        MS:On(event, function(_, ...) if C_ChallengeMode then fn(...) end end)
+    else
+        MS:On(event, function(_, ...) fn(...) end)
+    end
 end
-
--- Defer registration if loaded mid-combat to avoid ADDON_ACTION_FORBIDDEN.
-if InCombatLockdown() then
-    local deferFrame = CreateFrame("Frame")
-    deferFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
-    deferFrame:SetScript("OnEvent", function(self)
-        self:UnregisterAllEvents()
-        self:SetScript("OnEvent", nil)
-        RegisterAllEvents()
-    end)
-else
-    RegisterAllEvents()
-end
-
-frame:SetScript("OnEvent", function(_, event, ...)
-    if event:find("^CHALLENGE_MODE_") and not C_ChallengeMode then return end
-    local fn = H[event]
-    if fn then fn(...) end
-end)
 
 -- ── Polls ──────────────────────────────────────────────────────────────────
 -- C_DamageMeter every 2s (DAMAGE_METER_COMBAT_SESSION_UPDATED is blocked in

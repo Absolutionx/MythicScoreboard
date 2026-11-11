@@ -20,6 +20,12 @@ local function Trim(runs, cap)
     while #runs > cap do _rem(runs) end
 end
 
+-- The run saved last and when (GetTime), for loot that arrives after it.
+local _lastSaved, _lastSavedAt
+function MS:LastSavedRun() return _lastSaved, _lastSavedAt end
+-- A deleted run takes no more loot.
+function MS:ForgetLastSaved(run) if run == nil or run == _lastSaved then _lastSaved = nil end end
+
 -- A finished run, saved: newest first in history, and into the archive.
 function MS:_CommitRunToHistory(run)
     local runs = Runs()
@@ -29,8 +35,7 @@ function MS:_CommitRunToHistory(run)
     Trim(runs, self:GetHistoryLimit())
     -- Loot (e.g. the Mythic+ chest) can arrive after this; Loot.lua attaches
     -- it to the saved copy for a few minutes.
-    self._lastCommittedRun = saved
-    self._lastCommittedAt  = GetTime()
+    _lastSaved, _lastSavedAt = saved, GetTime()
     if self.NoteCommittedHere then self:NoteCommittedHere() end
     if self.ArchiveRun then self:ArchiveRun(saved) end
     return saved
@@ -46,7 +51,7 @@ end)
 -- archive behind the Stats page is left alone.
 function MS:ClearHistory()
     if MythicScoreboardDB then MythicScoreboardDB.runs = {} end
-    self._lastCommittedRun = nil
+    _lastSaved = nil
     self.displayRun = nil
     self:MirrorHistory()
     self:Changed("history")
@@ -54,14 +59,14 @@ end
 
 -- ── All your characters ────────────────────────────────────────────────────
 local function AccountChars()
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
-    return type(acc) == "table" and type(acc.chars) == "table" and acc.chars or nil
+    local acc = MS.AccountDB()
+    return acc and type(acc.chars) == "table" and acc.chars or nil
 end
 
 -- This character's history, account-wide (the same table).
 function MS:MirrorHistory()
-    if not self._charKey and self.SyncAccountStats then self:SyncAccountStats() end
-    local key, chars = self._charKey, AccountChars()
+    if not self:CharKey() and self.SyncAccountStats then self:SyncAccountStats() end
+    local key, chars = self:CharKey(), AccountChars()
     local runs = Runs()
     if not (key and chars and runs) then return end
     chars[key] = chars[key] or {}
@@ -70,12 +75,12 @@ end
 
 -- Whose runs the history list shows: "all" characters or just "me".
 function MS:GetHistoryScope()
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
-    return (type(acc) == "table" and acc.historyScope == "me") and "me" or "all"
+    local acc = MS.AccountDB()
+    return (acc and acc.historyScope == "me") and "me" or "all"
 end
 function MS:SetHistoryScope(scope)
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
-    if type(acc) == "table" then acc.historyScope = (scope == "me") and "me" or nil end
+    local acc = MS.AccountDB()
+    if acc then acc.historyScope = (scope == "me") and "me" or nil end
     self:Changed("history")
 end
 
@@ -87,7 +92,7 @@ function MS:IsOwnHistoryRun(run) return run ~= nil and _owner[run] == nil end
 
 -- Other characters with saved runs.
 function MS:OtherHistoryChars()
-    local out, chars, me = {}, AccountChars(), self._charKey
+    local out, chars, me = {}, AccountChars(), self:CharKey()
     if not (chars and me) then return out end
     for key, c in pairs(chars) do
         if key ~= me and type(c.history) == "table" and #c.history > 0 then
@@ -136,7 +141,13 @@ end
 -- A key's best time: your fastest in-time run of that dungeon at that level,
 -- from the archive (every run you've finished), and from the table older
 -- versions kept.
+local _bests, _bestsRev = {}, nil   -- "dungeon:level" -> best time, for one archive revision
 function MS:BestKeyTime(dungeon, level)
+    local rev = self.StatsRevision and self:StatsRevision()
+    if rev ~= _bestsRev then wipe(_bests); _bestsRev = rev end
+    local slot = (dungeon or "") .. ":" .. (level or 0)
+    local hit = _bests[slot]
+    if hit ~= nil then return hit or nil end
     local best
     local legacy = MythicScoreboardDB and MythicScoreboardDB.personalBests
     local old = legacy and legacy[(dungeon or "") .. ":" .. (level or 0)]
@@ -147,6 +158,20 @@ function MS:BestKeyTime(dungeon, level)
                     and (e.dur or 0) > 0 and (not best or e.dur < best) then
                 best = e.dur
             end
+        end
+    end
+    _bests[slot] = best or false
+    return best
+end
+
+-- Your fastest in-time run of a dungeon at a key level, from the archive
+-- (its boss kill times are the splits to beat), or nil.
+function MS:BestKeyRun(dungeon, level)
+    local best
+    for _, e in ipairs(self.ArchiveRuns and self:ArchiveRuns() or {}) do
+        if e.dungeon == dungeon and e.key == level and e.cleared and e.inTime
+                and (e.dur or 0) > 0 and (not best or e.dur < best.dur) then
+            best = e
         end
     end
     return best
@@ -173,10 +198,10 @@ function MS:_AnnouncePB(run, before)
     local dur = self:GetRunDuration(run)
     local timeStr = self:FormatTime(dur)
     if not before then
-        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** " .. L["First recorded clear!"] .. "|r %s +%d -- %s",
+        MS.Say(_fmt("|cffffcc00** " .. L["First recorded clear!"] .. "|r %s +%d -- %s",
             run.dungeonName, run.keystoneLevel, timeStr))
     elseif dur < before then
-        print(_fmt("|cff00ccff[MythicScoreboard]|r |cffffcc00** " .. L["New personal best!"] .. "|r %s +%d -- %s |cff888888(-%s)|r",
+        MS.Say(_fmt("|cffffcc00** " .. L["New personal best!"] .. "|r %s +%d -- %s |cff888888(-%s)|r",
             run.dungeonName, run.keystoneLevel, timeStr, self:FormatTime(before - dur)))
     end
 end

@@ -32,7 +32,7 @@ end
 local function DoClearHistory()
     MS:ClearHistory()                       -- History.lua (a run in progress carries on)
     if UI.frame and UI.frame.RefreshHistBtn then UI.frame.RefreshHistBtn() end
-    print("|cff00ccff[MythicScoreboard]|r " .. L["History cleared. Your stats still have these runs."])
+    MS.Say(L["History cleared. Your stats still have these runs."])
 end
 
 local DROP_ROW_H = 28
@@ -101,7 +101,7 @@ local function MakeRow()
                 end
             end
             if MS.displayRun == run then MS.displayRun = nil end
-            if MS._lastCommittedRun == run then MS._lastCommittedRun = nil end   -- no late loot for it
+            MS:ForgetLastSaved(run)   -- no late loot for it
         end
         if not runs or #runs == 0 then CloseHistDropdown() else Fill() end
         MS:RefreshOverview()
@@ -309,7 +309,7 @@ local function OpenHistDropdown(anchorBtn)
     if histDropdown then CloseHistDropdown(); return end
     if #MS:HistoryEntries() == 0 and #((MythicScoreboardDB and MythicScoreboardDB.runs) or {}) == 0
             and #MS:OtherHistoryChars() == 0 then
-        print("|cff00ccff[MythicScoreboard]|r " .. L["No saved runs yet."])
+        MS.Say(L["No saved runs yet."])
         return
     end
     if not drop then

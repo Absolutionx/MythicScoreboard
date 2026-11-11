@@ -1,28 +1,22 @@
-local _abs    = math.abs
 local _floor  = math.floor
 local _huge   = math.huge
 local _max    = math.max
-local _min    = math.min
 local _fmt    = string.format
-local _ins    = table.insert
-local _rem    = table.remove
-local _sort   = table.sort
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Abbrev, Art, Btn, BuildTimeline, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.BuildTimeline, UI.CELL_FONT_SIZE
+local Abbrev, Art, Btn, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.CELL_FONT_SIZE
 local CLASS_ICON_COORDS, COLS, CT, ClassColor, ComputeColumnAnchors = UI.CLASS_ICON_COORDS, UI.COLS, UI.CT, UI.ClassColor, UI.ComputeColumnAnchors
-local DN, DiffShort, FRAME_W, GetRole, GetTimelineDuration, HGrad = UI.DN, UI.DiffShort, UI.FRAME_W, UI.GetRole, UI.GetTimelineDuration, UI.HGrad
+local DN, FRAME_W, GetRole, HGrad = UI.DN, UI.FRAME_W, UI.GetRole, UI.HGrad
 local Outline, P, PAD_X, ROLE_ICON_COORDS, ROLE_ICON_TEX, ROW_H = UI.Outline, UI.P, UI.PAD_X, UI.ROLE_ICON_COORDS, UI.ROLE_ICON_TEX, UI.ROW_H
-local ScoreColor, SetFont, Solid, SplitAbbrev, Text, Tint = UI.ScoreColor, UI.SetFont, UI.Solid, UI.SplitAbbrev, UI.Text, UI.Tint
+local ScoreColor, Solid, SplitAbbrev, Text, Tint = UI.ScoreColor, UI.Solid, UI.SplitAbbrev, UI.Text, UI.Tint
 
 -- Scoreboard, the player rows: each row's frames (made once, then reused),
 -- its loot icons and tooltip, the numbers in each column, and filling a row
 -- in. UI_Scoreboard.lua lays the rows out and refreshes them, through UI.Rows.
 
-local _rowPool = {}       -- rows handed back, for reuse
 
 -- ── Loot icons ──────────────────────────────────────────────────────────
 
@@ -118,7 +112,8 @@ local function RowOnEnter(self2)
     GameTooltip:SetOwner(self2, "ANCHOR_CURSOR_RIGHT", 12, 12)
     local r2, g2, b2 = ClassColor(pc.class)
     GameTooltip:SetText(DN(pc.name) or "?", r2, g2, b2)
-    local spec, specRole = MS.SpecLabel and MS.SpecLabel(pc.specID, pc.class)
+    local spec, specRole
+    if MS.SpecLabel then spec, specRole = MS.SpecLabel(pc.specID, pc.class) end
     if spec then
         local role = (pc.role ~= "" and pc.role) or specRole
         local roleName = role and rawget(_G, role)
@@ -220,16 +215,10 @@ local function RowOnEnter(self2)
     GameTooltip:Show()
 end
 
-local function AcquireRow(parent)
-    local row = _rem(_rowPool)
-    if row then
-        row:SetParent(parent)
-        row:ClearAllPoints()
-        row:Show()
-        return row
-    end
-
-    row = CreateFrame("Frame", nil, parent)
+-- One player row (filled by FillRow). Made once per line; the scoreboard
+-- keeps them in a pool (UI.Pool) and reuses each line's row in place.
+local function MakeRow(parent)
+    local row = CreateFrame("Frame", nil, parent)
     row:SetSize(FRAME_W - 2, ROW_H)
 
     row._stripe = Solid(row, "BACKGROUND", 0, 1, 0.94, 0.86, 0.018)
@@ -321,13 +310,6 @@ local function AcquireRow(parent)
     return row
 end
 
-local function ReleaseRow(row)
-    if not row then return end
-    row:Hide()
-    row:SetParent(UIParent)
-    row:ClearAllPoints()
-    _ins(_rowPool, row)
-end
 
 -- ===========================================================================
 -- Column rendering
@@ -529,6 +511,6 @@ local function FillRow(row, idx, p, isSelf, ctx)
 end
 
 UI.Rows = {
-    AcquireRow = AcquireRow, ReleaseRow = ReleaseRow, FillRow = FillRow,
+    MakeRow = MakeRow, FillRow = FillRow,
     RateOf = RateOf, COL_RENDERERS = COL_RENDERERS,
 }

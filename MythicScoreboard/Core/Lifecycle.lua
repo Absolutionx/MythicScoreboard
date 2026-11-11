@@ -19,15 +19,19 @@
 -- which use the same Begin/Finish functions. Whether a run is cleared, and
 -- saving it, is Completion.lua.
 
-local _max = math.max
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local _fmt = string.format
 
 local MYTHIC_PLUS = MS.MYTHIC_PLUS
 local PAUSE_LIMIT = 30 * 60      -- a paused run closes after this many seconds
+-- Waits after a run starts, for the game to catch up (seconds):
+local TIME_LIMIT_TRIES = { 1.0, 4.0 }   -- a key's timer, if the map didn't say at once
+local ROSTER_RETRY     = 2.0            -- the group, if it wasn't loaded yet
+local FIRST_READ       = 0.5            -- the meter, once the roster is in
+local OPEN_AFTER_LEAVE = 2.0            -- the window, after a run saved on leaving
 
-local function Say(msg) print("|cff00ccff[MythicScoreboard]|r " .. msg) end
+local Say = MS.Say
 
 -- ── Difficulties ───────────────────────────────────────────────────────────
 -- Stored in English and translated where shown (UI_Theme DiffShort).
@@ -113,7 +117,6 @@ local function ActiveChallengeMap()
 end
 
 -- ── State ──────────────────────────────────────────────────────────────────
-MS._deadUnits = MS._deadUnits or {}   -- units seen dead, so each death counts once
 
 function MS:RunState()
     local run = self.currentRun
@@ -131,6 +134,16 @@ function MS:WatchRunState(fn) _watchers[#_watchers + 1] = fn end
 function MS:UpdateRunWatchers()
     local state = self:RunState()
     for i = 1, #_watchers do _watchers[i](state) end
+end
+
+-- fn after `delay` seconds, if run is still the run in progress then (a run
+-- that ended or was replaced in the meantime is left alone).
+function MS:AfterForRun(run, delay, fn)
+    C_Timer.After(delay, function()
+        if MS.currentRun ~= run then return end
+        local ok, err = pcall(fn)                -- no error popup from a timer
+        if not ok then MS:ReportError("Timer", err) end
+    end)
 end
 
 -- The one place the run state changes.
@@ -156,7 +169,6 @@ function MS:SetRunState(state, run)
     else
         error("unknown run state " .. tostring(state))
     end
-    if state ~= "active" then wipe(self._deadUnits) end
     self:UpdateRunWatchers()
 end
 
@@ -225,6 +237,8 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     end
     run.affixes = CurrentAffixes()
     run.uiMapID = CurrentUiMap()
+    -- A dungeon with wings: which wing, if its map tells (Forever.lua).
+    if self.NoteForeverWing then self:NoteForeverWing(run) end
     -- Meter not reset for this run: its first reading is the zero point (Meter.lua).
     if not self:GetAutoResetMeter() then run._baselinePending = true end
 
@@ -242,20 +256,18 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
                     self:Changed("run")
                 end
             end
-            C_Timer.After(1.0, TryFetchTimeLimit)
-            C_Timer.After(4.0, TryFetchTimeLimit)
+            for _, wait in ipairs(TIME_LIMIT_TRIES) do self:AfterForRun(run, wait, TryFetchTimeLimit) end
         end
         run.currentPct = 0
     end
 
     local function SeedPlayers()
-        if self.currentRun ~= run then return end
         for _, unit in ipairs(self:GroupUnits()) do self:EnsurePlayer(unit) end
     end
     SeedPlayers()
     -- Solo, or the group not loaded yet: look again in a moment.
     if GetNumGroupMembers() == 0 then
-        C_Timer.After(2.0, function()
+        self:AfterForRun(run, ROSTER_RETRY, function()
             SeedPlayers()
             self:PopulateAll()
             self:PopulateRolesAndScores()
@@ -268,8 +280,8 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     self:SaveCurrentRun()
     self:Changed("run")
     -- Short delay lets roster seeding settle before first snapshot.
-    C_Timer.After(0.5, function()
-        if self.currentRun and not InCombatLockdown() then
+    self:AfterForRun(run, FIRST_READ, function()
+        if not InCombatLockdown() then
             self:SnapshotFromDamageMeter()
             self:SaveCurrentRun()
             self:Changed("run")
@@ -300,7 +312,7 @@ function MS:FinishRun(completed, inTime)
     local leaveMode = self:ApplyLeaveRules(self.currentRun)
     self:CommitRun({ completed = completed, inTime = inTime or false })
     if leaveMode and self:GetAutoOpenOnComplete() then
-        C_Timer.After(2, function() MS:ShowScoreboard() end)
+        C_Timer.After(OPEN_AFTER_LEAVE, function() MS:ShowScoreboard() end)
     end
 end
 
@@ -444,22 +456,16 @@ end
 
 -- A reset instance is a fresh dungeon: the paused run can't continue in it.
 -- The game announces it as "<Dungeon> has been reset." to the group.
-local _resetPattern
-if type(INSTANCE_RESET_SUCCESS) == "string" then
-    local escaped = INSTANCE_RESET_SUCCESS:gsub("([%(%)%.%+%-%*%?%[%]%^%$])", "%%%1")
-    _resetPattern = "^" .. escaped:gsub("%%s", "(.+)") .. "$"
-end
-local resetFrame = CreateFrame("Frame")
-MS:WatchRunState(function(state)              -- only listened for while paused
-    if state == "paused" then pcall(resetFrame.RegisterEvent, resetFrame, "CHAT_MSG_SYSTEM")
-    else resetFrame:UnregisterEvent("CHAT_MSG_SYSTEM") end
-end)
-resetFrame:SetScript("OnEvent", function(_, _, msg)
+local _resetPattern = MS.FormatPattern(rawget(_G, "INSTANCE_RESET_SUCCESS"))
+local function OnSystemMessage(_, msg)
     local run = MS.currentRun
-    if not (_resetPattern and run and run._suspended and type(msg) == "string") then return end
-    if MS.IsSecret(msg) then return end
-    local dungeon = msg:match(_resetPattern)
+    if not (_resetPattern and run and run._suspended) then return end
+    local dungeon = MS.MatchFormat(msg, _resetPattern)
     if dungeon and dungeon == run.dungeonName then MS:ClosePausedRun() end
+end
+MS:WatchRunState(function(state)              -- only listened for while paused
+    if state == "paused" then MS:On("CHAT_MSG_SYSTEM", OnSystemMessage)
+    else MS:Off("CHAT_MSG_SYSTEM", OnSystemMessage) end
 end)
 
 -- A paused run doesn't wait forever.

@@ -19,7 +19,6 @@
 -- give a third form under "<plural key>|few" (Russian: 2-4 and 22-24...).
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 
 MS.ClientLocale = (GetLocale and GetLocale()) or "enUS"
 if MS.ClientLocale == "enGB" then MS.ClientLocale = "enUS" end

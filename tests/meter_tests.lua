@@ -69,7 +69,7 @@ check("pet share stable over polls", P("Hizazi").damageTaken == 300, P("Hizazi")
 
 -- 6. Pet owner from tooltip text when the pet isn't a visible unit.
 run = fresh()
-M.roster.party4pet = nil; MS._petGUIDToOwner = {}; MS._petNameToOwner = {}
+M.roster.party4pet = nil; MS:ForgetPets()
 C_TooltipInfo.GetHyperlink = function(l) if l == "unit:Pet-0-1-55" then return { lines = { {}, { leftText = "Akasha's Pet" } } } end end
 meter({}, 100, { duration = 100, combatSources = { src("Imp", "Pet-0-1-55", 40, false, nil) } })
 MS:SnapshotFromDamageMeter()

@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.10.0
+
+### New: the in-run frame
+A small frame that shows how the run is going while you play. It's on by default; turn it off under "In-run frame" in settings or with `/sb compact off`.
+- **Mythic+:** the timer and time left, a bar marking the +3, +2 and +1 times, every boss with its kill time, your best time and how far ahead or behind you are, enemy forces with the count and how much the last pull gave, deaths and the time they cost, and your pace against your best run of that key. Hover the deaths for who died. Shift-click the frame to post the time left to your party.
+- **WoW Forever:** the dungeon and its level range, the clock, the bosses, experience (dungeon and quests), mobs killed, deaths and gold looted.
+- **Three styles:** detailed, compact and a single line. Right-click the frame to switch. Left-click opens the scoreboard; drag it wherever you like.
+- **Try it anywhere:** `/sb compact demo` plays out a sample run in fast-forward, with a different dungeon each time.
+
+### Mythic+
+- The live timer now matches the game's own, deaths included. Keys you've already saved are converted to the same clock, so old and new runs compare fairly.
+- Run comparison: every bar shows its time, including each boss kill, and the labels stay clear of the lines between bars. No bar runs outside the window any more.
+- Key upgrades use bronze for +1, silver for +2 and gold for +3, everywhere.
+
+### WoW Forever
+- **Mobs killed counts every kill,** including grey mobs and kills at max level, not only ones that gave XP. Kills are seen on enemy nameplates, your target and your group's targets, and a kill that also gave XP is counted once. Keep enemy nameplates on for the best count.
+
+### Fixes
+- The lines between bars on the run comparison chart are smoother.
+- If something goes wrong in the in-run frame or a delayed check, you get one line in chat instead of an error popup.
+
 ## 2.9.2
 
 ### WoW Forever

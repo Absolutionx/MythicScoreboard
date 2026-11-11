@@ -60,6 +60,7 @@ MS.SerializeRun = function(...) copies = copies + 1; return ser(...) end
 
 -- 1. A live run with the window closed: nothing drawn, nothing copied.
 check("nothing ticks out in the world", #M.tickers == 0, #M.tickers)
+MS:SetCompactStyle("off")            -- the in-run frame is checked on its own below
 local before = objects()
 zone(RFC)
 check("meter and death polls run in a dungeon", #M.tickers == 2, #M.tickers)
@@ -70,6 +71,16 @@ for i, b in ipairs({ "Oggleflint", "Taragaman the Hungerer" }) do
     MS:RecordDeathEvent(MS.currentRun.players[next(MS.currentRun.players)])
 end
 check("closed window: nothing drawn during a run", objects() - before < 20, objects() - before)
+
+-- The in-run frame: made once, then redrawn in place (no new pieces per redraw).
+MS:SetCompactStyle("detailed")
+local frame = rawget(_G, "MythicScoreboardCompact")
+check("in-run frame shown during a run", frame and frame._shown)
+for _ = 1, 4 do frame:Fire("OnUpdate", 1) end
+local made = objects()
+for _ = 1, 40 do wait(2); meter(M.now); M.Tick(); M.RunTimers(1); frame:Fire("OnUpdate", 1) end
+check("in-run frame: redraws make nothing new", objects() - made == 0, objects() - made)
+MS:SetCompactStyle("off")
 check("no copies of the run during play", copies == 0, copies)
 
 -- 2. Meter: one read per stat type per update.

@@ -1,7 +1,7 @@
 -- Minimal World of Warcraft API stand-in for loading MythicScoreboard outside
 -- the game. Widgets record their scripts so tests can fire them. Unknown
--- widget methods are no-ops; unknown *globals* are errors (that's the point:
--- a missing local after a refactor must fail loudly here).
+-- widget methods and unknown globals are errors (that's the point: a missing
+-- local after a refactor, or a typo, must fail loudly here).
 
 local M = {}
 M.timers, M.tickers, M.printed, M.events = {}, {}, {}, {}
@@ -10,18 +10,27 @@ M.now = 1000
 -- ── Widgets ────────────────────────────────────────────────────────────────
 local Widget = {}
 local function noop() end
+-- Game widget methods the addon calls whose effect tests don't look at.
+-- Anything else unknown reads as nil, so calling it fails here: a typo, or
+-- an addon field that was never set (frame.UpdateLive), can't pass as a
+-- game call. A new game method used by the addon is added to this list.
+local NOOP_METHODS = {
+    AddDoubleLine=1, AddLine=1, AddMaskTexture=1, EnableMouse=1, EnableMouseWheel=1, Play=1,
+    Raise=1, RegisterForClicks=1, RegisterForDrag=1, SetAllPoints=1, SetAlpha=1, SetBackdrop=1,
+    SetBlendMode=1, SetClampedToScreen=1, SetColorTexture=1, SetDesaturated=1, SetDuration=1,
+    SetFormattedText=1, SetFrameLevel=1, SetFrameStrata=1, SetFromAlpha=1, SetGradient=1,
+    SetHighlightTexture=1, SetHyperlink=1, SetJustifyH=1, SetJustifyV=1, SetLooping=1, SetMaxLines=1,
+    SetMovable=1, SetObeyStepOnDrag=1, SetOrientation=1, SetRotation=1, SetScrollChild=1,
+    SetShadowColor=1, SetShadowOffset=1, SetSmoothing=1, SetSnapToPixelGrid=1, SetTexCoord=1,
+    SetTexelSnappingBias=1, SetTextColor=1, SetThumbTexture=1, SetToAlpha=1, SetToplevel=1,
+    SetValueStep=1, SetVertexColor=1, SetVerticalScroll=1, SetWordWrap=1, StartMoving=1,
+    StopMovingOrSizing=1,
+}
 local WidgetMT = {
     __index = function(t, k)
         local v = rawget(Widget, k)
         if v ~= nil then return v end
-        -- Only real widget method names fall back to a no-op; the addon's
-        -- own fields (frame.SettingsPopup etc.) must read as nil until set.
-        if type(k) == "string" and (k:find("^Set%u") or k:find("^Enable") or k:find("^Disable")
-                or k:find("^Register") or k:find("^Unregister") or k:find("^Clear%u")
-                or k:find("^Lower") or k:find("^Raise") or k:find("^Start") or k:find("^Stop")
-                or k:find("^Play") or k:find("^Add%u") or k:find("^Adjust") or k:find("^Update%u")) then
-            return noop
-        end
+        if NOOP_METHODS[k] then return noop end
         return nil
     end,
 }
@@ -83,6 +92,7 @@ function Widget:GetName() return nil end
 function Widget:GetNumPoints() return self._points end
 function Widget:SetPoint(a, rel, b, x, y) self._points = self._points + 1; self._at = { a, rel, b, x, y } end
 function Widget:ClearAllPoints() self._points = 0 end
+function Widget:GetPoint() local a = self._at or {} return a[1], a[2], a[3], a[4], a[5] end
 function Widget:GetMinMaxValues() return self._min or 0, self._max or 0 end
 function Widget:SetMinMaxValues(a, b) self._min, self._max = a, b end
 function Widget:GetValue() return self._val or 0 end
@@ -106,9 +116,20 @@ function Widget:SetThickness(t) self._thick = t end
 function Widget:CreateMaskTexture() return New("MaskTexture", self) end
 function Widget:CreateFontString() return New("FontString", self) end
 function Widget:CreateAnimationGroup() local g = New("AnimationGroup", self); g.CreateAnimation = function() return New("Animation", g) end; return g end
-function Widget:RegisterEvent(e) M.events[e] = M.events[e] or {}; table.insert(M.events[e], self) end
-function Widget:UnregisterEvent() end
-function Widget:UnregisterAllEvents() end
+-- Like the game: registering twice is once, and unregistering stops events.
+function Widget:RegisterEvent(e)
+    local list = M.events[e] or {}
+    M.events[e] = list
+    for _, f in ipairs(list) do if f == self then return end end
+    table.insert(list, self)
+end
+function Widget:UnregisterEvent(e)
+    local list = M.events[e] or {}
+    for i = #list, 1, -1 do if list[i] == self then table.remove(list, i) end end
+end
+function Widget:UnregisterAllEvents()
+    for e in pairs(M.events) do self:UnregisterEvent(e) end
+end
 function Widget:IsEventRegistered() return true end
 function Widget:NumLines() return 0 end
 
@@ -235,13 +256,17 @@ UnitLevel = function(u) if u == "player" and M.level then return M.level end loc
 UnitIsPlayer = function(u) local r = R(u); return r ~= nil and not r.npc end
 UnitIsDeadOrGhost = function(u) return M.dead[u] == true end
 UnitIsFriend = function() return true end
-UnitCanAttack = function() return false end
+UnitCanAttack = function(_, u) local r = R(u); return r ~= nil and r.hostile == true end
+UnitIsDead = function(u) return M.dead[u] == true end
+UnitIsTapDenied = function(u) local r = R(u); return r ~= nil and r.tapDenied == true end
+UnitPlayerControlled = function(u) local r = R(u); return r ~= nil and not r.npc end
 UnitClassification = function() return "normal" end
 UnitIsBossMob = function() return false end
 UnitGroupRolesAssigned = function(u) return u == "party2" and "TANK" or (u == "party3" and "HEALER" or "DAMAGER") end
 UnitAffectingCombat = function() return false end
 GetNumGroupMembers = function() return M.groupSize or 5 end
 IsInGroup = function() return (M.groupSize or 5) > 0 end
+IsShiftKeyDown = function() return M.shift == true end
 IsInRaid = function() return false end
 CanInspect = function() return false end
 NotifyInspect = noop

@@ -15,11 +15,11 @@ end
 
 local function OnLoaded()
     -- The client's language, or the one picked with /sb lang to preview it.
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
-    MS:UseLocale(type(acc) == "table" and acc.previewLocale or nil)
+    local acc = MS.AccountDB()
+    MS:UseLocale(acc and acc.previewLocale or nil)
     local db = InitDB()
     if not (C_DamageMeter and C_DamageMeter.IsDamageMeterAvailable) then
-        print("|cffff4444[MythicScoreboard]|r " .. L["C_DamageMeter unavailable — requires WoW 12.0+."])
+        MS.Warn(L["C_DamageMeter unavailable — requires WoW 12.0+."])
     end
     MS:RunMigrations()                      -- saved data up to date before anything reads it
     MS:SyncAccountStats()                   -- this character's runs, account-wide
@@ -55,9 +55,9 @@ local function OnLoaded()
         end
         C_Timer.After(0.2, function() MS:Changed("run") end)
     end
-    print("|cff00ccff[MythicScoreboard]|r v" .. MS.version .. "  " .. L["/sb to open."])
+    MS.Say("v" .. MS.version .. "  " .. L["/sb to open."])
 end
 
-MS.EventHandlers.ADDON_LOADED = function(name)
+MS:On("ADDON_LOADED", function(_, name)
     if name == "MythicScoreboard" then OnLoaded() end
-end
+end)

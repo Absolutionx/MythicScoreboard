@@ -34,7 +34,9 @@ local function IconButton(parent, file, size, hoverCol)
     return b
 end
 
-local function BuildChrome(f)
+-- The window's stone-and-bronze look, for any size of frame (the in-run
+-- frame uses it too). washH: how far the warm light from the top reaches.
+local function BuildChrome(f, washH)
     -- Border: black hairline outside a dark-bronze hairline.
     local outer = Solid(f, "BACKGROUND", -7, 0, 0, 0, 1); outer:SetAllPoints()
     local inner = Solid(f, "BACKGROUND", -6, P.bronzeDk[1], P.bronzeDk[2], P.bronzeDk[3], 1)
@@ -51,22 +53,21 @@ local function BuildChrome(f)
     grain:SetAlpha(0.5)
 
     -- Bronze top rule, bright in the middle and fading to the corners.
-    local half = (FRAME_W - 4) / 2
     local tl = f:CreateTexture(nil, "BORDER", nil, 5)
-    tl:SetPoint("TOPLEFT", 2, -2); tl:SetSize(half, 2)
+    tl:SetPoint("TOPLEFT", 2, -2); tl:SetPoint("BOTTOMRIGHT", f, "TOP", 0, -4)
     HGrad(tl, P.bronze, P.bronzeHi, 0, 1)
     local tr = f:CreateTexture(nil, "BORDER", nil, 5)
-    tr:SetPoint("TOPRIGHT", -2, -2); tr:SetSize(half, 2)
+    tr:SetPoint("TOPRIGHT", -2, -2); tr:SetPoint("BOTTOMLEFT", f, "TOP", 0, -4)
     HGrad(tr, P.bronzeHi, P.bronze, 1, 0)
     -- A faint warm light falling from the top rule.
     local wash = f:CreateTexture(nil, "BACKGROUND", nil, -3)
-    wash:SetPoint("TOPLEFT", 2, -4); wash:SetPoint("TOPRIGHT", -2, -4); wash:SetHeight(70)
+    wash:SetPoint("TOPLEFT", 2, -4); wash:SetPoint("TOPRIGHT", -2, -4); wash:SetHeight(washH or 70)
     VGrad(wash, P.bronze, P.bronze, 0, 0.05)
 end
+UI.BuildChrome = BuildChrome
 
-function MS:BuildUI()
-    if sbFrame then return end
-
+-- ── The window ─────────────────────────────────────────────────────────────
+local function BuildWindow()
     sbFrame = CreateFrame("Frame", "MythicScoreboardFrame", UIParent)
     UI.frame = sbFrame
     sbFrame:SetSize(FRAME_W, FRAME_H)
@@ -96,7 +97,10 @@ function MS:BuildUI()
     tinsert(UISpecialFrames, "MythicScoreboardFrame")
 
     BuildChrome(sbFrame)
+end
 
+-- Title, difficulty badge, the line under it, and the personal-best label.
+local function BuildHeader()
     -- ── Header ──────────────────────────────────────────────────────────
     local hdr = CreateFrame("Frame", nil, sbFrame)
     hdr:SetPoint("TOPLEFT", 1, -1); hdr:SetPoint("TOPRIGHT", -1, -1)
@@ -142,10 +146,10 @@ function MS:BuildUI()
         local hov = CreateFrame("Frame", nil, hdr)
         hov:SetAllPoints(subline)
         hov:EnableMouse(true)
-        hov:SetScript("OnEnter", function(self)
+        hov:SetScript("OnEnter", function(owner)
             local run = sbFrame.SublineRun
             if not (run and run.progress) then return end
-            GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+            GameTooltip:SetOwner(owner, "ANCHOR_CURSOR_RIGHT", 12, 12)
             GameTooltip:SetText(L["This run"], P.ivory[1], P.ivory[2], P.ivory[3])
             UI.AddProgressLines(run.progress)
             GameTooltip:Show()
@@ -158,8 +162,11 @@ function MS:BuildUI()
     pbLabel:SetText(L["New personal best"])
     pbLabel:Hide()
     sbFrame.PBLabel = pbLabel
+    return hdr, subline
+end
 
-    -- Affix icons sit at the end of the subline.
+-- Affix icons sit at the end of the subline.
+local function BuildAffixIcons(hdr, subline)
     local AFFIX = 18
     local affixIcons = {}
     for i = 1, 4 do
@@ -212,8 +219,10 @@ function MS:BuildUI()
             end
         end
     end
+end
 
-    -- ── Controls: history selector, settings, close ─────────────────────
+-- Close and settings, at the top right.
+local function BuildCloseAndSettings(hdr)
     local closeBtn = IconButton(hdr, "Close", 30, P.bloodHi)
     closeBtn:SetPoint("TOPRIGHT", hdr, "TOPRIGHT", -16, -17)
     closeBtn:SetScript("OnClick", function() CloseHistDropdown(); sbFrame:Hide() end)
@@ -238,7 +247,11 @@ function MS:BuildUI()
     end)
     settBtn:HookScript("OnLeave", GameTooltip_Hide)
     sbFrame.SettingsBtn = settBtn
+    return settBtn
+end
 
+-- The run picker: which run the window shows (opens the history list).
+local function BuildHistoryButton(hdr, settBtn)
     local histBtn = Btn(hdr)
     histBtn:SetSize(300, 30)
     histBtn:SetPoint("RIGHT", settBtn, "LEFT", -8, 0)
@@ -316,8 +329,11 @@ function MS:BuildUI()
         OpenHistDropdown(histBtn)
     end)
     sbFrame.HistoryButton = histBtn
+    return histBtn
+end
 
-    -- ── Stats button (UI_Stats.lua): three rising bars ──────────────────
+-- The Stats button (UI_Stats.lua): three rising bars.
+local function BuildStatsButton(hdr, histBtn)
     local statsBtn = Btn(hdr)
     statsBtn:SetSize(30, 30)
     statsBtn:SetPoint("RIGHT", histBtn, "LEFT", -8, 0)
@@ -352,12 +368,10 @@ function MS:BuildUI()
         UI.ToggleStats()
     end)
     sbFrame.StatsBtn = statsBtn
+end
 
-    -- ── Settings popup (UI_Settings.lua) ─────────────────────────────────
-    local settPop = UI.BuildSettingsPopup(sbFrame, settBtn)
-    sbFrame.SettingsPopup = settPop
-
-    -- ── Column header row ───────────────────────────────────────────────
+-- The column headers: click to sort, again to reverse, a third time to reset.
+local function BuildColumnHeader()
     local colHdr = CreateFrame("Frame", nil, sbFrame)
     colHdr:SetPoint("TOPLEFT",  sbFrame, "TOPLEFT",  2, -(HDR_H + 1))
     colHdr:SetPoint("TOPRIGHT", sbFrame, "TOPRIGHT", -2, -(HDR_H + 1))
@@ -417,8 +431,10 @@ function MS:BuildUI()
         x = x + col.w
     end
     RefreshHeaderLabels()
+end
 
-    -- ── Player rows + timeline containers ───────────────────────────────
+-- Player rows, the timeline under them, and the Stats page.
+local function BuildBody()
     overviewSF = MakeScrollFrame(sbFrame)
     UI.overviewSF = overviewSF
     overviewSF:SetPoint("TOPLEFT",     sbFrame, "TOPLEFT",     1, -(HDR_H + COL_HDR_H + 1))
@@ -436,8 +452,22 @@ function MS:BuildUI()
     UI.BuildStatsView(sbFrame)
 
     MS:SetSBFrameVisibleCallback(function() return sbFrame and sbFrame:IsShown() end)
-
 end
+
+function MS:BuildUI()
+    if sbFrame then return end
+    BuildWindow()
+    local hdr, subline = BuildHeader()
+    BuildAffixIcons(hdr, subline)
+    local settBtn = BuildCloseAndSettings(hdr)
+    local histBtn = BuildHistoryButton(hdr, settBtn)
+    BuildStatsButton(hdr, histBtn)
+    sbFrame.SettingsPopup = UI.BuildSettingsPopup(sbFrame, settBtn)   -- UI_Settings.lua
+    BuildColumnHeader()
+    BuildBody()
+    MS:SetSBFrameVisibleCallback(function() return sbFrame and sbFrame:IsShown() end)
+end
+
 
 -- Each language by its own name (/sb lang).
 local LANG_NAMES = {
@@ -448,8 +478,8 @@ local LANG_NAMES = {
 -- /sb lang [code]: shows the addon in another language from the next
 -- /reload, to check a translation without changing the game's language.
 local function LangCommand(arg)
-    local say = function(s) print("|cff00ccff[MythicScoreboard]|r " .. s) end
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
+    local say = MS.Say
+    local acc = MS.AccountDB()
     if arg == "" then
         say(_fmt(L["Language: %s"], LANG_NAMES[MS.Locale] or MS.Locale)
             .. ((MS.Locale ~= MS.ClientLocale) and ("  |cff888888(" .. L["preview"] .. ")|r") or ""))
@@ -465,7 +495,7 @@ local function LangCommand(arg)
         end
     end
     if not pick then say(_fmt(L["Unknown language: %s"], arg)); return end
-    if type(acc) ~= "table" then MythicScoreboardAccountDB = {}; acc = MythicScoreboardAccountDB end
+    acc = acc or MS.AccountDB(true)
     acc.previewLocale = (pick ~= MS.ClientLocale) and pick or nil
     say(_fmt(L["Type /reload to see the addon in %s."], LANG_NAMES[pick] or pick))
 end
@@ -547,6 +577,8 @@ local function DemoRun(up)
     return run
 end
 
+UI.DemoRun = DemoRun          -- (the in-run frame's sample, UI_Compact.lua)
+
 local function DemoCommand(arg)
     local up = tonumber(arg)
     if not (up and DEMO_TIMES[up]) then up = 2 end
@@ -554,7 +586,7 @@ local function DemoCommand(arg)
     if UI.statsOpen then UI.CloseStats() end
     MS.displayRun = DemoRun(up)
     MS:RefreshOverview()
-    print("|cff00ccff[MythicScoreboard]|r " .. L["A sample key, not saved. Pick a run from history to go back."])
+    MS.Say(L["A sample key, not saved. Pick a run from history to go back."])
 end
 
 -- Slash commands work before the window is first opened (it is built then).
@@ -564,22 +596,24 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
     local cmd = _slower(_smatch(msg or "", "^%s*(.-)%s*$"))
     local langArg = _smatch(cmd, "^lang%s*(.*)$")
     local demoArg = _smatch(cmd, "^demo%s*(.*)$")
+    local compactArg = _smatch(cmd, "^compact%s*(.*)$")
     if langArg then
         LangCommand(langArg)
     elseif demoArg then
         DemoCommand(demoArg)
+    elseif compactArg then
+        MS:CompactCommand(compactArg)
     elseif _smatch(cmd, "^removeloot") then
         -- /sb removeloot [item]: Shift-click the item into the line.
         local link = _smatch(msg or "", "|H(item:[%-%d:]+)") or _smatch(msg or "", "(item:%d+)")
         local n = link and MS:RemoveLootItem(link)
-        local tag = "|cff00ccff[MythicScoreboard]|r "
         if not link then
-            print(tag .. L["Type /sb removeloot, then Shift-click the item into the line."])
+            MS.Say(L["Type /sb removeloot, then Shift-click the item into the line."])
         elseif n and n > 0 then
-            print(tag .. MS.Plural(n, "Removed from %d run.", "Removed from %d runs."))
+            MS.Say(MS.Plural(n, "Removed from %d run.", "Removed from %d runs."))
             MS:RefreshOverview()
         else
-            print(tag .. L["That item isn't on any of your runs from the last day."])
+            MS.Say(L["That item isn't on any of your runs from the last day."])
         end
     elseif cmd == "" then
         MS:ShowScoreboard()
@@ -588,19 +622,21 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         UI.OpenStats()
     elseif cmd == "abandon" then
         if not MS:AbandonRun() then
-            print("|cff00ccff[MythicScoreboard]|r " .. L["No run in progress to abandon."])
+            MS.Say(L["No run in progress to abandon."])
         end
     elseif cmd == "help" then
-        print("|cff00ccff[MythicScoreboard]|r v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb removeloot, /sb help")
+        MS.Say("v" .. MS.version
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, /sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)
-        print("|cff00ccff[MythicScoreboard]|r " .. L["Reset meter on zone-in:"] .. " "
+        MS.Say(L["Reset meter on zone-in:"] .. " "
             .. (newVal and ("|cff00ff00" .. L["on"] .. "|r") or ("|cffff4444" .. L["off"] .. "|r")))
     elseif cmd == "clear" then
         DoClearHistory()
+    elseif cmd == "killdebug" and MS.KillDebug then
+        MS:KillDebug()
     else
-        print("|cff00ccff[MythicScoreboard]|r " .. L["Unknown command. Type /sb help for a list."])
+        MS.Say(L["Unknown command. Type /sb help for a list."])
     end
 end

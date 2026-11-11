@@ -25,7 +25,7 @@ local _ins, _rem, _sort = table.insert, table.remove, table.sort
 
 local MAX_RUNS = 2000
 
-local function Int(n) return _floor((tonumber(n) or 0) + 0.5) end
+local Int = MS.Round
 
 -- Stats are worked out once and kept until the runs change. Anything that
 -- changes an archive bumps this; the cache key also notes each character's
@@ -43,16 +43,12 @@ function MS:StatsRevision() return _rev end   -- changes whenever any archived r
 -- copy is moved over the first time the character logs in.
 
 local function Account()
-    if type(rawget(_G, "MythicScoreboardAccountDB")) ~= "table" then MythicScoreboardAccountDB = {} end
-    local acc = MythicScoreboardAccountDB
+    local acc = MS.AccountDB(true)
     if type(acc.chars) ~= "table" then acc.chars = {} end
     return acc
 end
 
-local function Plain(v)
-    if v == nil or MS.IsSecret(v) then return nil end
-    return v
-end
+local Plain = MS.ReadableValue
 
 local function CharKey()
     local name = Plain(MS.UnitPlayerName and MS:UnitPlayerName("player") or UnitName("player"))
@@ -94,17 +90,21 @@ end
 
 -- This character's archive table: { v = data version, runs, seeded }.
 -- Reading it changes nothing once it's in place.
+-- This character's key (name@realm), once known. Archive.lua sets it.
+local _charKey
+function MS:CharKey() return _charKey end
+
 local function Store()
     if not MythicScoreboardDB then return nil end
-    local key = MS._charKey or CharKey()
+    local key = _charKey or CharKey()
     if not key then
         -- Name not known yet: keep it with the character until it is.
         if not Valid(MythicScoreboardDB.archive) then MythicScoreboardDB.archive = NewArchive() end
         return Ready(MythicScoreboardDB.archive)
     end
-    MS._charKey = key
-    local acc = rawget(_G, "MythicScoreboardAccountDB")
-    local c = type(acc) == "table" and type(acc.chars) == "table" and acc.chars[key]
+    _charKey = key
+    local acc = MS.AccountDB()
+    local c = acc and type(acc.chars) == "table" and acc.chars[key]
     if c and Valid(c.archive) and c.runs == nil and MythicScoreboardDB.archive == nil then
         return Ready(c.archive)
     end
@@ -354,7 +354,7 @@ function MS:SyncAccountStats()
     c.name, c.realm = name, realm
     local _, cls = UnitClass("player")
     c.class = Plain(cls) or c.class
-    self._charKey = key
+    _charKey = key
 end
 
 -- "all", or one character's key.
@@ -371,8 +371,8 @@ function MS:StatsCharacters()
     local out = {}
     for key, c in pairs(Account().chars) do
         local n = #CharRuns(c)
-        if n > 0 or key == self._charKey then
-            _ins(out, { key = key, name = c.name or key, class = c.class, runs = n, me = key == self._charKey })
+        if n > 0 or key == _charKey then
+            _ins(out, { key = key, name = c.name or key, class = c.class, runs = n, me = key == _charKey })
         end
     end
     _sort(out, function(x, y)
@@ -387,7 +387,7 @@ function MS:CharacterInfo(key) return key and Account().chars[key] end
 -- The cache key for what the Stats page shows right now.
 local _memo, _memoKey = {}, nil
 local function StatsKey(self)
-    local parts = { _rev, tostring(self._charKey), self:GetStatsChar() }
+    local parts = { _rev, tostring(_charKey), self:GetStatsChar() }
     for key, c in pairs(Account().chars) do
         local runs = CharRuns(c)
         parts[#parts + 1] = key .. tostring(runs) .. #runs
@@ -406,9 +406,9 @@ end
 -- Which character each archived run belongs to.
 local function OwnersNow(self)
     local out = {}
-    for _, e in ipairs(self:ArchiveRuns()) do out[e] = self._charKey end
+    for _, e in ipairs(self:ArchiveRuns()) do out[e] = _charKey end
     for key, c in pairs(Account().chars) do
-        if key ~= self._charKey then
+        if key ~= _charKey then
             for _, e in ipairs(CharRuns(c)) do out[e] = key end
         end
     end
@@ -416,9 +416,9 @@ local function OwnersNow(self)
 end
 function MS:RunOwner(e) return Memo(self, "owners", OwnersNow)[e] end
 function MS:IsOwnRun(e)
-    if not self._charKey then return true end      -- name not known yet: everything is ours
+    if not _charKey then return true end      -- name not known yet: everything is ours
     local owner = self:RunOwner(e)
-    return owner ~= nil and owner == self._charKey
+    return owner ~= nil and owner == _charKey
 end
 
 -- The runs the Stats page shows, oldest first.
@@ -430,7 +430,7 @@ function MS:StatsRuns()
 end
 function StatsRunsNow(self)
     local mine = self:ArchiveRuns()
-    local me, want = self._charKey, self:GetStatsChar()
+    local me, want = _charKey, self:GetStatsChar()
     if not me or want == me then return mine end
     local out = {}
     for key, c in pairs(Account().chars) do

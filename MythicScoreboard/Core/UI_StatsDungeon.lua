@@ -6,9 +6,9 @@ local L = MS.L
 local LK = MS.LK      -- a label kept in English, translated where it is shown
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local P, PAD_X, HDR_H, COL_HDR_H, FRAME_W = UI.P, UI.PAD_X, UI.HDR_H, UI.COL_HDR_H, UI.FRAME_W
-local Text, Solid, Btn, Tint, Art, Box = UI.Text, UI.Solid, UI.Btn, UI.Tint, UI.Art, UI.Box
-local VGrad, MakeScrollFrame, ClassHex, CT, DN, Abbrev = UI.VGrad, UI.MakeScrollFrame, UI.ClassHex, UI.CT, UI.DN, UI.Abbrev
+local P, COL_HDR_H, FRAME_W = UI.P, UI.COL_HDR_H, UI.FRAME_W
+local Text, Solid, Btn, Tint, Art = UI.Text, UI.Solid, UI.Btn, UI.Tint, UI.Art
+local VGrad, MakeScrollFrame, CT, Abbrev = UI.VGrad, UI.MakeScrollFrame, UI.CT, UI.Abbrev
 local FIGHT_BOT, FIGHT_TOP = UI.FIGHT_BOT, UI.FIGHT_TOP
 
 -- Stats page, part 2: one dungeon (a bar per run, the run list, each boss's
@@ -279,7 +279,8 @@ local function FillDetail(d, s, stats)
         row.cmp.Look()
         local c = row.cells
         c.date:SetText(Day(e.at))
-        c.level:SetText(e.me and e.me.lvl or CT(P.ash2, "-"))
+        -- A key: its level. Otherwise your character's level then (Forever).
+        c.level:SetText(e.key and CT(P.bronzeHi, "+" .. e.key) or (e.me and e.me.lvl) or CT(P.ash2, "-"))
         c.time:SetText(e.cleared and e.dur == s.best and CT(P.bronzeHi, Dur(e.dur)) or Dur(e.dur))
         c.result:SetText(Result(e))
         c.deaths:SetText((e.deaths or 0) > 0 and CT(P.bloodHi, e.deaths) or CT(P.ash, "0"))
@@ -386,16 +387,21 @@ local function BuildCompare(parent)
         lane.track = track
         lane.ends = Solid(c, "OVERLAY", 1, P.ivory[1], P.ivory[2], P.ivory[3], 0.8)
         lane.ends:SetSize(2, LANE_H + 8)
+        -- Each run's times on the side away from the lines joining the two:
+        -- above the first bar, below the second. 0:00, each kill, the end.
+        lane.above = (i == 1)
+        lane.zero = Text(c, "medium", 11, P.ash, "LEFT")
+        lane.zero:SetText("0:00")
+        lane.endLbl = Text(c, "medium", 11, P.ash, "CENTER")
+        lane.killAt, lane.killsHideFrom = Pool(function() return Text(c, "medium", 11, P.ash2, "CENTER") end)
         lane.blockAt, lane.blocksHideFrom = Pool(function()
             local t = c:CreateTexture(nil, "ARTWORK"); return t
         end)
         c.lanes[i] = lane
     end
     c.linkAt, c.linksHideFrom = Pool(function()
-        return UI.ChartLine(c, 3)
+        return UI.ChartLine(c, 8, true)   -- long shallow lines: the softer-edged texture
     end)
-    c.axis0 = Text(c, "medium", 11, P.ash, "LEFT")
-    c.axisEnd = Text(c, "medium", 11, P.ash, "RIGHT")
     c.verdict = Text(c, "semibold", 14, P.ivory, "LEFT")
     c.verdict:SetPoint("TOPLEFT", c, "TOPLEFT", X0, -(COL_HDR_H + 22 + 62 + 52))
 
@@ -417,6 +423,43 @@ local function BuildCompare(parent)
     return c
 end
 
+-- A lane's times: 0:00 at its start, its end time under (or over) the end
+-- mark, and each kill's time at the end of its block. A kill time that
+-- would run into another is left out (the start and end come first).
+local function PlaceLaneTimes(lane, e, runEnd, At)
+    local point = lane.above and "BOTTOM" or "TOP"
+    local y = lane.above and (lane.y - 8 + 3) or (lane.y - 8 - LANE_H - 4)
+    local taken = {}
+    local function Fits(x1, x2)
+        for _, r in ipairs(taken) do
+            if x1 < r[2] + 6 and x2 > r[1] - 6 then return false end
+        end
+        return true
+    end
+    local function Put(fs, cx, text)
+        fs:SetText(text)
+        local half = fs:GetStringWidth() / 2
+        cx = _max(LANE_X + half, _min(cx, LANE_X + LANE_W - half))   -- inside the lane
+        fs:ClearAllPoints()
+        fs:SetPoint(point, lane.zero:GetParent(), "TOPLEFT", cx, y)
+        return cx - half, cx + half
+    end
+    local z1, z2 = Put(lane.zero, LANE_X, "0:00")
+    taken[#taken + 1] = { z1, z2 }
+    local e1, e2 = Put(lane.endLbl, At(runEnd), Dur(runEnd))
+    taken[#taken + 1] = { e1, e2 }
+    local n = 0
+    for _, b in ipairs(e.bosses or {}) do
+        if b.t then
+            n = n + 1
+            local fs = lane.killAt(n)
+            local x1, x2 = Put(fs, At(b.t), Dur(_min(b.t, runEnd)))
+            if Fits(x1, x2) then taken[#taken + 1] = { x1, x2 } else fs:Hide() end
+        end
+    end
+    lane.killsHideFrom(n + 1)
+end
+
 local function FillCompare(c, cmp)
     local A, B = cmp.first, cmp.second
     c.backTxt:SetText(A.dungeon or L["Back"])
@@ -430,12 +473,17 @@ local function FillCompare(c, cmp)
             CT(P.ivory, Dur(e.dur)), Result(e),
             ((e.deaths or 0) > 0 and CT(P.bloodHi, MS.Plural(e.deaths, "%d death", "%d deaths")) or L["No deaths"]),
         }, "    "))
+        -- A kill logged after the run ended (a key's last ENCOUNTER_END can
+        -- come after its timer stopped) is drawn at the end, as on the
+        -- scoreboard's timeline, so nothing runs past the run's own end.
+        local runEnd = (e.dur or 0) > 0 and e.dur or scale
+        local function At(t) return LX(_min(t or 0, runEnd)) end
         local k = 0
         for _, b in ipairs(e.bosses or {}) do
             k = k + 1
             local t = lane.blockAt(k)
-            local x1 = LX(b.d and (b.t - b.d) or b.t)
-            local w = _max(2, LX(b.t) - x1)
+            local x1 = At(b.d and (b.t - b.d) or b.t)
+            local w = _max(2, At(b.t) - x1)
             t:ClearAllPoints()
             t:SetPoint("TOPLEFT", c, "TOPLEFT", x1, lane.y - 8)
             t:SetSize(w, LANE_H)
@@ -443,7 +491,8 @@ local function FillCompare(c, cmp)
         end
         lane.blocksHideFrom(k + 1)
         lane.ends:ClearAllPoints()
-        lane.ends:SetPoint("TOPLEFT", c, "TOPLEFT", LX(e.dur) - 1, lane.y - 4)
+        lane.ends:SetPoint("TOPLEFT", c, "TOPLEFT", LX(runEnd) - 1, lane.y - 4)
+        PlaceLaneTimes(lane, e, runEnd, At)
     end
     -- Lines joining the same boss's kill in both runs.
     local n = 0
@@ -454,15 +503,12 @@ local function FillCompare(c, cmp)
             n = n + 1
             local l = c.linkAt(n)
             local col = (r.split or 0) < -0.5 and P.verd or (r.split or 0) > 0.5 and P.bloodHi or P.ash
-            UI.ChartLineColor(l, col, 0.7)
-            l:SetStartPoint("TOPLEFT", c, LX(r.a.t), y1)
-            l:SetEndPoint("TOPLEFT", c, LX(r.b.t), y2)
+            UI.ChartLineColor(l, col, 0.85)
+            l:SetStartPoint("TOPLEFT", c, LX(_min(r.a.t, A.dur or r.a.t)), y1)
+            l:SetEndPoint("TOPLEFT", c, LX(_min(r.b.t, B.dur or r.b.t)), y2)
         end
     end
     c.linksHideFrom(n + 1)
-    c.axis0:ClearAllPoints(); c.axis0:SetPoint("TOPLEFT", c, "TOPLEFT", LANE_X, y2 - LANE_H - 4); c.axis0:SetText("0:00")
-    c.axisEnd:ClearAllPoints(); c.axisEnd:SetPoint("TOPRIGHT", c, "TOPLEFT", LANE_X + LANE_W, y2 - LANE_H - 4)
-    c.axisEnd:SetText(Dur(scale))
 
     -- Verdict
     local T = cmp.total

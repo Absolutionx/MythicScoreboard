@@ -19,12 +19,18 @@ local DEFAULTS = {
     showMobForces           = true,
     showMobForcesNameplates = true,
     minimapButton           = true,
+    compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
+    -- compactPos: no default (the frame starts near the top right)
     -- minimapAngle: no default (the button's resting place is its own)
     -- trackedDifficulties: { [group key] = bool }, defaults from MS.DIFF_GROUPS
 }
 MS.SETTING_DEFAULTS = DEFAULTS
 
 local HISTORY_MIN, HISTORY_MAX = 1, 30
+
+-- Read from DEFAULTS until the player picks one, so a later default reaches
+-- everyone who never chose.
+local UNSAVED = { compactStyle = true }
 
 local function Store()
     local db = rawget(_G, "MythicScoreboardDB")
@@ -36,8 +42,10 @@ function MS:InitSettings(db)
     db.settings = type(db.settings) == "table" and db.settings or {}
     local s = db.settings
     for k, v in pairs(DEFAULTS) do
-        if s[k] == nil then s[k] = v end
+        if s[k] == nil and not UNSAVED[k] then s[k] = v end
     end
+    -- Test builds saved the in-run frame's first default as if picked.
+    if s.compactStyle == "compact" and not s.compactPicked then s.compactStyle = nil end
     if type(s.trackedDifficulties) ~= "table" then s.trackedDifficulties = {} end
     for _, grp in ipairs(MS.DIFF_GROUPS) do
         if s.trackedDifficulties[grp.key] == nil then
@@ -80,6 +88,32 @@ MS.GetAutoOpenOnComplete,   MS.SetAutoOpenOnComplete   = Bool("autoOpenOnComplet
 MS.GetMobForcesTooltip,     MS.SetMobForcesTooltip     = Bool("showMobForces")
 MS.GetMobForcesNameplate,   MS.SetMobForcesNameplate   = Bool("showMobForcesNameplates")
 MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
+
+-- The in-run frame's style (UI_Compact.lua); "off" hides it.
+MS.COMPACT_STYLES = { "compact", "detailed", "minimal" }
+function MS:GetCompactStyle()
+    local v = self:GetSetting("compactStyle")
+    if v == "off" then return "off" end
+    for _, s in ipairs(MS.COMPACT_STYLES) do if s == v then return v end end
+    return DEFAULTS.compactStyle
+end
+function MS:SetCompactStyle(v)
+    local s = Store()
+    if s then s.compactPicked = true end
+    self:SetSetting("compactStyle", v)
+end
+-- On or off, for the settings popup; turning it back on brings back the style it had.
+function MS:GetCompactFrame() return self:GetCompactStyle() ~= "off" end
+function MS:SetCompactFrame(on)
+    local s = Store()
+    if on then
+        self:SetCompactStyle((s and s.compactLastStyle) or DEFAULTS.compactStyle)
+    else
+        local cur = self:GetCompactStyle()
+        if s and cur ~= "off" then s.compactLastStyle = cur end
+        self:SetCompactStyle("off")
+    end
+end
 
 function MS:GetHistoryLimit()
     return _max(HISTORY_MIN, _min(HISTORY_MAX, tonumber(self:GetSetting("historyLimit")) or DEFAULTS.historyLimit))

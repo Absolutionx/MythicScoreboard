@@ -2,175 +2,16 @@
 --
 -- Forever has classic-era dungeons (plus new ones), Normal/Heroic only and no
 -- Mythic+. Everything the scoreboard needs to know about those dungeons lives
--- in the DUNGEONS table below, so the addon works on its own. When the
+-- in Data/ForeverDungeons.lua, so the addon works on its own. When the
 -- ForeverDungeonJournal addon is installed its boss portraits are preferred;
--- otherwise the bundled copy in Core/BossPortraits.lua is used.
+-- otherwise the bundled copy in Data/BossPortraits.lua is used.
 
 local MS = _G["MythicScoreboard"]
-local L = MS.L
 -- (How Forever differs from retail is in Flavor_Forever.lua.)
 
--- ── Dungeon data ────────────────────────────────────────────────────────
--- levels   : recommended level range
--- final    : the boss whose death means the dungeon is done
--- instance : the instance's own name, when it holds several wings and the
---            key isn't "<instance>: <wing>" (Blackrock Spire's two halves)
--- bosses : in rough kill order. A plain string is a regular boss. A table can
---          mark  rare = true    (rare spawn, never required)
---                summon = true  (summoned / optional event, never required)
---                aka = {...}    (other names the game may use for it)
--- Dungeons with an empty boss list are announced but not yet documented.
-
-local DUNGEONS = {
-    ["Ragefire Chasm"] = { levels = {13, 18}, final = "Bazzalan", bosses = {
-        "Oggleflint", "Taragaman the Hungerer", "Jergosh the Invoker", "Bazzalan",
-    }},
-    ["Hall of Thanes"] = { levels = {13, 20}, final = "Durgen Dirgehammer", bosses = {
-        "Faldrim Anvilmar", { "Magmatus", aka = { "Infurnus" } }, "Plunder", "Durgen Dirgehammer",
-    }},
-    ["Ruins of Lordaeron"] = { levels = {15, 22}, final = "Viktor the Vile", bosses = {
-        { "The Baron", aka = { "The Butcher" } }, "Witherfang", "The Abandoned", "Bjork",
-        "Rath'mael", "Viktor the Vile", { "Lordaeron Captain", rare = true },
-    }},
-    ["Wailing Caverns"] = { levels = {15, 24}, final = "Mutanus the Devourer", bosses = {
-        "Lord Cobrahn", "Lady Anacondra", "Kresh", "Lord Pythas", "Skum", "Lord Serpentis",
-        "Verdan the Everliving", "Mutanus the Devourer", { "Deviate Faerie Dragon", rare = true },
-    }},
-    ["The Deadmines"] = { levels = {17, 26}, final = "Edwin VanCleef", bosses = {
-        "Rhahk'Zor", { "Miner Johnson", rare = true }, "Sneed's Shredder", "Sneed", "Gilnid",
-        "Mr. Smite", "Captain Greenskin", "Edwin VanCleef", "Cookie",
-    }},
-    ["Shadowfang Keep"] = { levels = {20, 30}, final = "Archmage Arugal", bosses = {
-        "Rethilgore", { "Fel Steed / Shadow Charger", aka = { "Fel Steed", "Shadow Charger" } },
-        "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher",
-        { "Deathsworn Captain", rare = true }, "Arugal's Voidwalker", "Fenrus the Devourer",
-        "Wolf Master Nandos", "Archmage Arugal",
-    }},
-    ["Blackfathom Deeps"] = { levels = {24, 32}, final = "Aku'mai", bosses = {
-        "Ghamoo-ra", "Lady Sarevess", { "Gelihast", aka = { "Geilhast" } },
-        { "Lorgus Jett", rare = true },                -- doesn't always spawn
-        "Old Serra'kis", "Twilight Lord Kelris", "Aku'mai",
-    }},
-    ["The Stockade"] = { levels = {24, 32}, final = "Bazil Thredd", bosses = {
-        "Targorr the Dread", "Kam Deepfury", "Hamhock", "Dextren Ward", "Bazil Thredd",
-        { "Bruegal Ironknuckle", rare = true },
-    }},
-    ["Excavation Site: Wetlands"] = { levels = {26, 33}, final = "Relic Guardian", bosses = {
-        "Saltspine", "Shadetooth", "Relic Guardian",
-    }},
-    ["City of Dalaran"] = { levels = {28, 33}, final = "Shade of the Archmage", bosses = {
-        "Atrexis the Grave Knight", "Arcane Anomaly", "Fel Ancient", "Unstable Sentinel",
-        "Mana Devourer", { "Arcanic Enigma", aka = { "Mana Elemental" } },
-        { "Lyn the Ignored", summon = true }, "Shade of the Archmage",
-    }},
-    ["Gnomeregan"] = { levels = {29, 38}, final = "Mekgineer Thermaplugg", bosses = {
-        "Grubbis", "Viscous Fallout", "Electrocutioner 6000", "Crowd Pummeler 9-60",
-        { "Dark Iron Ambassador", rare = true }, "Mekgineer Thermaplugg",
-    }},
-    ["Razorfen Kraul"] = { levels = {29, 38}, final = "Charlga Razorflank", bosses = {
-        "Roogug", "Aggem Thorncurse", "Death Speaker Jargba", "Overlord Ramtusk",
-        "Agathelos the Raging", { "Blind Hunter", rare = true }, { "Earthcaller Halmgar", rare = true },
-        "Charlga Razorflank",
-    }},
-    ["Scarlet Monastery: Graveyard"] = { levels = {30, 38}, final = "Bloodmage Thalnos", bosses = {
-        "Interrogator Vishas", { "Azshir the Sleepless", rare = true }, { "Fallen Champion", rare = true },
-        { "Ironspine", rare = true }, "Bloodmage Thalnos",
-    }},
-    ["Scarlet Monastery: Library"] = { levels = {33, 41}, final = "Arcanist Doan", bosses = {
-        "Houndmaster Loksey", "Arcanist Doan",
-    }},
-    ["Scarlet Monastery: Armory"] = { levels = {34, 42}, final = "Herod", bosses = {
-        { "Herod", aka = { "Herod, the Scarlet Champion" } },
-    }},
-    ["Scarlet Monastery: Cathedral"] = { levels = {36, 45}, final = "High Inquisitor Whitemane", bosses = {
-        { "High Inquisitor Fairbanks", aka = { "Fairbanks" } },
-        { "Scarlet Commander Mograine", aka = { "Mograine" } },
-        { "High Inquisitor Whitemane", aka = { "Whitemane" } },
-    }},
-    ["Razorfen Downs"] = { levels = {37, 46}, final = "Amnennar the Coldbringer", bosses = {
-        "Tuten'kash", "Mordresh Fire Eye", "Glutton", { "Ragglesnout", rare = true },
-        { "Plaguemaw the Rotting", rare = true, aka = { "Plaguemaw" } },
-        { "Amnennar the Coldbringer", aka = { "Amnennar" } },
-    }},
-    ["Uldaman"] = { levels = {38, 48}, final = "Archaedas", bosses = {
-        "Revelosh", { "The Lost Dwarves", aka = { "Baelog", "Eric \"The Swift\"", "Olaf" } },
-        "Ironaya", "Ancient Stone Keeper", "Galgann Firehammer", "Grimlok", "Archaedas",
-    }},
-    ["Zul'Farrak"] = { levels = {43, 50}, final = "Chief Ukorz Sandscalp", bosses = {
-        "Antu'sul", "Witch Doctor Zum'rah", "Shadowpriest Sezz'ziz", { "Gahz'rilla", summon = true },
-        { "Zerillis", rare = true }, { "Sandarr Dunereaver", rare = true }, { "Dustwraith", rare = true },
-        "Ruuzlu", "Chief Ukorz Sandscalp",
-    }},
-    ["Maraudon"] = { levels = {45, 52}, final = "Princess Theradras", bosses = {
-        "Noxxion", "Razorlash", "Lord Vyletongue", { "Meshlok the Harvester", rare = true },
-        "Celebras the Cursed", "Landslide", "Tinkerer Gizlock", "Rotgrip", "Princess Theradras",
-    }},
-    ["Sunken Temple"] = { levels = {49, 56}, final = "Shade of Eranikus", bosses = {
-        "Atal'alarion", "Dreamscythe", "Weaver", "Avatar of Hakkar", "Jammal'an the Prophet",
-        "Ogom the Wretched", "Morphaz", "Hazzas", "Shade of Eranikus",
-    }},
-    ["Blackrock Depths"] = { levels = {52, 60}, final = "Emperor Dagran Thaurissan", bosses = {
-        "High Interrogator Gerstahn", "Lord Roccor", "Houndmaster Grebmar", "Gorosh the Dervish",
-        "Grizzle", "Eviscerator", "Ok'thor the Breaker", "Anub'shiah", "Hedrum the Creeper",
-        "Pyromancer Loregrain", "Fineous Darkvire", "Warder Stilgiss", "Lord Incendius", "Bael'Gar",
-        "General Angerforge", "Golem Lord Argelmach", "Hurley Blackbreath", "Phalanx",
-        "Ribbly Screwspigot", "Plugger Spazzring", "Ambassador Flamelash",
-        { "Panzor the Invincible", rare = true },
-        { "The Seven", aka = { "Doom'rel", "Hate'rel", "Anger'rel", "Vile'rel", "Gloom'rel", "Seeth'rel", "Dope'rel" } },
-        "Magmus", "Princess Moira Bronzebeard", "Emperor Dagran Thaurissan",
-    }},
-    ["Lower Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "Overlord Wyrmthalak", bosses = {
-        { "Spirestone Butcher", rare = true }, { "Spirestone Battle Lord", rare = true },
-        { "Spirestone Lord Magus", rare = true }, "Highlord Omokk", "Shadow Hunter Vosh'gajin",
-        "War Master Voone", "Mother Smolderweb", { "Crystal Fang", rare = true }, "Urok Doomhowl",
-        { "Bannok Grimaxe", rare = true }, "Quartermaster Zigris", "Halycon", "Gizrul the Slavener",
-        { "Ghok Bashguud", rare = true }, "Overlord Wyrmthalak",
-    }},
-    ["Upper Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "General Drakkisath", bosses = {
-        "Pyroguard Emberseer", "Solakar Flamewreath", { "Jed Runewatcher", rare = true },
-        "Goraluk Anvilcrack", "Gyth", "Warchief Rend Blackhand", "The Beast",
-        { "Lord Valthalak", summon = true }, "General Drakkisath",
-    }},
-    ["Dire Maul: East"] = { levels = {55, 60}, final = "Alzzin the Wildshaper", bosses = {
-        "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper",
-    }},
-    ["Dire Maul: West"] = { levels = {57, 60}, final = "Prince Tortheldrin", bosses = {
-        "Tendris Warpwood", "Illyanna Ravenoak", { "Tsu'zee", rare = true }, "Magister Kalendris",
-        "Immol'thar", "Lord Hel'nurath", "Prince Tortheldrin",
-    }},
-    ["Dire Maul: North"] = { levels = {57, 60}, final = "King Gordok", bosses = {
-        "Guard Mol'dar", "Stomper Kreeg", "Guard Fengus", "Guard Slip'kik", "Captain Kromcrush",
-        "Cho'Rush the Observer", "King Gordok",
-    }},
-    ["Scholomance"] = { levels = {58, 60}, final = "Darkmaster Gandling", bosses = {
-        { "Kirtonos the Herald", summon = true }, "Jandice Barov", "Rattlegore", "Marduk Blackpool",
-        "Vectus", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov",
-        "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov",
-        "Darkmaster Gandling",
-    }},
-    ["Stratholme: Living"] = { levels = {58, 60}, final = "Balnazzar", bosses = {
-        { "Skul", rare = true }, { "Hearthsinger Forresten", rare = true }, "The Unforgiven",
-        "Timmy the Cruel", "Postmaster Malown", "Cannon Master Willey", "Archivist Galford", "Balnazzar",
-    }},
-    ["Stratholme: Undead"] = { levels = {58, 60}, final = "Baron Rivendare", bosses = {
-        { "Stonespine", rare = true }, "Magistrate Barthilas", "Nerub'enkan", "Baroness Anastari",
-        "Maleki the Pallid", "Ramstein the Gorger", "Baron Rivendare",
-    }},
-    -- Announced, bosses not documented yet: runs are saved as "Finished".
-    ["The Drowned City"]    = { levels = {35, 40}, bosses = {} },
-    -- (ForeverDungeonJournal 1.7.2: bosses in its order, the last one final.)
-    ["Krol'dok Stronghold"] = { levels = {40, 45}, final = "Overlord Mugg", bosses = {
-        "Slavecrusher Grox", "Twilight Commander Zarmok", "War Handler Ashka", "Nar'gurk",
-        "Bossman Toof", "Overlord Mugg",
-    }},
-    ["The Drowned City"] = { levels = {35, 40}, final = "Min'loth the Serpent", bosses = {
-        "Zul'Alai", "Var'Taka", "Captain Dreadrise", "Deathless Marrow",
-        { "Gill", rare = true }, "Min'loth the Serpent",
-    }},
-    ["Alcaz Prison"]        = { levels = {48, 53}, bosses = {} },
-    ["Blackmaw Hold"]       = { levels = {55, 60}, bosses = {} },
-    ["Shaper's Terrace"]    = { levels = {58, 60}, bosses = {} },
-}
+-- ── Dungeon data (Data/ForeverDungeons.lua) ──────────────────────────────
+local DUNGEONS, INSTANCE_ALIASES, INSTANCE_IDS =
+    MS.ForeverData.DUNGEONS, MS.ForeverData.INSTANCE_ALIASES, MS.ForeverData.INSTANCE_IDS
 
 -- Normalise entries to { name=, rare=, summon=, aka= }.
 for _, def in pairs(DUNGEONS) do
@@ -184,31 +25,11 @@ for _, def in pairs(DUNGEONS) do
 end
 MS.FOREVER_DUNGEONS = DUNGEONS
 
--- Other names the game may give an instance than the key above.
-local INSTANCE_ALIASES = {
-    ["Deadmines"]                 = "The Deadmines",
-    ["Stormwind Stockade"]        = "The Stockade",
-    ["The Stockades"]             = "The Stockade",
-    ["The Temple of Atal'Hakkar"] = "Sunken Temple",
-    ["Temple of Atal'Hakkar"]     = "Sunken Temple",
-}
 local function Canonical(name)
     name = (name or ""):gsub("\226\128\153", "'")
     return INSTANCE_ALIASES[name] or name
 end
 
--- The classic dungeons by instance ID (GetInstanceInfo), for clients in other
--- languages, where the dungeon's name isn't the English one in DUNGEONS.
--- Dungeons with wings map to the instance; the wing is found by its bosses.
-local INSTANCE_IDS = {
-    [389] = "Ragefire Chasm",    [43]  = "Wailing Caverns",  [36]  = "The Deadmines",
-    [33]  = "Shadowfang Keep",   [48]  = "Blackfathom Deeps", [34]  = "The Stockade",
-    [90]  = "Gnomeregan",        [47]  = "Razorfen Kraul",   [189] = "Scarlet Monastery",
-    [129] = "Razorfen Downs",    [70]  = "Uldaman",          [209] = "Zul'Farrak",
-    [349] = "Maraudon",          [109] = "Sunken Temple",    [230] = "Blackrock Depths",
-    [229] = "Blackrock Spire",   [429] = "Dire Maul",        [329] = "Stratholme",
-    [289] = "Scholomance",
-}
 
 -- The instance a dungeon key is part of: "Scarlet Monastery" for
 -- "Scarlet Monastery: Library", its `instance` for Blackrock Spire's halves.
@@ -254,7 +75,6 @@ local function IsRequired(entry)
     return not entry.rare and not entry.summon and not entry.trash and not entry.summonItem
 end
 
-local _missed = setmetatable({}, { __mode = "k" })   -- run -> what it was last searched with
 
 -- The run's dungeon as DUNGEONS names it: its own name, or (another
 -- language) the name its instance ID stands for.
@@ -266,18 +86,74 @@ local function RunName(run)
     return INSTANCE_IDS[run and run.instanceID or 0] or name
 end
 
--- Finds the dungeon for a run: by name, then by wing name ("Scarlet
--- Monastery" -> "Scarlet Monastery: Library"), then by which dungeon
--- contains the bosses the group has fought.
-function MS:ForeverDungeon(run)
-    if not run then return nil end
-    if run._fdjKey and DUNGEONS[run._fdjKey] then return DUNGEONS[run._fdjKey], run._fdjKey end
-    local name = RunName(run)
-    if DUNGEONS[name] then run._fdjKey = name; return DUNGEONS[name], name end
-    -- Not found before with these bosses: don't search again until one is added.
-    local sig = name .. "#" .. #(run.bosses or {})
-    if _missed[run] == sig then return nil end
+-- ── Which wing, from where you are ─────────────────────────────────────────
+-- Each wing is its own map. Its name (the map's, its floor's, or the
+-- journal's) says which wing in English; whatever the language, a map is
+-- remembered as the wing its bosses turned out to be, for next time.
+local function WingMaps()
+    local acc = MS.AccountDB()
+    if not acc then return nil end
+    acc.wingMaps = acc.wingMaps or {}
+    return acc.wingMaps
+end
 
+local function MapNames(map)
+    local out = {}
+    local C = rawget(_G, "C_Map")
+    if C and C.GetMapInfo then
+        local ok, info = pcall(C.GetMapInfo, map)
+        if ok and type(info) == "table" and type(info.name) == "string" then out[#out + 1] = info.name end
+    end
+    if C and C.GetMapGroupID and C.GetMapGroupMembersInfo then
+        local ok, group = pcall(C.GetMapGroupID, map)
+        local members
+        if ok and group then
+            local ok2, list = pcall(C.GetMapGroupMembersInfo, group)
+            if ok2 and type(list) == "table" then members = list end
+        end
+        for _, m in ipairs(members or {}) do
+            if m.mapID == map and type(m.name) == "string" then out[#out + 1] = m.name end
+        end
+    end
+    local ForMap, Info = rawget(_G, "EJ_GetInstanceForMap"), rawget(_G, "EJ_GetInstanceInfo")
+    if ForMap and Info then
+        local ok, inst = pcall(ForMap, map)
+        if ok and inst and inst ~= 0 then
+            local ok2, ejName = pcall(Info, inst)
+            if ok2 and type(ejName) == "string" then out[#out + 1] = ejName end
+        end
+    end
+    return out
+end
+
+local function WingAt(run, name)
+    local map = run.uiMapID
+    if type(map) ~= "number" then return nil end
+    local learned = WingMaps()
+    learned = learned and learned[map]
+    if learned and DUNGEONS[learned] and IsWingOf(learned, name) then return learned end
+    local names = MapNames(map)
+    for key in pairs(DUNGEONS) do
+        if IsWingOf(key, name) then
+            local wing = (key:match(": (.+)$") or key):lower()
+            for _, n in ipairs(names) do
+                n = n:lower()
+                if n == key:lower() or n == wing or n:find(wing, 1, true) then return key end
+            end
+        end
+    end
+end
+
+-- Which dungeon a run is in, as DUNGEONS names it, and how that's known:
+--   "name"    its name is a DUNGEONS key
+--   "bosses"  the dungeon (or wing) holding the bosses the group has fought
+--   "map"     the wing its map is (learned, or named after the wing)
+-- Only reads: nothing on the run or in saved data changes (NoteForeverWing
+-- below writes what's learned, for the run in progress). Remembered per run
+-- until its name, boss count or map change.
+local _resolved = setmetatable({}, { __mode = "k" })   -- run -> { sig, key, how }
+
+local function BestByBosses(run, name)
     local best, bestScore
     for key, def in pairs(DUNGEONS) do
         local score = 0
@@ -289,14 +165,49 @@ function MS:ForeverDungeon(run)
         if score > 0 and IsWingOf(key, name) then score = score + 0.5 end
         if score > 0 and (not bestScore or score > bestScore) then best, bestScore = key, score end
     end
-    if best then
-        run._fdjKey = best
-        if IsWingOf(best, name) then run.wingName = best end
-        return DUNGEONS[best], best
+    return best
+end
+
+local function Resolve(run)
+    local name, nb = RunName(run), #(run.bosses or {})
+    local sig = name .. "#" .. nb .. "#" .. tostring(run.uiMapID)
+    local hit = _resolved[run]
+    if hit and hit.sig == sig then return hit.key, hit.how end
+    local key, how
+    if DUNGEONS[name] then
+        key, how = name, "name"
+    else
+        key = nb > 0 and BestByBosses(run, name)
+        if key then how = "bosses" else key = WingAt(run, name); how = key and "map" end
     end
-    _missed[run] = sig
+    _resolved[run] = { sig = sig, key = key or nil, how = how }
+    return key or nil, how
+end
+
+-- The run's dungeon entry and its key, or nil.
+function MS:ForeverDungeon(run)
+    if not run then return nil end
+    local key = Resolve(run)
+    if key then return DUNGEONS[key], key end
     return nil
 end
+
+-- For the run in progress: which wing it's in (shown as its name), and,
+-- once its bosses say so, the wing its map is, for the next time. (A map
+-- that turns out to hold two wings isn't used to tell them apart.)
+function MS:NoteForeverWing(run)
+    if not run then return end
+    local key, how = Resolve(run)
+    if not (key and IsWingOf(key, RunName(run))) then return end
+    run.wingName = key
+    if how ~= "bosses" or type(run.uiMapID) ~= "number" then return end
+    local maps = WingMaps()
+    if maps then
+        local had = maps[run.uiMapID]
+        maps[run.uiMapID] = (had == nil or had == key) and key or false
+    end
+end
+MS:OnBossFight(function(run) MS:NoteForeverWing(run) end)
 
 -- Whether a dungeon's instance holds several wings ("Scarlet Monastery" for
 -- its Graveyard, Library, Armory and Cathedral).
@@ -456,7 +367,7 @@ end
 -- Portrait for a boss medallion: "display", displayID  or  "file", path.
 -- ForeverDungeonJournal's live data wins when it's installed (it may be newer
 -- and has custom art for a few bosses); otherwise the bundled table in
--- Core/BossPortraits.lua is used.
+-- Data/BossPortraits.lua is used.
 local function ArtFromFDJ(self, boss, run)
     local ns = _G.ForeverDungeonJournal_NS
     local db = ns and type(ns.DB) == "table" and ns.DB

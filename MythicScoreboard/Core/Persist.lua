@@ -3,8 +3,8 @@
 -- The game writes saved variables to disk only at logout and /reload, never
 -- during play (nor after a crash), so the run in progress is copied into
 -- them only then (PLAYER_LEAVING_WORLD / PLAYER_LOGOUT call FlushSave).
--- SaveCurrentRun just notes that there's something to write. It also marks
--- the run as changed, so the scoreboard redraws its rows.
+-- SaveCurrentRun just counts the change (run._seq), which caches of the
+-- run's numbers use to tell they're stale.
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
@@ -12,14 +12,12 @@ local L = MS.L
 local OFFLINE_AFTER = 60     -- a gap longer than this between saving and loading was a logout
 
 function MS:SaveCurrentRun()
-    self._saveDirty = true
     local run = self.currentRun
     if run then run._seq = (run._seq or 0) + 1 end
 end
 
 function MS:FlushSave()
     if not MythicScoreboardDB then return end
-    self._saveDirty = false
     if not self.currentRun then MythicScoreboardDB.activeRun = nil; return end
     local ok, err = pcall(function()
         local saved = self:SerializeRun(self.currentRun, true)
@@ -28,11 +26,11 @@ function MS:FlushSave()
         saved._savedAt        = time()
         MythicScoreboardDB.activeRun = saved
         local pets = {}
-        for guid, owner in pairs(self._petGUIDToOwner) do pets[guid] = owner end
+        for guid, owner in pairs(self:PetOwners()) do pets[guid] = owner end
         MythicScoreboardDB.petGUIDCache = pets
     end)
     if not ok then
-        print("|cffff4444[MythicScoreboard]|r " .. L["Saving the run in progress failed:"] .. " " .. tostring(err))
+        MS.Warn(L["Saving the run in progress failed:"] .. " " .. tostring(err))
     end
 end
 
@@ -83,11 +81,11 @@ function MS:RestoreCurrentRun()
     end
     if MythicScoreboardDB.petGUIDCache then
         for guid, owner in pairs(MythicScoreboardDB.petGUIDCache) do
-            self._petGUIDToOwner[guid] = owner
+            self:NotePetOwner(guid, owner)
         end
     end
     self.itemLevelCache = {}
     self.specCache = {}
     self:SetRunState(run._suspended and "paused" or "active", run)
-    print("|cff00ccff[MythicScoreboard]|r " .. L["Run restored after UI reload."])
+    MS.Say(L["Run restored after UI reload."])
 end
