@@ -253,6 +253,49 @@ D.WING_TRASH = {
         [9264] = "Firebrand Pyromancer" },
 }
 
+-- Dungeon entrances, for the world map's markers (Core/MapPins.lua): the
+-- zone's map ID and the spot on it (x, y from 0 to 1). The positions are the
+-- Forever Dungeon Journal addon's (gathered for the Forever client); wings
+-- that share an entrance share a marker. levels: for dungeons not in
+-- DUNGEONS above.
+D.ENTRANCES = {
+    { "Ragefire Chasm",               map = 1454, x = 0.526, y = 0.490 },
+    { "Wailing Caverns",              map = 1413, x = 0.460, y = 0.364 },
+    { "The Deadmines",                map = 1436, x = 0.425, y = 0.717 },
+    { "Shadowfang Keep",              map = 1421, x = 0.448, y = 0.678 },
+    { "Blackfathom Deeps",            map = 1440, x = 0.145, y = 0.142 },
+    { "The Stockade",                 map = 1453, x = 0.524, y = 0.700 },
+    { "Gnomeregan",                   map = 1426, x = 0.243, y = 0.398 },
+    { "Razorfen Kraul",               map = 1413, x = 0.429, y = 0.902 },
+    { "Razorfen Downs",               map = 1413, x = 0.500, y = 0.920 },
+    { "Scarlet Monastery: Graveyard", map = 1420, x = 0.826, y = 0.338 },
+    { "Scarlet Monastery: Library",   map = 1420, x = 0.826, y = 0.338 },
+    { "Scarlet Monastery: Armory",    map = 1420, x = 0.826, y = 0.338 },
+    { "Scarlet Monastery: Cathedral", map = 1420, x = 0.826, y = 0.338 },
+    { "Ruins of Lordaeron",           map = 1420, x = 0.634, y = 0.674 },
+    { "Uldaman",                      map = 1418, x = 0.443, y = 0.120 },
+    { "Zul'Farrak",                   map = 1446, x = 0.387, y = 0.200 },
+    { "Maraudon",                     map = 1443, x = 0.291, y = 0.625 },
+    { "Sunken Temple",                map = 1435, x = 0.695, y = 0.535 },
+    { "Blackrock Depths",             map = 1427, x = 0.348, y = 0.840 },
+    { "Lower Blackrock Spire",        map = 1427, x = 0.348, y = 0.840 },
+    { "Upper Blackrock Spire",        map = 1427, x = 0.348, y = 0.840 },
+    { "Dire Maul: East",              map = 1444, x = 0.590, y = 0.450 },
+    { "Dire Maul: West",              map = 1444, x = 0.590, y = 0.450 },
+    { "Dire Maul: North",             map = 1444, x = 0.590, y = 0.450 },
+    { "Scholomance",                  map = 1422, x = 0.697, y = 0.732 },
+    { "Stratholme: Living",           map = 1423, x = 0.300, y = 0.150 },
+    { "Stratholme: Undead",           map = 1423, x = 0.440, y = 0.190 },
+    { "Hall of Thanes",               map = 1455, x = 0.435, y = 0.520 },
+    { "Excavation Site: Wetlands",    map = 1437, x = 0.477, y = 0.562 },
+    { "The Drowned City",             map = 1434, x = 0.214, y = 0.279 },
+    { "City of Dalaran",              map = 1416, x = 0.085, y = 0.593 },
+    { "Krol'dok Stronghold",          map = 2548, x = 0.375, y = 0.373 },
+    { "Alcaz Prison",                 map = 1445, x = 0.753, y = 0.141, levels = { 48, 53 } },
+    { "Blackmaw Hold",                map = 1447, x = 0.386, y = 0.332, levels = { 55, 60 } },
+    { "Shaper's Terrace",             map = 1449, x = 0.481, y = 0.061, levels = { 58, 60 } },
+}
+
 D.INSTANCE_IDS = {
     [389] = "Ragefire Chasm",    [43]  = "Wailing Caverns",  [36]  = "The Deadmines",
     [33]  = "Shadowfang Keep",   [48]  = "Blackfathom Deeps", [34]  = "The Stockade",

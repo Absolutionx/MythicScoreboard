@@ -86,7 +86,8 @@ function Widget:GetTop() return self._h end
 function Widget:GetBottom() return 0 end
 function Widget:GetCenter() return 0, 0 end
 function Widget:GetEffectiveScale() return 1 end
-function Widget:GetScale() return 1 end
+function Widget:GetScale() return self._scale or 1 end
+function Widget:SetScale(s) self._scale = s end
 function Widget:GetObjectType() return self._kind end
 function Widget:GetName() return nil end
 function Widget:GetNumPoints() return self._points end
@@ -267,6 +268,7 @@ UnitAffectingCombat = function() return false end
 GetNumGroupMembers = function() return M.groupSize or 5 end
 IsInGroup = function() return (M.groupSize or 5) > 0 end
 IsShiftKeyDown = function() return M.shift == true end
+TakeTaxiNode = function(i) M.tookTaxi = i end
 IsInRaid = function() return false end
 CanInspect = function() return false end
 NotifyInspect = noop
@@ -376,10 +378,12 @@ function M.LoadTOC(dir, toc)
         if line ~= "" and not line:find("^##") then files[#files + 1] = (line:gsub("\\", "/")) end
     end
     for _, f in ipairs(files) do
+      if not f:find("%.xml$") then                    -- templates: the game's XML, nothing to run here
         local chunk, err = loadfile(dir .. "/" .. f)
         if not chunk then error("load " .. f .. ": " .. err) end
         local ok, e = pcall(chunk, "MythicScoreboard", {})
         if not ok then error("run " .. f .. ": " .. tostring(e)) end
+      end
     end
     return files
 end

@@ -552,7 +552,15 @@ local function DrawMinimal(run)
         _ins(parts, CT(P.xpMob, MS.FormatThousands(m + q) .. " XP"))
     end
     local line = FS("line", "medium", 14, P.ivory, "LEFT")
-    Place(line, 10, -6); line:SetText(table.concat(parts, "   "))
+    -- Centred in the stone between the bronze rule along the top and the
+    -- bottom edge: a box that fills that space, the text in its middle (a
+    -- box a point taller at the bottom, as most of the line has no
+    -- descenders and so sits high in its box).
+    line:ClearAllPoints()
+    line:SetPoint("TOPLEFT", f, "TOPLEFT", 10, -5)
+    line:SetPoint("BOTTOMLEFT", f, "BOTTOMLEFT", 10, 0)
+    line:SetJustifyV("MIDDLE")
+    line:SetText(table.concat(parts, "   "))
     f:SetSize(_floor(line:GetStringWidth()) + 20, 28)
 end
 

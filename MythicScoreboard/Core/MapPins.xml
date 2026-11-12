@@ -1,0 +1,15 @@
+<Ui xmlns="http://www.blizzard.com/wow/ui/">
+    <!-- A dungeon entrance on the world map (Core/MapPins.lua). No scripts here:
+         the map calls the mixin's OnLoad, OnMouseEnter, OnMouseLeave and OnClick
+         itself, and won't take a pin that sets OnEnter or OnLeave. -->
+    <Frame name="MythicScoreboardEntrancePinTemplate" mixin="MythicScoreboardEntrancePinMixin" enableMouse="true" virtual="true">
+        <Size x="20" y="20"/>
+        <Layers>
+            <Layer level="ARTWORK">
+                <Texture parentKey="Icon" setAllPoints="true"/>
+            </Layer>
+        </Layers>
+    </Frame>
+    <!-- The way to a dungeon, drawn over the map (Core/UI_RouteMap.lua). -->
+    <Frame name="MythicScoreboardRoutePinTemplate" mixin="MythicScoreboardRoutePinMixin" enableMouse="false" virtual="true"/>
+</Ui>

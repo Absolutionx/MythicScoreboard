@@ -638,6 +638,10 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         MS:KillDebug()
     elseif cmd == "wingdebug" and MS.WingDebug then
         MS:WingDebug(true)
+    elseif cmd == "routedebug" and MS.RouteDebug then
+        local t = MS.NavigationTarget and MS:NavigationTarget()
+        if t and t.spot then MS:RouteDebug(t.spot, t.name)
+        else MS.Say("routedebug: click a dungeon marker first") end
     else
         MS.Say(L["Unknown command. Type /sb help for a list."])
     end

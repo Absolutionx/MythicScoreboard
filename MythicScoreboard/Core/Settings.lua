@@ -19,6 +19,7 @@ local DEFAULTS = {
     showMobForces           = true,
     showMobForcesNameplates = true,
     minimapButton           = true,
+    autoTakeFlights         = false,       -- WoW Forever: take the flight the directions say to
     compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
     -- compactPos: no default (the frame starts near the top right)
     -- minimapAngle: no default (the button's resting place is its own)
@@ -88,6 +89,7 @@ MS.GetAutoOpenOnComplete,   MS.SetAutoOpenOnComplete   = Bool("autoOpenOnComplet
 MS.GetMobForcesTooltip,     MS.SetMobForcesTooltip     = Bool("showMobForces")
 MS.GetMobForcesNameplate,   MS.SetMobForcesNameplate   = Bool("showMobForcesNameplates")
 MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
+MS.GetAutoTakeFlights,      MS.SetAutoTakeFlights      = Bool("autoTakeFlights")
 
 -- The in-run frame's style (UI_Compact.lua); "off" hides it.
 MS.COMPACT_STYLES = { "compact", "detailed", "minimal" }
