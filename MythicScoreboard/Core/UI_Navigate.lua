@@ -31,9 +31,13 @@ local function StepText(leg)
     if leg.how == "fly" then return _fmt(L["Fly to %s"], to.name), to end
     if leg.how == "boat" then return _fmt(L["Take the boat to %s"], to.name), to end
     if leg.how == "zeppelin" then return _fmt(L["Take the zeppelin to %s"], to.name), to end
+    if leg.how == "tram" then return _fmt(L["Take the tram to %s"], to.name), to end
+    if leg.how == "airship" then return _fmt(L["Take the airship to %s"], to.name), to end
     if to.kind == "flight" then return _fmt(L["Run to the flight master: %s"], to.name), to end
     if to.kind == "dock" then
-        local text = to.transport == "zeppelin" and L["Run to the zeppelin to %s"] or L["Run to the boat to %s"]
+        local text = to.transport == "zeppelin" and L["Run to the zeppelin to %s"]
+            or to.transport == "tram" and L["Run to the tram to %s"]
+            or to.transport == "airship" and L["Run to the airship to %s"] or L["Run to the boat to %s"]
         return _fmt(text, to.other and to.other.name or to.name), to
     end
     return _fmt(L["Run to %s"], target and target.name or to.name or "?"), to

@@ -1,11 +1,10 @@
 local MS = _G["MythicScoreboard"]
-local UI = MS.UI
 
 -- ── The way to a dungeon, on the world map (WoW Forever) ──────────────────
 -- While the arrow shows the way (Core/UI_Navigate.lua), the world map draws
--- it: a line from you through each stop to the entrance (gold on foot, blue
--- in the air), a dot at each flight master and dock, and a bigger one at
--- the dungeon. On the continent's map, a zone's, or the world's.
+-- it: a thin light line from you through each stop to the entrance, a dot
+-- at each flight master and dock, and a bigger one at the dungeon. On the
+-- continent's map, a zone's, or the world's.
 --
 -- The route is on its continent's map; MS:RouteOnMap works out where that is
 -- on the map you're looking at. The drawing is one map pin the size of the
@@ -82,12 +81,11 @@ if MS.FLAVOR ~= "forever" then return end
 
 local CreateFromMixins = rawget(_G, "CreateFromMixins")
 local PinBase = rawget(_G, "MapCanvasPinMixin")
-local P = UI and UI.P
-local GOLD = P and P.bronzeHi or { 0.91, 0.72, 0.47 }
-local SKY = { 0.45, 0.78, 1 }
-local DARK = { 0, 0, 0, 0.75 }
+-- A thin, light line with a soft shadow, like other guides' routes.
+local LINE = { 0.96, 0.96, 0.96, 0.9 }
+local DARK = { 0, 0, 0, 0.35 }
 local DOT = "Interface\\CHARACTERFRAME\\TempPortraitAlphaMask"   -- a white circle
-local WIDTH, EDGE, DOT_SIZE, END_SIZE = 3, 2, 9, 14               -- on screen
+local WIDTH, EDGE, DOT_SIZE, END_SIZE = 2, 1, 6, 9                -- on screen
 local FOLLOW = 0.1                                                -- seconds between redraws
 
 -- Global: the XML template (Core/MapPins.xml) names it.
@@ -187,9 +185,8 @@ function RoutePin:Draw()
                 l:SetThickness((WIDTH + 2 * EDGE) * px)
                 l:SetColorTexture(DARK[1], DARK[2], DARK[3], DARK[4])
             else
-                local col = s.how == "fly" and SKY or GOLD
                 l:SetThickness(WIDTH * px)
-                l:SetColorTexture(col[1], col[2], col[3], 1)
+                l:SetColorTexture(LINE[1], LINE[2], LINE[3], LINE[4])
             end
         end
     end
@@ -203,7 +200,6 @@ function RoutePin:Draw()
             t:ClearAllPoints()
             t:SetPoint("CENTER", self, "TOPLEFT", d[1] * W, -d[2] * H)
             if pass == 1 then t:SetVertexColor(DARK[1], DARK[2], DARK[3], DARK[4])
-            elseif d.last then t:SetVertexColor(1, 0.82, 0, 1)
             else t:SetVertexColor(1, 1, 1, 1) end
         end
     end
