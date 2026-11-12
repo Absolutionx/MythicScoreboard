@@ -62,7 +62,15 @@ for _, w in ipairs(M.allFrames) do
             and w._scripts.OnClick and w._scripts.OnEnter and not w._children[2] then del = del or w end
 end
 check("history delete button found", del ~= nil)
-if del then del:Fire("OnClick"); M.RunTimers(2) end
+if del then
+    del:Fire("OnClick")
+    check("history delete: one click only asks", #MythicScoreboardDB.runs == 2, #MythicScoreboardDB.runs)
+    M.RunTimers(4)
+    del:Fire("OnClick")
+    check("history delete: the ask runs out", #MythicScoreboardDB.runs == 2, #MythicScoreboardDB.runs)
+    del:Fire("OnClick")
+    M.RunTimers(2)
+end
 check("history delete also removes from stats", #MS:ArchiveRuns() == 1 and #MythicScoreboardDB.runs == 1,
     #MS:ArchiveRuns() .. "/" .. #MythicScoreboardDB.runs)
 

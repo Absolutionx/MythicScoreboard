@@ -607,6 +607,7 @@ function UI.RefreshStats(force)
     f.PBLabel:Hide()
     if f.WholeRunBtn then f.WholeRunBtn:Hide() end
     if f.AbandonBtn then f.AbandonBtn:Hide() end
+    if f.FreshRunBtn then f.FreshRunBtn:Hide() end
     f.LayoutAffixIcons(0)
     local parts = {
         MS.Plural(stats.runs, "%d run", "%d runs", CT(P.ivory, stats.runs)),
