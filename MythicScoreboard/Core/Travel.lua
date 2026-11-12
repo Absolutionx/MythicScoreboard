@@ -17,6 +17,7 @@ local CONTINENT = 2                          -- Enum.UIMapType.Continent
 local RUN, FLY = 9, 30                       -- yards a second: mounted-ish, and a flight
 local FLY_EXTRA = 20                         -- seconds: the flight master, take-off, landing
 local SAIL = 200                             -- seconds for a boat or zeppelin, with the wait
+local RIDE = { tram = 70 }                   -- shorter rides, with the wait
 local FLY_PATH = 1.3                         -- a flight follows its paths, not a straight line
 -- Running from one zone into another: zones are walled by hills, so the
 -- way round is longer than the straight line, and slower.
@@ -25,17 +26,22 @@ local CROSS_FACTOR, CROSS_EXTRA = 1.3, 60
 local function MapAPI() return rawget(_G, "C_Map") end
 
 -- ── Maps ───────────────────────────────────────────────────────────────────
--- The continent a map is on, or nil.
+-- The continent a map is on, or nil. An island that's on no continent
+-- (Zephras Isle, say) is a continent of its own: its own map.
 function MS:ContinentOf(mapID)
     local C = MapAPI()
     if not (C and C.GetMapInfo) then return nil end
+    local last
     for _ = 1, 8 do
-        if not mapID then return nil end
+        if not mapID or mapID == 0 then return last end
         local ok, info = pcall(C.GetMapInfo, mapID)
-        if not (ok and info) then return nil end
+        if not (ok and info) then return last end
         if info.mapType == CONTINENT then return mapID end
+        if info.mapType and info.mapType <= 1 then return last end   -- the world, or beyond
+        last = mapID
         mapID = info.parentMapID
     end
+    return last
 end
 
 function MS:MapName(mapID)
@@ -212,7 +218,8 @@ local function Places(from, to)
                 end
             end
             if a.c and b.c then
-                a.other, b.other = b, a
+                a.other = b
+                if not t.oneway then b.other = a end
                 _ins(P, a); _ins(P, b)
             end
         end
@@ -227,7 +234,7 @@ end
 
 -- Seconds from one place to another, and how: "run", "fly", "sail". Or nil.
 local function Leg(a, b)
-    if a.kind == "dock" and a.other == b then return SAIL, a.transport end
+    if a.kind == "dock" and a.other == b then return RIDE[a.transport] or SAIL, a.transport end
     if a.c ~= b.c then return nil end
     local yards = MS:Yards(a.c, a.x, a.y, b.x, b.y)
     if not yards then return nil end
@@ -241,7 +248,7 @@ local function Leg(a, b)
 end
 
 -- The quickest way from one spot to another ({ c, x, y }), as legs:
--- { how = "run" | "fly" | "boat" | "zeppelin", to = place }. Or nil.
+-- { how = "run" | "fly" | "boat" | "zeppelin" | "tram", to = place }. Or nil.
 function MS:PlanRoute(from, to)
     if not (from and to and from.c and to.c) then return nil end
     local P = Places(from, to)

@@ -4,11 +4,10 @@ local MS = _G["MythicScoreboard"]
 -- Flight masters and the boats and zeppelins between the continents, each on
 -- its zone's map (x, y from 0 to 1), for Core/Travel.lua.
 --
--- Classic's positions, from memory of the old world: close, not exact. The
--- flight masters are corrected by the game itself: open any flight map and
--- the addon learns every flight master on that continent, where it really
--- stands and which ones you know (Travel.lua, TAXIMAP_OPENED). Boats and
--- zeppelins: walk to the dock, which is close enough for the arrow.
+-- Flight masters: classic's positions, close, not exact; the game corrects
+-- them: open any flight map and the addon learns every flight master on that
+-- continent, where it really stands and which ones you know (Travel.lua,
+-- TAXIMAP_OPENED). Boats, zeppelins and the tram: where you board.
 --
 -- side: "Horde", "Alliance", or nil for both.
 
@@ -79,27 +78,55 @@ D.FLIGHT_MASTERS = {
     { "Light's Hope Chapel",    map = 1423, x = 0.802, y = 0.570 },
 }
 
--- Boats and zeppelins: two docks, one each end. kind: "boat" or "zeppelin".
+-- Boats, zeppelins and the tram: two docks, one each end, where you stand
+-- to board (WoW Forever's own routes and positions). kind: "boat",
+-- "zeppelin", "airship" or "tram". oneway: it only goes from the first to the second.
 D.TRANSPORTS = {
+    -- Horde zeppelins (the towers outside Orgrimmar and Undercity, and Grom'gol)
     { kind = "zeppelin", side = "Horde",
-      { "Orgrimmar",          map = 1411, x = 0.506, y = 0.126 },
-      { "Undercity",          map = 1420, x = 0.607, y = 0.588 } },
+      { "Orgrimmar",          map = 1411, x = 0.5082, y = 0.1381 },
+      { "Undercity",          map = 1420, x = 0.6070, y = 0.5876 } },
     { kind = "zeppelin", side = "Horde",
-      { "Orgrimmar",          map = 1411, x = 0.514, y = 0.143 },
-      { "Grom'gol Base Camp", map = 1434, x = 0.316, y = 0.292 } },
+      { "Orgrimmar",          map = 1411, x = 0.5057, y = 0.1266 },
+      { "Grom'gol Base Camp", map = 1434, x = 0.3135, y = 0.3012 } },
     { kind = "zeppelin", side = "Horde",
-      { "Undercity",          map = 1420, x = 0.619, y = 0.590 },
-      { "Grom'gol Base Camp", map = 1434, x = 0.312, y = 0.300 } },
+      { "Undercity",          map = 1420, x = 0.6188, y = 0.5910 },
+      { "Grom'gol Base Camp", map = 1434, x = 0.3153, y = 0.2915 } },
+    -- Both sides
     { kind = "boat",
-      { "Booty Bay",          map = 1434, x = 0.259, y = 0.731 },
-      { "Ratchet",            map = 1413, x = 0.637, y = 0.386 } },
+      { "Booty Bay",          map = 1434, x = 0.2592, y = 0.7315 },
+      { "Ratchet",            map = 1413, x = 0.6366, y = 0.3865 } },
+    { kind = "boat",
+      { "Powderfuse Port",    map = 2548, x = 0.8030, y = 0.5440 },
+      { "Steamwheedle Port",  map = 1446, x = 0.6834, y = 0.2298 } },
+    -- The airships to Zephras Isle
+    { kind = "airship", side = "Horde",
+      { "Valanaar",           map = 2521, x = 0.5794, y = 0.8072 },
+      { "Mulgore",            map = 1412, x = 0.3429, y = 0.2573 } },
+    { kind = "airship", side = "Alliance",
+      { "Valanaar",           map = 2521, x = 0.6582, y = 0.8342 },
+      { "Dalaran",            map = 1416, x = 0.1252, y = 0.5196 } },
+    -- Alliance
     { kind = "boat", side = "Alliance",
-      { "Menethil Harbor",    map = 1437, x = 0.046, y = 0.571 },
-      { "Theramore",          map = 1445, x = 0.715, y = 0.564 } },
+      { "Stormwind",          map = 1453, x = 0.2260, y = 0.5613 },
+      { "Auberdine",          map = 1439, x = 0.3076, y = 0.4100 } },
     { kind = "boat", side = "Alliance",
-      { "Menethil Harbor",    map = 1437, x = 0.050, y = 0.635 },
-      { "Auberdine",          map = 1439, x = 0.324, y = 0.438 } },
+      { "Rut'theran Village", map = 1438, x = 0.5486, y = 0.9679 },
+      { "Auberdine",          map = 1439, x = 0.3319, y = 0.4013 } },
     { kind = "boat", side = "Alliance",
-      { "Auberdine",          map = 1439, x = 0.332, y = 0.403 },
-      { "Rut'theran Village", map = 1438, x = 0.550, y = 0.969 } },
+      { "Menethil Harbor",    map = 1437, x = 0.0508, y = 0.6340 },
+      { "Theramore",          map = 1445, x = 0.7154, y = 0.5634 } },
+    -- The loop: Auberdine to Menethil to Southshore and back to Auberdine.
+    { kind = "boat", side = "Alliance", oneway = true,
+      { "Auberdine",          map = 1439, x = 0.3239, y = 0.4380 },
+      { "Menethil Harbor",    map = 1437, x = 0.0465, y = 0.5716 } },
+    { kind = "boat", side = "Alliance", oneway = true,
+      { "Menethil Harbor",    map = 1437, x = 0.0465, y = 0.5719 },
+      { "Southshore",         map = 1424, x = 0.5060, y = 0.6971 } },
+    { kind = "boat", side = "Alliance", oneway = true,
+      { "Southshore",         map = 1424, x = 0.5060, y = 0.6971 },
+      { "Auberdine",          map = 1439, x = 0.3239, y = 0.4380 } },
+    { kind = "tram", side = "Alliance",
+      { "Stormwind",          map = 1453, x = 0.6036, y = 0.1247 },
+      { "Ironforge",          map = 1455, x = 0.7290, y = 0.5027 } },
 }

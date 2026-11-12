@@ -95,6 +95,31 @@ check("other continent: run, zeppelin, run", hows(legs) == "run,zeppelin,run", h
 side = "Alliance"
 check("other continent, no zeppelin for the Alliance: no route", MS:PlanRoute(from(), over) == nil)
 side = "Horde"
+-- One way only: there, but not back.
+local both = MS.ForeverData.TRANSPORTS
+MS.ForeverData.TRANSPORTS = { { kind = "boat", oneway = true,
+    { "Kdock", map = 1411, x = 0.2, y = 0.2 }, { "Edock", map = 1420, x = 0.3, y = 0.3 } } }
+check("one-way boat: there", hows(MS:PlanRoute(from(), over)) == "run,boat,run")
+check("one-way boat: not back", MS:PlanRoute({ c = EK, x = 0.35, y = 0.35 }, from()) == nil)
+MS.ForeverData.TRANSPORTS = { { kind = "tram",
+    { "Kdock", map = 1411, x = 0.2, y = 0.2 }, { "Edock", map = 1420, x = 0.3, y = 0.3 } } }
+local tram = MS:PlanRoute(from(), over)
+check("tram", hows(tram) == "run,tram,run", hows(tram))
+-- An island on no continent (its parent's the world): a continent of its own.
+local ISLE, WORLD = 2521, 947
+local mapInfo = C_Map.GetMapInfo
+C_Map.GetMapInfo = function(id)
+    if id == ISLE then return { mapType = 3, parentMapID = WORLD, name = "Zephras Isle" } end
+    if id == WORLD then return { mapType = 1, name = "Azeroth" } end
+    return mapInfo(id)
+end
+check("island: its own continent", MS:ContinentOf(ISLE) == ISLE)
+MS.ForeverData.TRANSPORTS = { { kind = "airship",
+    { "Kdock", map = 1411, x = 0.2, y = 0.2 }, { "Valanaar", map = ISLE, x = 0.5, y = 0.8 } } }
+local isle = MS:PlanRoute(from(), { c = ISLE, x = 0.4, y = 0.4 })
+check("island: by airship", hows(isle) == "run,airship,run", hows(isle))
+C_Map.GetMapInfo = mapInfo
+MS.ForeverData.TRANSPORTS = both
 
 -- The way to it: straight ahead when facing it; west of you: turn left.
 local turn, yards = MS:TurnTo({ c = KALIMDOR, x = 0.5, y = 0.6 }, { x = 0.5, y = 0.5 })

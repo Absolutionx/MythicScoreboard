@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.11.1
+
+### WoW Forever: directions
+- **Boats and zeppelins go where Forever's do:**
+  - The zeppelin towers outside Orgrimmar and Undercity, and at Grom'gol, point to where you board at the top, so the arrow no longer turns you round on the stairs.
+  - Every dock is at the right spot.
+  - The Alliance boats follow Forever's routes: Stormwind to Auberdine, and the one-way loop from Auberdine to Menethil Harbor to Southshore and back.
+- **New ways across:**
+  - The Deeprun Tram between Stormwind and Ironforge.
+  - The boat between Powderfuse Port (Riverglades) and Steamwheedle Port (Tanaris).
+  - The airships to Valanaar on Zephras Isle, from Mulgore (Horde) and Dalaran (Alliance).
+- **Directions on Zephras Isle,** and to Krol'dok Stronghold by boat.
+- The route on the world map is a thin, light line, easier to see the map through.
+
 ## 2.11.0
 
 ### WoW Forever: the way to any dungeon
@@ -9,7 +23,7 @@
   - It prefers the flight master in the dungeon's own zone, the way players go, instead of a closer one over the hills.
   - The arrow keeps pointing on flights, boats and zeppelins, and after a `/reload` in the air.
   - Shift-click the arrow to stop, or click the marker again. Right-click goes through to the game, so turning your character over it is fine. Drag it wherever you like.
-- **The route on the world map:** a line from you through each stop to the dungeon (gold on foot, blue in the air), with a dot at each stop. It follows you while the map is open.
+- **The route on the world map:** a thin line from you through each stop to the dungeon, with a dot at each stop. It follows you while the map is open.
 - **Take flights automatically** (in settings, off by default): when the next step is a flight, talking to the flight master skips straight to the flight map and takes that flight. Hold Shift to pick your own.
 - `/sb routedebug` shows why a route was chosen and the best alternatives.
 
