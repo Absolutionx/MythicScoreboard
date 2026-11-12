@@ -66,9 +66,25 @@ if MS.FLAVOR ~= "forever" then return end
 local CreateFromMixins = rawget(_G, "CreateFromMixins")
 local PinBase, ProviderBase = rawget(_G, "MapCanvasPinMixin"), rawget(_G, "MapCanvasDataProviderMixin")
 
+-- Which mouse buttons go through a frame to the one under it: the game
+-- blocks this for addons in combat (the map sets it on each marker as it
+-- adds it, so opening the map in a fight would be blocked). In combat, left
+-- as it was.
+function MS.SafePassThrough(frame, ...)
+    local InCombat = rawget(_G, "InCombatLockdown")
+    if InCombat and InCombat() then return end
+    local mt = getmetatable(frame)
+    local index = mt and mt.__index
+    local fn
+    if type(index) == "table" then fn = index.SetPassThroughButtons
+    elseif type(index) == "function" then fn = index(frame, "SetPassThroughButtons") end
+    if fn then pcall(fn, frame, ...) end
+end
+
 -- Global: the XML template (Core/MapPins.xml) names it.
 local PinMixin = CreateFromMixins and PinBase and CreateFromMixins(PinBase) or {}
 rawset(_G, "MythicScoreboardEntrancePinMixin", PinMixin)
+PinMixin.SetPassThroughButtons = MS.SafePassThrough
 
 function PinMixin:OnLoad()
     if self.SetScalingLimits then self:SetScalingLimits(1, 1.0, 1.2) end

@@ -91,6 +91,7 @@ local FOLLOW = 0.1                                                -- seconds bet
 -- Global: the XML template (Core/MapPins.xml) names it.
 local RoutePin = CreateFromMixins and PinBase and CreateFromMixins(PinBase) or {}
 rawset(_G, "MythicScoreboardRoutePinMixin", RoutePin)
+RoutePin.SetPassThroughButtons = MS.SafePassThrough            -- not in combat (Core/MapPins.lua)
 
 -- Never in the way of the map's clicks, or its markers'.
 local function NoMouse(self)
