@@ -298,6 +298,7 @@ local function HeaderEmpty()
     UI.frame.LayoutAffixIcons(0)
     if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
     if UI.frame.AbandonBtn then UI.frame.AbandonBtn:Hide() end
+    if UI.frame.FreshRunBtn then UI.frame.FreshRunBtn:Hide() end
     StartFreshButton():SetShown(MS:CanStartFresh())
 end
 

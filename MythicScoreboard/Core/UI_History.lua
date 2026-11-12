@@ -77,18 +77,49 @@ local function MakeRow()
 
     row:SetScript("OnEnter", function() hov:Show() end)
     row:SetScript("OnLeave", function() if not row.selected then hov:Hide() end end)
-    delBtn:SetScript("OnEnter", function()
-        hov:Show(); Tint(delIcon, P.bloodHi)
+    -- Two clicks: the first asks (the X turns red, "Click again to delete"),
+    -- the second, within a few seconds, deletes.
+    local armed, timer = false, nil
+    local function Tip()
         GameTooltip:SetOwner(delBtn, "ANCHOR_RIGHT")
-        GameTooltip:SetText(L["Delete run"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:SetText(armed and L["Click again to delete"] or L["Delete run"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
         GameTooltip:AddLine(L["Removes this run from history and from your stats."], 0.8, 0.8, 0.8)
         GameTooltip:Show()
+    end
+    local function Disarm()
+        armed = false
+        if timer then timer:Cancel(); timer = nil end
+        Tint(delIcon, delBtn:IsMouseOver() and P.bloodHi or P.ash2)
+        local was = row.fRes._was
+        if was then
+            row.fRes:SetText(was[1]); row.fRes:SetTextColor(was[2], was[3], was[4])
+            row.fRes._was = nil
+        end
+        if GameTooltip:IsOwned(delBtn) then Tip() end
+    end
+    row.Disarm = Disarm
+    delBtn:SetScript("OnEnter", function()
+        hov:Show(); Tint(delIcon, P.bloodHi)
+        Tip()
     end)
     delBtn:SetScript("OnLeave", function()
-        Tint(delIcon, P.ash2); if not row.selected then hov:Hide() end
+        if not armed then Tint(delIcon, P.ash2) end
+        if not row.selected then hov:Hide() end
         GameTooltip:Hide()
     end)
     delBtn:SetScript("OnClick", function()
+        if not armed then
+            armed = true
+            Tint(delIcon, P.bloodHi)
+            local r, g, b = row.fRes:GetTextColor()
+            row.fRes._was = { row.fRes:GetText(), r, g, b }
+            row.fRes:SetText(L["Delete?"])
+            row.fRes:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+            timer = C_Timer.NewTimer(3, Disarm)
+            Tip()
+            return
+        end
+        Disarm()
         GameTooltip:Hide()
         local runs = MythicScoreboardDB and MythicScoreboardDB.runs
         local run = row.run
@@ -250,6 +281,7 @@ function Fill()
         row:SetSize(dropW - 8, DROP_ROW_H)
         row:ClearAllPoints()
         row:SetPoint("TOPLEFT", drop, "TOPLEFT", 4, yOff)
+        if row.run ~= run and row.Disarm then row.Disarm() end   -- a new run here: not armed
         row.run, row.live = run, entry.live
         row.own = entry.live or entry.own
 

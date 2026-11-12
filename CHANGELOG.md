@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.11.2
+
+### Fixes
+- **Deleting a run from history asks first:** the X turns red and the run shows "Delete?"; click again within 3 seconds to delete it.
+- "Start new run" no longer shows over the Stats page's tabs.
+
 ## 2.11.1
 
 ### WoW Forever: directions
