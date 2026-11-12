@@ -83,5 +83,25 @@ end
 local _, legs = LastFlight(XROADS, Dungeon("Wailing Caverns"))
 check("Wailing Caverns from the Crossroads: run", Show(legs):match("^run [^,]*$") ~= nil, Show(legs))
 
+-- Eastern Kingdoms: in Swamp of Sorrows by Stonard, not learned yet. Going
+-- north: run to Stonard (talking to it learns it) and fly, not the long run
+-- to Grom'gol.
+local EK = 1415
+local mapInfo = C_Map.GetMapInfo
+C_Map.GetMapInfo = function(id)
+    if id == EK then return { mapType = 2, name = "Eastern Kingdoms" } end
+    return mapInfo(id)
+end
+MythicScoreboardDB.flights[EK] = {
+    N("The Sepulcher", 0.4109, 0.2978), N("Undercity", 0.4469, 0.2513), N("Tarren Mill", 0.4790, 0.3182),
+    N("Hammerfall", 0.5539, 0.3572), N("Booty Bay", 0.4401, 0.9337), N("Grom'gol", 0.4504, 0.8472),
+    N("Kargath", 0.5165, 0.6009),
+    { name = "Stonard", x = 0.5477, y = 0.7638, known = false },
+    { name = "Flame Crest", x = 0.5167, y = 0.6380, known = false },
+}
+legs = MS:PlanRoute({ c = EK, x = 0.557, y = 0.756 }, { c = EK, x = 0.447, y = 0.24, name = "north" })
+check("by Stonard, not learned: start there", legs and legs[1].to.name == "Stonard" and legs[2].how == "fly", Show(legs))
+C_Map.GetMapInfo = mapInfo
+
 io.stdout:write(("route_audit_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

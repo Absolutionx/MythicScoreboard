@@ -148,6 +148,8 @@ function MS:LearnFlightMap()
         local x, y
         if pos and pos.GetXY then x, y = pos:GetXY() end
         x, y = MS.ReadableNumber(x), MS.ReadableNumber(y)
+        -- Old nodes the game still lists ("zzOLD..."): not real flight masters.
+        if name and name:find("^zz") then name = nil end
         if name and x and y then
             -- state: 0 here, 1 known (and reachable), 2 not known.
             local state = MS.ReadableNumber(n.state)
@@ -164,7 +166,13 @@ end
 -- Flight masters on a continent for your side: { name, x, y, known }.
 function MS:FlightMasters(continent)
     local learned = Learned()[continent]
-    if learned then return learned end
+    if learned then
+        local out = {}
+        for _, f in ipairs(learned) do
+            if not (f.name or ""):find("^zz") then _ins(out, f) end
+        end
+        return out
+    end
     local side = MS:Side()
     local out = {}
     for _, f in ipairs(MS.ForeverData.FLIGHT_MASTERS or {}) do
@@ -226,7 +234,9 @@ local function Places(from, to)
     end
     for c in pairs(continents) do
         for _, f in ipairs(MS:FlightMasters(c)) do
-            if f.known then _ins(P, { kind = "flight", c = c, x = f.x, y = f.y, name = f.name }) end
+            -- One you haven't learned yet: you can still fly from it (talking
+            -- to it learns it), just not to it.
+            _ins(P, { kind = "flight", c = c, x = f.x, y = f.y, name = f.name, known = f.known ~= false })
         end
     end
     return P
@@ -239,6 +249,7 @@ local function Leg(a, b)
     local yards = MS:Yards(a.c, a.x, a.y, b.x, b.y)
     if not yards then return nil end
     if a.kind == "flight" and b.kind == "flight" then
+        if not b.known then return nil end
         return FLY_EXTRA + yards * FLY_PATH / FLY, "fly"
     end
     local secs = yards / RUN

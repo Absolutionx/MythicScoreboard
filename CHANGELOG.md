@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.11.3
+
+### WoW Forever: directions
+- **Flight masters you haven't learned yet count:** the way can start at one near you, since talking to it learns it, instead of a long run to one you know.
+- **A smoother arrow,** with clean edges at any angle, and **bigger text** under it.
+
+### Fixes
+- Opening the world map in combat no longer shows an "action blocked" error.
+
 ## 2.11.2
 
 ### Fixes

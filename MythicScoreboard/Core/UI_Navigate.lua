@@ -72,6 +72,10 @@ function MS:TurnTo(here, spot)
 end
 
 -- ── The arrow ──────────────────────────────────────────────────────────────
+local passLater                              -- right-click pass-through, once out of combat
+MS:On("PLAYER_REGEN_ENABLED", function()
+    if passLater and frame then passLater = false; MS.SafePassThrough(frame, "RightButton") end
+end)
 -- The route drawn on the world map (Core/UI_RouteMap.lua) follows it.
 local function RouteChanged()
     if MS.RefreshRouteMap then MS:RefreshRouteMap() end
@@ -116,7 +120,14 @@ local function Build()
     -- Only a Shift-click stops it: the right button goes through to the game,
     -- so holding it over the arrow still turns you.
     frame:RegisterForClicks("LeftButtonUp")
-    if frame.SetPassThroughButtons then pcall(frame.SetPassThroughButtons, frame, "RightButton") end
+    -- Right-click goes through (to turn your character). Not allowed in
+    -- combat: then once the fight's over.
+    local InCombat = rawget(_G, "InCombatLockdown")
+    if InCombat and InCombat() then
+        passLater = true
+    else
+        MS.SafePassThrough(frame, "RightButton")
+    end
     frame:SetScript("OnDragStart", function(self) self:StartMoving() end)
     frame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
@@ -134,20 +145,29 @@ local function Build()
     frame:SetScript("OnClick", function() if IsShiftKeyDown() then MS:StopNavigation() end end)
 
     local arrow = frame:CreateTexture(nil, "ARTWORK")
-    arrow:SetTexture("Interface\\AddOns\\MythicScoreboard\\Media\\Arrow")
+    -- Smooth when turned and scaled (the art is drawn near its size on screen).
+    arrow:SetTexture("Interface\\AddOns\\MythicScoreboard\\Media\\Arrow", nil, nil, "TRILINEAR")
     arrow:SetSize(56, 56); arrow:SetPoint("TOP", 0, 0)
     if arrow.SetSnapToPixelGrid then arrow:SetSnapToPixelGrid(false); arrow:SetTexelSnappingBias(0) end
     if P then arrow:SetVertexColor(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
     frame.arrow = arrow
 
+    -- The game's fonts, a little bigger: easy to read at a glance.
+    local function Size(fs, size)
+        local file, _, flags = fs:GetFont()
+        if file then fs:SetFont(file, size, flags) end
+    end
     local name = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    Size(name, 14)
     name:SetPoint("TOP", arrow, "BOTTOM", 0, -2)
     frame.name = name
     local step = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+    Size(step, 14)
     step:SetPoint("TOP", name, "BOTTOM", 0, -3)
-    step:SetWidth(220)
+    step:SetWidth(260)
     frame.step = step
     local dist = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    Size(dist, 13)
     dist:SetPoint("TOP", step, "BOTTOM", 0, -2)
     frame.dist = dist
 

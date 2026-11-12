@@ -46,6 +46,11 @@ local function New(kind, parent, name)
 end
 M.New = New
 function Widget:SetScript(n, f) self._scripts[n] = f end
+-- Blocked for addons in combat: counted, as the game's ADDON_ACTION_BLOCKED.
+function Widget:SetPassThroughButtons(...)
+    if InCombatLockdown() then M.blocked = (M.blocked or 0) + 1; return end
+    self._passThrough = { ... }
+end
 function Widget:GetScript(n) return self._scripts[n] end
 function Widget:HookScript(n, f)
     local old = self._scripts[n]

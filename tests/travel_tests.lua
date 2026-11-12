@@ -82,6 +82,17 @@ check("at the flight master: fly first", steps[1] and steps[1].how == "fly", ste
 MythicScoreboardDB.flights[KALIMDOR][2].known = false
 check("Beta not known: run", hows(MS:PlanRoute(from(), far)) == "run", hows(MS:PlanRoute(from(), far)))
 MythicScoreboardDB.flights[KALIMDOR][2].known = true
+-- Alpha not learned yet, right by you: run there (talking to it learns it), fly on.
+MythicScoreboardDB.flights[KALIMDOR][1].known = false
+legs = MS:PlanRoute(from(), far)
+check("not learned, nearby: fly from it", hows(legs) == "run,fly,run" and legs[1].to.name == "Alpha", hows(legs))
+MythicScoreboardDB.flights[KALIMDOR][1].known = true
+-- Old nodes the game still lists ("zzOLD..."): left out.
+table.insert(MythicScoreboardDB.flights[KALIMDOR], { name = "zzOLDGhost", x = 0.12, y = 0.121, known = true })
+local ghost = false
+for _, f in ipairs(MS:FlightMasters(KALIMDOR)) do if f.name:find("^zz") then ghost = true end end
+check("zzOLD nodes left out", not ghost)
+table.remove(MythicScoreboardDB.flights[KALIMDOR])
 
 -- Near: just run.
 legs = MS:PlanRoute(from(), { c = KALIMDOR, x = 0.15, y = 0.12 })
@@ -275,6 +286,20 @@ check("map: follows you", math.abs(pinFrame.route.lines[1][1] - 0.5) < 1e-6, pin
 onTaxi = false
 MS:StopNavigation()
 check("map: nothing once stopped", MS:RouteOnMap(KALIMDOR) == nil)
+
+-- In combat: nothing the game blocks. The map's markers skip it; the arrow
+-- lets right-click through once the fight's over.
+check("arrow: right-click goes through", arrow._passThrough and arrow._passThrough[1] == "RightButton")
+local Entrance = rawget(_G, "MythicScoreboardEntrancePinMixin")
+local inFight = true
+InCombatLockdown = function() return inFight end
+local marker = CreateFrame("Frame")
+Entrance.SetPassThroughButtons(marker, "RightButton")
+check("combat: marker pass-through skipped", (M.blocked or 0) == 0 and marker._passThrough == nil, M.blocked)
+inFight = false
+Entrance.SetPassThroughButtons(marker, "RightButton")
+check("out of combat: marker pass-through set", marker._passThrough and marker._passThrough[1] == "RightButton")
+InCombatLockdown = function() return false end
 
 for _, p in ipairs(M.printed) do if p:find("error") then check("no errors", false, p) end end
 io.stdout:write(("travel_tests: %d passed, %d failed\n"):format(passes, fails))
