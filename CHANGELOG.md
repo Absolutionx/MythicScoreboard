@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.11.0
+
+### WoW Forever: the way to any dungeon
+- **Dungeon entrances on the world map:** every Forever dungeon's entrance is marked on its zone's map and on the continent's. Hover a marker for the dungeon and its levels; wings that share a door share a marker.
+- **Click a marker for directions:** an arrow above your character points the way, with the step you're on ("Run to the flight master: Camp Taurajo", "Fly to Camp Taurajo", "Run to Razorfen Kraul"), the distance and the time left at your current speed.
+  - The route uses the flight paths you know and the boats and zeppelins between continents, and is worked out again as you go, so a detour or a skipped step just leads to the next.
+  - It prefers the flight master in the dungeon's own zone, the way players go, instead of a closer one over the hills.
+  - The arrow keeps pointing on flights, boats and zeppelins, and after a `/reload` in the air.
+  - Shift-click the arrow to stop, or click the marker again. Right-click goes through to the game, so turning your character over it is fine. Drag it wherever you like.
+- **The route on the world map:** a line from you through each stop to the dungeon (gold on foot, blue in the air), with a dot at each stop. It follows you while the map is open.
+- **Take flights automatically** (in settings, off by default): when the next step is a flight, talking to the flight master skips straight to the flight map and takes that flight. Hold Shift to pick your own.
+- `/sb routedebug` shows why a route was chosen and the best alternatives.
+
+### Fixes
+- The single-line in-run frame sits centred in its bar.
+
 ## 2.10.1
 
 ### WoW Forever

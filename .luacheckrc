@@ -72,6 +72,7 @@ read_globals = {
     "InCombatLockdown",
     "IsInGroup",
     "IsShiftKeyDown",
+    "TakeTaxiNode",
     "IsInInstance",
     "IsInRaid",
     "LE_PARTY_CATEGORY_INSTANCE",

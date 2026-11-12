@@ -70,6 +70,10 @@ local TOGGLES = {
       LK("Opens the scoreboard when you finish a dungeon.") },
     { LK("In-run frame"), "CompactFrame",
       LK("A small frame with the clock, bosses and deaths while you're in a run. Right-click it to change its style; drag it to move it.") },
+    -- WoW Forever: the dungeon directions (UI_Navigate.lua).
+    { LK("Take flights automatically"), "AutoTakeFlights",
+      LK("When the directions say to fly, talking to the flight master skips to the flight map and takes that flight. Hold Shift to pick your own."),
+      MS.FLAVOR == "forever" },
     { LK("Minimap button"), "MinimapButton",
       LK("Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap.") },
 }

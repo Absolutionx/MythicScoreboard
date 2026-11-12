@@ -1,7 +1,7 @@
 ## Interface: 120105
 ## Title: Mythic Scoreboard
 ## Author: Continually
-## Version: 2.10.1
+## Version: 2.11.0
 ## Notes: Dungeon run scoreboard for Midnight (WoW 12.x). Tracks DPS, HPS, deaths, interrupts, dispels, and a boss timeline.
 ## IconTexture: Interface\AddOns\MythicScoreboard\Icons\Icon
 ## SavedVariablesPerCharacter: MythicScoreboardDB
