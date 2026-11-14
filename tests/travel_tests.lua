@@ -183,6 +183,26 @@ check("clock: m:ss", MS._NavClock(75) == "1:15" and MS._NavClock(3725) == "1:02:
 here = { 0.88, 0.9 }; MS:UpdateArrow()
 check("there: done", MS:NavigationTarget() == nil)
 
+-- Between looks at where you are, a frame only turns the arrow: it follows
+-- the way you face straight away, and nothing else is worked out.
+here = { 0.5, 0.6 }
+MS:NavigateTo({ name = "Razorfen Kraul", map = 1413, x = 0.5, y = 0.5 })     -- due north, 1,000 yards
+facing = 0; MS:UpdateArrow()
+check("frame: straight ahead", math.abs(arrow.arrow._rotation) < 1e-6, arrow.arrow._rotation)
+local spots, realSpot = 0, MS.PlayerSpot
+MS.PlayerSpot = function(...) spots = spots + 1; return realSpot(...) end
+arrow:Fire("OnUpdate", 0.2)                              -- (a look: where you are, the text)
+spots = 0
+facing = math.pi / 2
+arrow:Fire("OnUpdate", 0.01)
+check("frame: the turn follows at once", math.abs(arrow.arrow._rotation + math.pi / 2) < 1e-6, arrow.arrow._rotation)
+check("frame: where you are isn't read again", spots == 0, spots)
+for _ = 1, 20 do arrow:Fire("OnUpdate", 0.01) end
+check("ten looks a second", spots >= 1 and spots <= 3, spots)
+MS.PlayerSpot = realSpot
+facing = 0
+MS:StopNavigation()
+
 -- A click on the arrow doesn't stop it; a Shift-click does.
 here = { 0.12, 0.12 }
 MS:NavigateTo({ name = "Razorfen Kraul", map = 1413, x = 0.88, y = 0.9 })

@@ -37,7 +37,12 @@ function MS:_CommitRunToHistory(run)
     -- it to the saved copy for a few minutes.
     _lastSaved, _lastSavedAt = saved, GetTime()
     if self.NoteCommittedHere then self:NoteCommittedHere() end
-    if self.ArchiveRun then self:ArchiveRun(saved) end
+    -- (The run is in history by now: an error in its Stats summary is said
+    -- in chat and doesn't undo that.)
+    if self.ArchiveRun then
+        local ok, err = pcall(self.ArchiveRun, self, saved)
+        if not ok then self:ReportError("Stats", err) end
+    end
     return saved
 end
 

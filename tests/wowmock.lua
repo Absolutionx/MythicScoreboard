@@ -46,6 +46,7 @@ local function New(kind, parent, name)
 end
 M.New = New
 function Widget:SetScript(n, f) self._scripts[n] = f end
+function Widget:SetRotation(r) self._rotation = r end
 -- Blocked for addons in combat: counted, as the game's ADDON_ACTION_BLOCKED.
 function Widget:SetPassThroughButtons(...)
     if InCombatLockdown() then M.blocked = (M.blocked or 0) + 1; return end
@@ -395,6 +396,9 @@ function M.LoadTOC(dir, toc)
     -- own tests (startonpull_tests.lua) turn it on.
     local ms = rawget(_G, "MythicScoreboard")
     if ms and ms.SETTING_DEFAULTS and not M.startOnPull then ms.SETTING_DEFAULTS.startOnPull = false end
+    -- Likewise, most tests save runs nothing was fought in (they walk in and
+    -- out): kept for them. emptyrun_tests.lua turns the real check on.
+    if ms and ms.IsEmptyRun and not M.dropEmptyRuns then ms.IsEmptyRun = function() return false end end
     return files
 end
 

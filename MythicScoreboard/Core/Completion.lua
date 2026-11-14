@@ -15,6 +15,7 @@
 local _max = math.max
 
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 -- Waits (seconds) for the game to settle before acting:
 local OPEN_DELAY        = 0.5    -- the window, once a run is cleared or saved
 local CLEAR_CHECK_DELAY = 1.5    -- the clear check, after a kill (loot, experience lines)
@@ -285,11 +286,46 @@ end
 --                       keys (the meter is hidden as a key ends) and paused
 --                       runs (the meter may hold another place's numbers)
 --   outcome.show        open the scoreboard afterwards
+-- A run nothing happened in: never pulled (its clock still waiting), or no
+-- boss fought, nobody dead, nothing killed, looted or hit. Stepping into a
+-- dungeon and out again isn't a run.
+function MS:IsEmptyRun(run)
+    if not run then return true end
+    if run.completed or (run.keystoneLevel or 0) > 0 then return false end
+    if run._waitingForPull then return true end
+    if #(run.bosses or {}) > 0 then return false end
+    local pr = run.progress
+    if pr and ((pr.kills or 0) > 0 or #(pr.quests or {}) > 0) then return false end
+    for _, p in pairs(run.players or {}) do
+        if (p.deaths or 0) > 0 or (p.damageDone or 0) > 0 or (p.healingDone or 0) > 0
+                or (p.damageTaken or 0) > 0 or #(p.loot or {}) > 0 then
+            return false
+        end
+    end
+    return true
+end
+
+-- One step of saving a run. A step that fails is said once in chat and the
+-- rest still happen: a run is never lost to an error in something beside it
+-- (the meter, the archive, the personal-best line).
+local function Step(what, fn, ...)
+    local ok, a, b = pcall(fn, ...)
+    if not ok then MS:ReportError(what, a); return nil end
+    return a, b
+end
+
 function MS:CommitRun(outcome)
     local run = self.currentRun
     if not run then return end
     outcome = outcome or {}
     local paused = run._suspended ~= nil
+    -- Nothing happened in it: not saved.
+    if self:IsEmptyRun(run) then
+        self:DiscardCurrentRun()
+        self.displayRun = nil
+        self:Changed("run")
+        return
+    end
     -- Its length: up to now, or when it was paused, or the kill that cleared it.
     if not run.duration then
         local d = self:GetRunDuration(run)
@@ -303,14 +339,21 @@ function MS:CommitRun(outcome)
 
     local snapshot = outcome.snapshot
     if snapshot == nil then snapshot = (run.keystoneLevel or 0) == 0 and not paused end
-    if snapshot then self:SnapshotFromDamageMeter() end
-    self:PopulateAll()
-    self:_BackfillSyntheticInterrupts(run)
+    if snapshot then Step("Saving the run (meter)", self.SnapshotFromDamageMeter, self) end
+    Step("Saving the run (group)", self.PopulateAll, self)
+    Step("Saving the run (interrupts)", self._BackfillSyntheticInterrupts, self, run)
 
-    local before = self:BestKeyTime(run.dungeonName, run.keystoneLevel)
-    if run._resultTime then MS.ToResultClock(run) end
-    self:_CommitRunToHistory(run)
-    self:_AnnouncePB(run, before)
+    local before = Step("Saving the run (best time)", self.BestKeyTime, self, run.dungeonName, run.keystoneLevel)
+    if run._resultTime then Step("Saving the run (key clock)", MS.ToResultClock, run) end
+    local saved = Step("Saving the run", self._CommitRunToHistory, self, run)
+    if saved then Step("Saving the run (best time)", self._AnnouncePB, self, run, before) end
+    -- Not saved (an error above): the run is kept as it is in the saved
+    -- data, and saving it is tried again at the next /reload or login
+    -- (Bootstrap.lua), so it isn't lost.
+    if not saved and MythicScoreboardDB and MythicScoreboardDB.runs then
+        MythicScoreboardDB.unsavedRun = run
+        MS.Warn(L["Saving the run failed. It's kept, and saving it is tried again at your next /reload or login."])
+    end
     self:ClearSavedActiveRun()
     self.displayRun = nil
     self:SetRunState("none")

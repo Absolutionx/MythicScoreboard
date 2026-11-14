@@ -253,9 +253,14 @@ local function OnEvent(event, ...)
         end)
     end
 end
-for _, ev in ipairs({ "PLAYER_LOGIN", "ENCOUNTER_LOOT_RECEIVED", "CHAT_MSG_LOOT",
-                     "CHAT_MSG_ADDON", "GET_ITEM_INFO_RECEIVED" }) do
+for _, ev in ipairs({ "PLAYER_LOGIN", "ENCOUNTER_LOOT_RECEIVED", "CHAT_MSG_LOOT", "CHAT_MSG_ADDON" }) do
     MS:On(ev, OnEvent)
+end
+-- GET_ITEM_INFO_RECEIVED comes for every item the game loads, anywhere (the
+-- auction house, bags, other addons): listened for only while the scoreboard
+-- window is up, which is the only time it's redrawn for it.
+function MS:WatchItemInfo(on)
+    if on then MS:On("GET_ITEM_INFO_RECEIVED", OnEvent) else MS:Off("GET_ITEM_INFO_RECEIVED", OnEvent) end
 end
 
 -- ── Removing a piece of loot by hand ───────────────────────────────────────

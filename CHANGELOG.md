@@ -1,5 +1,25 @@
 # Changelog
 
+## 2.12.1
+
+### Fixes
+- **WoW Forever: gold and XP after a /reload or login inside a dungeon.** A run could count your whole purse and XP bar as gained. Nothing is read now until the loading screen is over.
+- **Runs nothing happened in aren't saved.** Stepping into a dungeon and out again (no pull, no boss, nobody dead, nothing killed or looted) no longer leaves an empty run in your history, under any clear rule.
+- **Saving a run can't lose it.** An error in one part of saving (the meter, the Stats summary) no longer stops the rest; if the save itself fails, the run is kept and saved at your next /reload or login.
+- **Item levels and specializations:**
+  - A player who can't be inspected is tried a few times, further and further apart, instead of every couple of seconds for the whole run.
+  - Nothing is inspected while your own Inspect window is open, and it's no longer cleared.
+  - An inspect meant for someone else is never taken as another player's numbers.
+  - Your own item level is read directly.
+
+### WoW Forever
+- **Alcaz Prison, Blackmaw Hold and Shaper's Terrace have their bosses,** so runs there show boss progress and can be cleared.
+- More boss portraits for Krol'dok Stronghold, the Drowned City and the three above, and the rares newly found in them.
+
+### Lighter
+- The directions arrow does far less work each frame (it turns every frame; where you are and the text ten times a second).
+- Outside a dungeon the addon no longer reacts to group, pet and combat changes it has no use for.
+
 ## 2.12.0
 
 ### The clock starts at the first pull

@@ -11,11 +11,48 @@ local MS = _G["MythicScoreboard"]
 local IsSecret = _G["MythicScoreboard"].IsSecret
 
 local inspectQueue   = {}
-local inspectPending = nil
+local inspectPending = nil     -- the player being inspected (their name)
+local pendingGUID    = nil     -- and their GUID, when the game shows it
 local INSPECT_DELAY  = 0.5
 local listening      = false   -- INSPECT_READY, from the first inspect on
 
 local function Later(fn) C_Timer.After(INSPECT_DELAY, fn) end
+
+-- A player whose inspect brought nothing isn't asked again at once: after
+-- each try the wait grows, and after the last it stops for the run (a new
+-- run starts afresh). (The
+-- game gives up on inspects out of range or sent too often; asking every
+-- couple of seconds only gets in the way of other inspects.)
+local RETRY_WAITS = { 5, 15, 60, 300 }
+local tries = {}               -- name -> { n = tries so far, at = no sooner than this }
+local triesFor                 -- the run's item level cache they belong to (a new run has a new one)
+local function MayInspect(name)
+    if triesFor ~= MS.itemLevelCache then wipe(tries); triesFor = MS.itemLevelCache end
+    local t = tries[name]
+    if not t then return true end
+    return t.n < #RETRY_WAITS + 1 and GetTime() >= t.at
+end
+local function NoteTry(name)
+    local t = tries[name] or { n = 0, at = 0 }
+    tries[name] = t
+    t.n = t.n + 1
+    t.at = GetTime() + (RETRY_WAITS[t.n] or 0)
+end
+
+-- Your own Inspect window is open: the addon's inspects wait, so they don't
+-- change or clear what it's showing.
+local function InspectWindowOpen()
+    local f = rawget(_G, "InspectFrame")
+    return f ~= nil and f.IsShown ~= nil and f:IsShown() == true
+end
+
+-- Your own item level, with no inspect: what you have on.
+local function OwnItemLevel()
+    local fn = rawget(_G, "GetAverageItemLevel")
+    if not fn then return nil end
+    local ok, _, equipped = pcall(fn)
+    if ok and type(equipped) == "number" and not IsSecret(equipped) and equipped > 0 then return _floor(equipped) end
+end
 
 -- Specializations exist on this client (not in Forever).
 local HAS_SPECS = rawget(_G, "GetInspectSpecialization") ~= nil and rawget(_G, "GetSpecializationInfoByID") ~= nil
@@ -50,9 +87,13 @@ local function EnsureInspectFrame()
     MS:On("INSPECT_READY", function(event, guid)
         if event ~= "INSPECT_READY" or not inspectPending then return end
         -- The GUID can be hidden in Midnight: compare only a readable one.
-        local targetUnit = MS:UnitForGUID(MS.Readable(guid))
+        guid = MS.Readable(guid)
+        -- Someone else's inspect coming back (yours, or another addon's): not
+        -- the one being waited for, and not this player's numbers.
+        if guid and pendingGUID and guid ~= pendingGUID then return end
+        local targetUnit = MS:UnitForGUID(guid)
         local name = inspectPending
-        inspectPending = nil
+        inspectPending, pendingGUID = nil, nil
         if targetUnit and C_PaperDollInfo and C_PaperDollInfo.GetInspectItemLevel then
             local ok, il = pcall(C_PaperDollInfo.GetInspectItemLevel, targetUnit)
             if ok and type(il) == "number" and not IsSecret(il) and il > 0 then
@@ -73,14 +114,14 @@ local function EnsureInspectFrame()
                 if p and p.specID ~= id then p.specID = id; MS:SaveCurrentRun(); MS:Changed("run") end
             end
         end
-        ClearInspectPlayer()
+        if not InspectWindowOpen() then ClearInspectPlayer() end
         if #inspectQueue > 0 then Later(function() MS:_ProcessInspectQueue() end) end
     end)
 end
 
 function MS:_ProcessInspectQueue()
     if inspectPending or #inspectQueue == 0 then return end
-    if InCombatLockdown() then
+    if InCombatLockdown() or InspectWindowOpen() then
         C_Timer.After(5.0, function() self:_ProcessInspectQueue() end); return
     end
     EnsureInspectFrame()
@@ -90,14 +131,16 @@ function MS:_ProcessInspectQueue()
         local p = self:PlayerForUnit(u)
         if p and p.name == entry.name then unit = u; break end
     end
-    if unit and CanInspect(unit) then
+    if unit and CanInspect(unit) and MayInspect(entry.name) then
         inspectPending = entry.name
+        pendingGUID = MS.UnitGUIDReadable(unit)
+        NoteTry(entry.name)
         NotifyInspect(unit)
         local pendingAtCall = entry.name
         C_Timer.After(5.0, function()
             if inspectPending == pendingAtCall then
-                inspectPending = nil
-                ClearInspectPlayer()
+                inspectPending, pendingGUID = nil, nil
+                if not InspectWindowOpen() then ClearInspectPlayer() end
                 if #inspectQueue > 0 then Later(function() self:_ProcessInspectQueue() end) end
             end
         end)
@@ -152,6 +195,10 @@ function MS:PopulateAll()
             if type(lvl) == "number" and not IsSecret(lvl) and lvl > 0 then
                 p.level = lvl
             end
+            if unit == "player" then
+                local own = OwnItemLevel()
+                if own then self.itemLevelCache[short] = own end
+            end
             local cached = self.itemLevelCache[short]
             if cached and cached > 0 then p.itemLevel = cached end
             local needSpec = false
@@ -164,7 +211,7 @@ function MS:PopulateAll()
             else
                 needSpec = HAS_SPECS
             end
-            if (not (cached and cached > 0) or needSpec) and not inspectPending then
+            if (not (cached and cached > 0) or needSpec) and not inspectPending and MayInspect(short) then
                 local already = false
                 for _, e in ipairs(inspectQueue) do
                     if e.name == short then already = true; break end

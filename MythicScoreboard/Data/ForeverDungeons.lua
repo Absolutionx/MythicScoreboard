@@ -152,19 +152,36 @@ D.DUNGEONS = {
         { "Stonespine", rare = true }, "Magistrate Barthilas", "Nerub'enkan", "Baroness Anastari",
         "Maleki the Pallid", "Ramstein the Gorger", "Baron Rivendare",
     }},
-    -- Announced, bosses not documented yet: runs are saved as "Finished".
+    -- WoW Forever's own dungeons.
     -- (Bosses in order, the last one final.)
     ["Krol'dok Stronghold"] = { levels = {40, 45}, final = "Overlord Mugg", bosses = {
-        "Slavecrusher Grox", "Twilight Commander Zarmok", "War Handler Ashka", "Nar'gurk",
-        "Bossman Toof", "Overlord Mugg",
+        "Slavecrusher Grox", { "Twilight Commander Zarmok", aka = { "Zarmok" } },
+        { "War Handler Ashka", aka = { "Handler Ashka" } }, "Nar'gurk",
+        { "Bossman Toof", aka = { "Boss Kof" } }, { "Kroog", rare = true },
+        { "Overlord Mugg", aka = { "Overseer Mugg" } },
     }},
     ["The Drowned City"] = { levels = {35, 40}, final = "Min'loth the Serpent", bosses = {
-        "Zul'Alai", "Var'Taka", "Captain Dreadrise", "Deathless Marrow",
-        { "Gill", rare = true }, "Min'loth the Serpent",
+        "Zul'Alai", { "Var'Taka", aka = { "Zin'aka" } }, "Captain Dreadrise", "Deathless Marrow",
+        { "Gill", rare = true }, { "Umbra", rare = true },
+        { "\"Pyromancer\" Braxton", rare = true, aka = { "Pyromancer Braxton" } },
+        { "Min'loth the Serpent", aka = { "Min'loth" } },
     }},
-    ["Alcaz Prison"]        = { levels = {48, 53}, bosses = {} },
-    ["Blackmaw Hold"]       = { levels = {55, 60}, bosses = {} },
-    ["Shaper's Terrace"]    = { levels = {58, 60}, bosses = {} },
+    ["Alcaz Prison"] = { levels = {48, 53}, final = "Blazeroar", bosses = {
+        { "Overseer Wrex", aka = { "Wrex" } }, { "The Questioner", aka = { "Questioner" } },
+        { "Tidemistress Ca'zass", aka = { "Ca'zass" } }, { "Katerina the Cleaner", aka = { "Katerina" } },
+        "Blazeroar",
+    }},
+    ["Blackmaw Hold"] = { levels = {55, 60}, final = "Varrox Bleakhoof", bosses = {
+        { "Impaan the Imprisoner", aka = { "Impaan" } }, { "Bonesnout the Unbroken", aka = { "Bonesnout" } },
+        { "Moontouched Wanderer", rare = true }, { "Gortek the Apprentice", rare = true, aka = { "Gortek" } },
+        { "Tunnelweb Matriarch", rare = true }, "Withermaw",
+        { "Elder Shaman Bloodmane", aka = { "Bloodmane" } }, "Blackmaw Behemoth", "Unbound Spirit",
+        { "Varrox Bleakhoof", aka = { "Varrox" } },
+    }},
+    ["Shaper's Terrace"] = { levels = {58, 60}, final = "Nanaya", bosses = {
+        "Titanosaur", "Venomridge", "Thunderhoof", "Direhorn Matriarch", "Cinder", "Bolt", "Snowtalon",
+        "Vitrix", { "Izha'Rel and Tor'Rel", aka = { "Izha'Rel", "Tor'Rel" } }, "Nanaya",
+    }},
 }
 
 -- Other names the game may give an instance than the key above.

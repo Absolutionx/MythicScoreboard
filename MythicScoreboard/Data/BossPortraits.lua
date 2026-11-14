@@ -330,4 +330,50 @@ MS.FOREVER_BOSS_DISPLAY = {
         ["Ramstein the Gorger"] = 12818,            -- npc 10439
         ["Baron Rivendare"] = 10729,                -- npc 10440
     },
+    ["Krol'dok Stronghold"] = {
+        ["Slavecrusher Grox"] = 141217,             -- npc 258966
+        ["Twilight Commander Zarmok"] = 141219,     -- npc 258972
+        ["War Handler Ashka"] = 141443,             -- npc 259281
+        ["Nar'gurk"] = 141215,                      -- npc 258964
+        ["Bossman Toof"] = 14424,                   -- npc 264773
+        ["Kroog"] = 17273,                          -- npc 262716
+        ["Overlord Mugg"] = 141218,                 -- npc 258968
+    },
+    ["The Drowned City"] = {
+        ["Zul'Alai"] = 144475,                      -- npc 258905
+        ["Var'Taka"] = 144487,                      -- npc 258924
+        ["Captain Dreadrise"] = 142144,             -- npc 260042
+        ["Gill"] = 144023,                          -- npc 264177
+        ["Umbra"] = 144022,                         -- npc 264172
+        ["\"Pyromancer\" Braxton"] = 142457,        -- npc 260468
+        ["Min'loth the Serpent"] = 142322,          -- npc 260274
+    },
+    ["Alcaz Prison"] = {
+        ["Overseer Wrex"] = 7914,                   -- npc 255391
+        ["The Questioner"] = 140092,                -- npc 256236
+        ["Tidemistress Ca'zass"] = 4973,            -- npc 255997
+        ["Katerina the Cleaner"] = 2317,            -- npc 257016
+        ["Blazeroar"] = 6374,                       -- npc 255702
+    },
+    ["Blackmaw Hold"] = {
+        ["Impaan the Imprisoner"] = 130432,         -- npc 247206
+        ["Bonesnout the Unbroken"] = 130427,        -- npc 247198
+        ["Moontouched Wanderer"] = 12235,           -- npc 269104
+        ["Gortek the Apprentice"] = 145808,         -- npc 269111
+        ["Withermaw"] = 140708,                     -- npc 247195
+        ["Elder Shaman Bloodmane"] = 130440,        -- npc 247209
+        ["Blackmaw Behemoth"] = 130436,             -- npc 247207
+        ["Unbound Spirit"] = 131644,                -- npc 247231
+        ["Varrox Bleakhoof"] = 130447,              -- npc 247234
+    },
+    ["Shaper's Terrace"] = {
+        ["Titanosaur"] = 142989,                    -- npc 253201
+        ["Venomridge"] = 144511,                    -- npc 261813
+        ["Thunderhoof"] = 144514,                   -- npc 261812
+        ["Direhorn Matriarch"] = 144515,            -- npc 262127
+        ["Bolt"] = 143063,                          -- npc 262081
+        ["Vitrix"] = 147098,                        -- npc 272561
+        ["Izha'Rel and Tor'Rel"] = 143040,          -- npc 253218
+        ["Nanaya"] = 143832,                        -- npc 261809
+    },
 }

@@ -95,13 +95,23 @@ end
 
 -- Someone in the dungeon with you pulled (you may be behind, out of range):
 -- the clock of a run waiting for its pull starts. Not someone fighting their
--- way to the dungeon outside.
-function H.UNIT_FLAGS(unit)
+-- way to the dungeon outside. UNIT_FLAGS comes for every unit the game shows,
+-- all the time: listened for only while a run is waiting for its pull.
+local function OnUnitFlags(_, unit)
     local run = MS.currentRun
     if not (run and run._waitingForPull and MS.inDungeon) then return end
     if type(unit) ~= "string" or not (unit:find("^party%d") or unit:find("^raid%d")) then return end
     if MS.InCombatUnit(unit) and MS:InDungeonWithMe(unit) then MS:StartClock() end
 end
+local watchingPull = false
+MS:WatchRunState(function()
+    local run = MS.currentRun
+    local want = run ~= nil and run._waitingForPull == true and MS.inDungeon == true
+    if want == watchingPull then return end
+    watchingPull = want
+    if want then MS:On("UNIT_FLAGS", OnUnitFlags) else MS:Off("UNIT_FLAGS", OnUnitFlags) end
+end)
+MS._WatchingPull = function() return watchingPull end     -- for tests
 
 -- encounterID is the dungeonEncounterID (as in EJ_GetEncounterInfoByIndex's
 -- seventh value), not the journal's own encounter ID.
@@ -130,6 +140,7 @@ function H.PLAYER_DEAD() if MS.inDungeon then MS.PollDeaths() end end
 function H.GROUP_ROSTER_UPDATE()
     MS:InvalidateGroupUnits()
     local run = MS.currentRun
+    if not run then return end               -- no run: nobody to keep track of
     if run and run._suspended and GetNumGroupMembers() == 0 then
         MS:ClosePausedRun()
         return
@@ -146,6 +157,8 @@ function H.GROUP_ROSTER_UPDATE()
 end
 
 function H.UNIT_PET(ownerUnit)
+    -- (Pets only matter to a run; one starting looks at them all, WarmPetCache.)
+    if not MS.currentRun then return end
     -- Read the pet GUID immediately: this is the window before any lockdown.
     if ownerUnit then
         local petUnit = ownerUnit .. "pet"
