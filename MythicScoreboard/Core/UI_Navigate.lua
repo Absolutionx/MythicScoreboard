@@ -19,6 +19,7 @@ local _floor, _fmt, _pi = math.floor, string.format, math.pi
 local ARRIVED_YARDS = 25
 local AT_YARDS = 15                          -- this close to a flight master or dock: there
 local REPLAN = 2                             -- seconds between working out the route again
+local REFRESH = 0.1                          -- seconds between looking where you are (the turn: every frame)
 
 local frame, target, plan, planAt, inAir
 local P = UI and UI.P
@@ -68,7 +69,15 @@ function MS:TurnTo(here, spot)
     local facing = MS.ReadableNumber(Facing and Facing()) or 0
     local turn = -(bearing + facing)
     turn = (turn + _pi) % (2 * _pi) - _pi
-    return turn, yards
+    return turn, yards, bearing
+end
+
+-- The arrow's turn for a bearing (clockwise from north) and the way you
+-- face now: all that changes from one frame to the next.
+local function TurnFor(bearing)
+    local Facing = rawget(_G, "GetPlayerFacing")
+    local facing = MS.ReadableNumber(Facing and Facing()) or 0
+    return (-(bearing + facing) + _pi) % (2 * _pi) - _pi
 end
 
 -- ── The arrow ──────────────────────────────────────────────────────────────
@@ -171,11 +180,20 @@ local function Build()
     dist:SetPoint("TOP", step, "BOTTOM", 0, -2)
     frame.dist = dist
 
-    -- Every frame: the turn follows you as you turn, with no lag. The route
-    -- itself only every couple of seconds.
-    frame:SetScript("OnUpdate", function()
-        local ok, err = pcall(MS.UpdateArrow, MS)
-        if not ok then MS:ReportError("Arrow", err); MS:StopNavigation() end
+    -- Every frame: only the arrow's turn, from the bearing last worked out
+    -- and the way you face now, so it follows you with no lag. Where you
+    -- are, the step and the distance: ten times a second. The route itself:
+    -- every couple of seconds.
+    local wait = 0
+    frame:SetScript("OnUpdate", function(self, elapsed)
+        wait = wait - (elapsed or 0)
+        if wait <= 0 then
+            wait = REFRESH
+            local ok, err = pcall(MS.UpdateArrow, MS)
+            if not ok then MS:ReportError("Arrow", err); MS:StopNavigation() end
+        elseif self.bearing then
+            self.arrow:SetRotation(TurnFor(self.bearing))
+        end
     end)
     frame:Hide()
     return frame
@@ -219,6 +237,16 @@ local function SetText(fs, key, text)
     if frame[key] ~= text then frame[key] = text; fs:SetText(text) end
 end
 
+-- The arrow pointing (its bearing kept, for the frames in between), or hidden.
+local function Point(turn, bearing)
+    frame.bearing = bearing
+    frame.arrow:Show(); frame.arrow:SetRotation(turn)
+end
+local function NoPoint()
+    frame.bearing = nil
+    frame.arrow:Hide()
+end
+
 function MS:UpdateArrow()
     if not (frame and target) then return end
     local OnTaxi = rawget(_G, "UnitOnTaxi")
@@ -242,9 +270,9 @@ function MS:UpdateArrow()
         -- Not known where it lands: the arrow to the dungeon itself.
         local spot = dest or target.spot
         SetText(frame.step, "lastStep", dest and _fmt(L["Flying to %s"], dest.name) or "")
-        local turn, yards
-        if here and spot and here.c == spot.c then turn, yards = MS:TurnTo(here, spot) end
-        if turn then frame.arrow:Show(); frame.arrow:SetRotation(turn) else frame.arrow:Hide() end
+        local turn, yards, bearing
+        if here and spot and here.c == spot.c then turn, yards, bearing = MS:TurnTo(here, spot) end
+        if turn then Point(turn, bearing) else NoPoint() end
         SetText(frame.dist, "lastDist", yards and DistText("fly:" .. (spot.name or ""), yards) or "")
         planAt, inAir = nil, true
         return
@@ -271,7 +299,7 @@ function MS:UpdateArrow()
     end
     local leg = plan and plan[1]
     if not (here and leg) then
-        frame.arrow:Hide()
+        NoPoint()
         local where = goal and MS:MapName(goal.c)
         SetText(frame.step, "lastStep", here and where and here.c ~= goal.c and _fmt(L["Travel to %s"], where) or "")
         SetText(frame.dist, "lastDist", "")
@@ -281,14 +309,14 @@ function MS:UpdateArrow()
     if #plan > 1 then text = _fmt(L["Step %d of %d"], 1, #plan) .. ": " .. text end
     SetText(frame.step, "lastStep", text)
     if spot then
-        local turn, yards = MS:TurnTo(here, spot)
+        local turn, yards, bearing = MS:TurnTo(here, spot)
         if turn then
-            frame.arrow:Show(); frame.arrow:SetRotation(turn)
+            Point(turn, bearing)
             SetText(frame.dist, "lastDist", DistText(_fmt("%s:%.4f:%.4f", spot.kind or "", spot.x, spot.y), yards))
             return
         end
     end
-    frame.arrow:Hide()
+    NoPoint()
     SetText(frame.dist, "lastDist", "")
 end
 

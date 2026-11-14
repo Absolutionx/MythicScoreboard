@@ -287,6 +287,7 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     -- spent waiting for the group doesn't count. Already fighting: now.
     if run.keystoneLevel == 0 and self:GetStartOnPull() then
         run._waitingForPull = true
+        self:UpdateRunWatchers()             -- (the group's pull is listened for from now)
         if self:GroupInCombat() then self:StartClock() end
     end
     self:SaveCurrentRun()
@@ -338,6 +339,7 @@ function MS:StartClock()
     run.startTime = GetTime()
     run._wallClockStart = time()
     run._offline = nil
+    self:UpdateRunWatchers()                 -- (pulled: no more listening for it)
     self:SaveCurrentRun()
     self:Changed("run")
 end

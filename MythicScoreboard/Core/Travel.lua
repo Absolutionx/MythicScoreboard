@@ -28,7 +28,16 @@ local function MapAPI() return rawget(_G, "C_Map") end
 -- ── Maps ───────────────────────────────────────────────────────────────────
 -- The continent a map is on, or nil. An island that's on no continent
 -- (Zephras Isle, say) is a continent of its own: its own map.
+local continentOf = {}                      -- map -> its continent, once found (a map never moves)
 function MS:ContinentOf(mapID)
+    if not mapID then return nil end
+    local known = continentOf[mapID]
+    if known then return known end
+    local found = self:_ContinentOf(mapID)
+    if found then continentOf[mapID] = found end      -- (not found: asked again, the game may not be ready)
+    return found
+end
+function MS:_ContinentOf(mapID)
     local C = MapAPI()
     if not (C and C.GetMapInfo) then return nil end
     local last

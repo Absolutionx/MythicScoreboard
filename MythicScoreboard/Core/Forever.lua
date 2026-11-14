@@ -451,6 +451,7 @@ if MS.FLAVOR == "forever" then
         return list
     end
     MS:On("CHAT_MSG_COMBAT_HOSTILE_DEATH", function(_, text)
+        if not MS.inDungeon then return end
         text = MS.Readable(text)
         if not text then return end
         for _, fp in ipairs(Patterns()) do
@@ -459,10 +460,12 @@ if MS.FLAVOR == "forever" then
         end
     end)
     MS:On("UNIT_DIED", function(_, guid)
+        if not MS.inDungeon then return end
         local npc = NpcOf(guid)
         if npc then MS:NoteForeverKill(npc, nil) end
     end)
     MS:On("PARTY_KILL", function(_, _, guid)
+        if not MS.inDungeon then return end
         local npc = NpcOf(guid)
         if npc then MS:NoteForeverKill(npc, nil) end
     end)
@@ -525,8 +528,15 @@ local function RecheckSoon()
     for _, delay in ipairs({ 1, 4, 10 }) do C_Timer.After(delay, SafeRecheck) end
 end
 if MS.FLAVOR == "forever" then
-    for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED", "ZONE_CHANGED_INDOORS", "ZONE_CHANGED_NEW_AREA" }) do
+    -- Arriving somewhere: always (the run may start a moment later).
+    for _, ev in ipairs({ "PLAYER_ENTERING_WORLD", "ZONE_CHANGED_NEW_AREA" }) do
         MS:On(ev, RecheckSoon)
+    end
+    -- From room to room: these come all the time out in the world too, so
+    -- only with a run going.
+    local function RecheckInRun() if MS.currentRun or wingDebug then RecheckSoon() end end
+    for _, ev in ipairs({ "ZONE_CHANGED", "ZONE_CHANGED_INDOORS" }) do
+        MS:On(ev, RecheckInRun)
     end
 end
 MS._RecheckWing = RecheckWing          -- for tests

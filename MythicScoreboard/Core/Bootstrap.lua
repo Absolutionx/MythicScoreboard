@@ -22,6 +22,14 @@ local function OnLoaded()
         MS.Warn(L["C_DamageMeter unavailable — requires WoW 12.0+."])
     end
     MS:RunMigrations()                      -- saved data up to date before anything reads it
+    -- A run whose saving failed last time (Completion.lua): once more. Kept
+    -- only for this one try, so an error in it can't come back every login.
+    local unsaved = db.unsavedRun
+    db.unsavedRun = nil
+    if type(unsaved) == "table" then
+        local ok, err = pcall(MS._CommitRunToHistory, MS, unsaved)
+        if not ok then MS:ReportError("Saving the run", err) end
+    end
     MS:SyncAccountStats()                   -- this character's runs, account-wide
     MS:MirrorHistory()                      -- and its history, for the other characters' lists
     -- The window is built the first time it's opened.

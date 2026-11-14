@@ -86,8 +86,10 @@ local function BuildWindow()
     end)
     sbFrame:SetScript("OnShow", function()
         if sbFrame.SetBackdrop then sbFrame:SetBackdrop(nil) end
+        MS:WatchItemInfo(true)
     end)
     sbFrame:SetScript("OnHide", function()
+        MS:WatchItemInfo(false)
         CloseHistDropdown()
         if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
     end)

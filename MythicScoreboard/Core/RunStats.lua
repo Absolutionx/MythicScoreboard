@@ -56,14 +56,24 @@ local function ReadMoney()
 end
 
 -- Where you are now becomes the starting point for every reading.
+-- While the game is still loading (a /reload or login inside a dungeon: the
+-- run is picked up before the loading screen ends) it reports no gold and
+-- no XP yet, and a reading taken then would make your whole purse and XP bar
+-- look gained. So nothing is read until the world is in (worldIn), and the
+-- reading is taken again each time it comes in.
+local worldIn = false
 local function Baseline()
+    if not worldIn then
+        last.xp, last.max, last.level, last.money = nil, nil, nil, nil
+        return
+    end
     last.xp, last.max, last.level = ReadXP()
     last.money = ReadMoney()
 end
 
 local function OnXP()
     local run = MS.currentRun
-    if not (run and MS.inDungeon) then return end
+    if not (run and MS.inDungeon and worldIn) then return end
     local xp, max, lvl = ReadXP()
     if not xp then return end
     if last.xp then
@@ -82,7 +92,7 @@ end
 
 local function OnMoney()
     local run = MS.currentRun
-    if not (run and MS.inDungeon) then return end
+    if not (run and MS.inDungeon and worldIn) then return end
     local m = ReadMoney()
     if not m then return end
     if last.money and m > last.money then Progress(run).gold = Progress(run).gold + (m - last.money) end
@@ -491,6 +501,12 @@ local function OnEvent(event, ...)
         OnInfoMessage(select(2, ...))
     end
 end
+
+-- The world is in (after every loading screen): readings can be trusted.
+MS:On("PLAYER_ENTERING_WORLD", function()
+    worldIn = true
+    if MS._RunStatsListening() then Baseline() end
+end)
 
 -- Listened for only while a run is recording.
 local EVENTS = { "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "CHAT_MSG_COMBAT_XP_GAIN",
