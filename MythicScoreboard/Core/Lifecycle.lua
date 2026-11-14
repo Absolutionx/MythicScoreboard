@@ -283,6 +283,12 @@ function MS:StartRun(dungeonName, keystoneLevel, difficultyID, difficultyLabel)
     self:PopulateAll()
     self:PopulateRolesAndScores()
     run._wallClockStart = time()
+    -- A dungeon run (not a key): the clock waits for the first pull, so time
+    -- spent waiting for the group doesn't count. Already fighting: now.
+    if run.keystoneLevel == 0 and self:GetStartOnPull() then
+        run._waitingForPull = true
+        if self:GroupInCombat() then self:StartClock() end
+    end
     self:SaveCurrentRun()
     self:Changed("run")
     -- Short delay lets roster seeding settle before first snapshot.
@@ -322,11 +328,75 @@ function MS:FinishRun(completed, inTime)
     end
 end
 
+-- The first pull of a run waiting for one: its clock starts now. The run's
+-- start moves here, so every time in it (boss pulls, deaths, loot) counts
+-- from the pull.
+function MS:StartClock()
+    local run = self.currentRun
+    if not (run and run._waitingForPull and self:RunState() == "active") then return end
+    run._waitingForPull = nil
+    run.startTime = GetTime()
+    run._wallClockStart = time()
+    run._offline = nil
+    self:SaveCurrentRun()
+    self:Changed("run")
+end
+
+-- Whether a unit's in combat (false if the game hides it).
+function MS.InCombatUnit(unit)
+    local UAC = rawget(_G, "UnitAffectingCombat")
+    if not UAC then return false end
+    local v = UAC(unit)
+    return not MS.IsSecret(v) and v == true
+end
+
+-- Whether a group member is in the dungeon with you:
+--   near you         in range (what lights up their party frame, about 40
+--                    yards), or close enough for the game to draw them
+--                    (about 100): they're here
+--   farther          on the same map as you. Inside a dungeon with no map
+--                    (WoW Forever's), only someone else with no map is in it
+--                    with you: out in the world, everyone has a zone's map.
+-- Unsure: not with you (the clock then starts when you pull, never early).
+local function Yes(fn, unit)
+    if not fn then return false end
+    local ok, v = pcall(fn, unit)
+    return ok and not MS.IsSecret(v) and v == true
+end
+local function MapOf(unit)
+    local C = rawget(_G, "C_Map")
+    if not (C and C.GetBestMapForUnit) then return nil end
+    local ok, map = pcall(C.GetBestMapForUnit, unit)
+    return ok and MS.ReadableNumber(map) or nil
+end
+function MS:InDungeonWithMe(unit)
+    if unit == "player" then return true end
+    if Yes(rawget(_G, "UnitInRange"), unit) or Yes(rawget(_G, "UnitIsVisible"), unit) then return true end
+    return MapOf("player") == MapOf(unit)                   -- (both none: both inside Forever's dungeon)
+end
+
+-- You or anyone in the dungeon with you in combat.
+function MS:GroupInCombat()
+    local UAC = rawget(_G, "UnitAffectingCombat")
+    if not UAC then return false end
+    for _, unit in ipairs(self:GroupUnits()) do
+        if MS.InCombatUnit(unit) and self:InDungeonWithMe(unit) then return true end
+    end
+    return MS.InCombatUnit("player")
+end
+
 -- active -> paused: left before the run was done (released after dying,
 -- or out to repair/sell). Walking back in resumes the run.
 function MS:PauseRun()
     local run = self.currentRun
     if not (self.inDungeon and run) then return end
+    -- Left before anyone pulled: nothing to keep. Back inside, a new run
+    -- waits for its pull.
+    if run._waitingForPull then
+        self:DiscardCurrentRun()
+        self:Changed("run")
+        return
+    end
     self:SnapshotFromDamageMeter()          -- last numbers from inside
     self:SetRunState("paused")
     self:SaveCurrentRun()
@@ -358,6 +428,14 @@ end
 function MS:AbandonRun()
     local run = self.currentRun
     if not run or run.completed then return false end
+    -- Not pulled yet: nothing to save.
+    if run._waitingForPull then
+        if self.inDungeon then self._abandonedIn = run.dungeonName end
+        self:DiscardCurrentRun()
+        self:Changed("run")
+        Say(_fmt(L["Run abandoned: %s"], run.dungeonName or ""))
+        return true
+    end
     run.finalDown, run.finishedOnLeave, run.clearedAt = nil, nil, nil
     run.abandoned = true
     if self.inDungeon then self._abandonedIn = run.dungeonName end

@@ -390,6 +390,11 @@ function M.LoadTOC(dir, toc)
         if not ok then error("run " .. f .. ": " .. tostring(e)) end
       end
     end
+    -- Tests written before "Start the clock on the first pull" let time pass
+    -- with no fighting: the clock starts at the door for them. The setting's
+    -- own tests (startonpull_tests.lua) turn it on.
+    local ms = rawget(_G, "MythicScoreboard")
+    if ms and ms.SETTING_DEFAULTS and not M.startOnPull then ms.SETTING_DEFAULTS.startOnPull = false end
     return files
 end
 

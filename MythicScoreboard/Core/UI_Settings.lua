@@ -66,6 +66,8 @@ local TOGGLES = {
       LK("Shows each mob's enemy forces % above its nameplate in Mythic+."), MS.Flavor.mythicPlus },
     { LK("Forces % in tooltips"), "MobForcesTooltip",
       LK("Adds enemy forces % to the unit tooltip in Mythic+."), MS.Flavor.mythicPlus },
+    { LK("Start the clock on the first pull"), "StartOnPull",
+      LK("A dungeon's clock waits until you or your group get into combat, so waiting for the group doesn't count. Keystones keep the game's timer.") },
     { LK("Open after a run"), "AutoOpenOnComplete",
       LK("Opens the scoreboard when you finish a dungeon.") },
     { LK("In-run frame"), "CompactFrame",

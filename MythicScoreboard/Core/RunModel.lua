@@ -80,9 +80,12 @@ end
 --   live key   the key's own timer (GetWorldElapsedTime, from the countdown)
 --   live       the game clock since the start (run.startTime, this session
 --              only: it's worked out again after a /reload)
+--   waiting    0 until the first pull (run._waitingForPull, a dungeon run
+--              with "Start the clock on the first pull" on)
 local function Elapsed(run)
     if not run then return 0 end
     if run.duration then return run.duration end
+    if run._waitingForPull then return 0 end     -- the clock starts at the first pull
     if (run.keystoneLevel or 0) > 0 then
         if GetWorldElapsedTime then
             local worldElapsed = select(2, GetWorldElapsedTime(1))
@@ -339,7 +342,7 @@ local LIVE = {
     run    = { "_carry", "_carryDur", "_lastDur", "_seq", "_pendingFinalize", "_combatEndedAt", "_clearedClock", "activeBoss",
                "_active", "_suspended", "startTime", "endTime", "_bossTotal",
                "_baselinePending", "_deathBase", "_offline", "_savedAt",
-               "_shown", "_resultTime", "_pullFrom", "lastPull", "_fdjKey", "_fdjPlace", "_wingBy" },       -- (the last two: from 2.9.2, no longer kept)
+               "_shown", "_resultTime", "_pullFrom", "lastPull", "_waitingForPull", "_fdjKey", "_fdjPlace", "_wingBy" },       -- (the last two: from 2.9.2, no longer kept)
     boss   = { "_before", "_session", "_tries", "_named", "_diedAt" },
     player = { "_lastDeathTime", "_lastRecapID" },
 }

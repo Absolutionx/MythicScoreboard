@@ -19,6 +19,7 @@ local DEFAULTS = {
     showMobForces           = true,
     showMobForcesNameplates = true,
     minimapButton           = true,
+    startOnPull             = true,        -- dungeon runs: the clock starts at the first pull, not at the door
     autoTakeFlights         = false,       -- WoW Forever: take the flight the directions say to
     compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
     -- compactPos: no default (the frame starts near the top right)
@@ -90,6 +91,7 @@ MS.GetMobForcesTooltip,     MS.SetMobForcesTooltip     = Bool("showMobForces")
 MS.GetMobForcesNameplate,   MS.SetMobForcesNameplate   = Bool("showMobForcesNameplates")
 MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
 MS.GetAutoTakeFlights,      MS.SetAutoTakeFlights      = Bool("autoTakeFlights")
+MS.GetStartOnPull,          MS.SetStartOnPull          = Bool("startOnPull")
 
 -- The in-run frame's style (UI_Compact.lua); "off" hides it.
 MS.COMPACT_STYLES = { "compact", "detailed", "minimal" }

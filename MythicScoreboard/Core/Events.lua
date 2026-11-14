@@ -90,13 +90,23 @@ end
 function H.PLAYER_REGEN_DISABLED()
     local run = MS.currentRun
     if run then run._combatEndedAt = nil end
-    if MS.inDungeon then MS:NotePullStart() end
+    if MS.inDungeon then MS:StartClock(); MS:NotePullStart() end
+end
+
+-- Someone in the dungeon with you pulled (you may be behind, out of range):
+-- the clock of a run waiting for its pull starts. Not someone fighting their
+-- way to the dungeon outside.
+function H.UNIT_FLAGS(unit)
+    local run = MS.currentRun
+    if not (run and run._waitingForPull and MS.inDungeon) then return end
+    if type(unit) ~= "string" or not (unit:find("^party%d") or unit:find("^raid%d")) then return end
+    if MS.InCombatUnit(unit) and MS:InDungeonWithMe(unit) then MS:StartClock() end
 end
 
 -- encounterID is the dungeonEncounterID (as in EJ_GetEncounterInfoByIndex's
 -- seventh value), not the journal's own encounter ID.
 function H.ENCOUNTER_START(encounterID, bossName)
-    if MS.inDungeon then MS:BossPull(bossName or "Boss", encounterID) end
+    if MS.inDungeon then MS:StartClock(); MS:BossPull(bossName or "Boss", encounterID) end
 end
 
 function H.ENCOUNTER_END(encounterID, bossName, _, _, success)
