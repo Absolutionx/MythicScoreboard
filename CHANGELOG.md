@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.12.0
+
+### The clock starts at the first pull
+- **A dungeon run's timer waits for the first pull:** it sits at 0:00 until you or your group get into combat (or a boss fight starts), so waiting for the group or summons doesn't count, and there's no need to abandon and restart a run for an accurate time.
+  - Group members count when they're near you or in the dungeon with you, not when they're fighting their way there outside.
+  - Leaving before anyone pulls drops the waiting run; you get a fresh one when you come back in.
+  - Keystones keep the game's own timer.
+  - On by default: **Start the clock on the first pull** in settings.
+
 ## 2.11.3
 
 ### WoW Forever: directions
