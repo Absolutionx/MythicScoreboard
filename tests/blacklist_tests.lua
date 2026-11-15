@@ -113,6 +113,20 @@ local girthy = forever and "Girthy Stone" or "Girthy"
 MS:AddToBlacklist(girthy, nil, "")
 check("added while in the group: said", said((forever and "Girthy Stone" or "Girthy-Forever") .. " from your blacklist") == 1)
 
+-- A /reload (or a login) with them still in the group: not said again.
+local before = said("from your blacklist")
+MS.currentRun = nil
+M.Fire("ADDON_LOADED", "MythicScoreboard"); M.Fire("PLAYER_ENTERING_WORLD", false, true)
+M.Fire("GROUP_ROSTER_UPDATE")
+check("after a /reload, still with you: not said again", said("from your blacklist") == before, said("from your blacklist") - before)
+-- Names not known yet just after a login: nobody's forgotten (nor warned twice).
+local realName = UnitName
+UnitName = function(u) if u == "party1" then return nil end return realName(u) end
+M.Fire("GROUP_ROSTER_UPDATE")
+UnitName = realName
+M.Fire("GROUP_ROSTER_UPDATE")
+check("names coming in late: not said again", said("from your blacklist") == before)
+
 -- ── Their tooltip ──────────────────────────────────────────────────────────
 check("tooltip hooked", type(tooltipCall) == "function")
 local tipLines = {}
@@ -297,6 +311,42 @@ check("add: saved with the note", skip and skip.note == "Afk the whole run" and 
 MS:AskBlacklistNote("Skip")
 def.OnShow(dialog, shownPopup.data)
 check("change: the note filled in", box.text == "Afk the whole run", box.text)
+
+-- ── An invite from them ────────────────────────────────────────────────────
+local dialogShown = true
+local inviteDialog = CreateFrame("Frame")
+inviteDialog.which = "PARTY_INVITE"
+inviteDialog.IsShown = function() return dialogShown end
+rawset(_G, "StaticPopup_FindVisible", function(which) return which == "PARTY_INVITE" and inviteDialog or nil end)
+local w0 = #warnings
+M.Fire("PARTY_INVITE_REQUEST", "Skip")
+M.RunTimers(1)
+check("invite from them: said", said("Skip") >= 1 and said("who invited you, is on your blacklist") == 1, table.concat(M.printed, " / "))
+check("invite from them: on screen too", #warnings == w0 + 1)
+local box = MS.ShowBlacklistInviteWarning and select(2, pcall(MS.ShowBlacklistInviteWarning, MS, inviteDialog, MS:BlacklistEntry("Skip")))
+check("invite: the note under the invite box", box and box:IsShown() and box.note:GetText() == "Afk the whole run", box and box.note:GetText())
+dialogShown = false
+box:Fire("OnUpdate", 0.1)
+check("invite box gone: the note too", not box:IsShown())
+M.Fire("PARTY_INVITE_REQUEST", "Datt Qt")
+M.RunTimers(1)
+check("invite from anyone else: nothing", said("who invited you") == 1)
+
+-- ── Nothing on it: nothing looked at ───────────────────────────────────────
+do
+    local saved = MythicScoreboardAccountDB.blacklist
+    MythicScoreboardAccountDB.blacklist = {}
+    local looked = 0
+    local realInfo = C_LFGList.GetSearchResultInfo
+    C_LFGList.GetSearchResultInfo = function(...) looked = looked + 1; return realInfo(...) end
+    local e = CreateFrame("Button"); e.Name = FontString(); e.resultID = 30
+    LFGBrowseSearchEntry_Update(e)
+    LFGListSearchEntry_Update(e)
+    check("empty list: listings not looked at", looked == 0, looked)
+    check("empty list: no border", e._msBlacklistBorder == nil)
+    C_LFGList.GetSearchResultInfo = realInfo
+    MythicScoreboardAccountDB.blacklist = saved
+end
 
 -- ── The window ─────────────────────────────────────────────────────────────
 local ok, err = pcall(MS.ShowBlacklist, MS)
