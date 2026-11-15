@@ -79,7 +79,12 @@ local function BuildWindow()
     sbFrame:SetMovable(true); sbFrame:EnableMouse(true)
     sbFrame:RegisterForDrag("LeftButton")
     sbFrame:SetScript("OnDragStart", sbFrame.StartMoving)
-    sbFrame:SetScript("OnDragStop",  sbFrame.StopMovingOrSizing)
+    sbFrame:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        -- Where it was put: kept for next time.
+        local p, _, rp, x, y = self:GetPoint()
+        if p then MS:SetSetting("windowPos", { p, rp, math.floor(x + 0.5), math.floor(y + 0.5) }) end
+    end)
     sbFrame:SetScript("OnMouseDown", function()
         CloseHistDropdown()
         if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
@@ -93,8 +98,13 @@ local function BuildWindow()
         CloseHistDropdown()
         if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
     end)
-    sbFrame:SetClampedToScreen(true)
-    sbFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    sbFrame:SetClampedToScreen(true)             -- (never off the screen, whatever was saved)
+    local pos = MS:GetSetting("windowPos")
+    if type(pos) == "table" and pos[1] then
+        sbFrame:SetPoint(pos[1], UIParent, pos[2] or pos[1], pos[3] or 0, pos[4] or 0)
+    else
+        sbFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 60)
+    end
     sbFrame:Hide()
     tinsert(UISpecialFrames, "MythicScoreboardFrame")
 
@@ -249,7 +259,28 @@ local function BuildCloseAndSettings(hdr)
     end)
     settBtn:HookScript("OnLeave", GameTooltip_Hide)
     sbFrame.SettingsBtn = settBtn
-    return settBtn
+
+    -- WoW Forever: the blacklist (UI_Blacklist.lua).
+    local left = settBtn
+    if MS.ToggleBlacklist then
+        local blBtn = IconButton(hdr, "Skull", 30, P.bloodHi)
+        blBtn:SetPoint("RIGHT", settBtn, "LEFT", -8, 0)
+        blBtn:SetScript("OnClick", function()
+            CloseHistDropdown()
+            if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
+            GameTooltip:Hide()
+            MS:ToggleBlacklist()
+        end)
+        blBtn:HookScript("OnEnter", function(b)
+            GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(L["Blacklist"])
+            GameTooltip:AddLine(MS.Plural(#MS:BlacklistEntries(), "%d player", "%d players"), 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        blBtn:HookScript("OnLeave", GameTooltip_Hide)
+        sbFrame.BlacklistBtn = blBtn
+        left = blBtn
+    end
+    return settBtn, left
 end
 
 -- The run picker: which run the window shows (opens the history list).
@@ -461,8 +492,8 @@ function MS:BuildUI()
     BuildWindow()
     local hdr, subline = BuildHeader()
     BuildAffixIcons(hdr, subline)
-    local settBtn = BuildCloseAndSettings(hdr)
-    local histBtn = BuildHistoryButton(hdr, settBtn)
+    local settBtn, leftmost = BuildCloseAndSettings(hdr)
+    local histBtn = BuildHistoryButton(hdr, leftmost)
     BuildStatsButton(hdr, histBtn)
     sbFrame.SettingsPopup = UI.BuildSettingsPopup(sbFrame, settBtn)   -- UI_Settings.lua
     BuildColumnHeader()
@@ -628,7 +659,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         end
     elseif cmd == "help" then
         MS.Say("v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, /sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, " .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)
@@ -640,6 +671,13 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         MS:KillDebug()
     elseif cmd == "wingdebug" and MS.WingDebug then
         MS:WingDebug(true)
+    elseif cmd == "menudebug" and MS.ShowBlacklist then
+        MS._menuDebug = not MS._menuDebug
+        MS.Say("menudebug " .. (MS._menuDebug and "on" or "off"))
+    elseif (cmd == "blacklist" or cmd == "bl") and MS.ShowBlacklist then
+        MS:ShowBlacklist()
+    elseif cmd == "dumptravel" and MS.DumpTravel then
+        MS:DumpTravel()
     elseif cmd == "routedebug" and MS.RouteDebug then
         local t = MS.NavigationTarget and MS:NavigationTarget()
         if t and t.spot then MS:RouteDebug(t.spot, t.name)

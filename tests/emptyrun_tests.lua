@@ -124,7 +124,7 @@ if MS.Flavor.progressStats then
     reset(); MS:SetStartOnPull(false)
     M.money, M.xp, M.xpMax, M.level = 550000, 30000, 60000, 41
     zone(RFC); M.Advance(10)
-    M.money = 550000 + 40; M.Fire("PLAYER_MONEY")
+    M.money = 550000 + 40; M.Fire("PLAYER_MONEY"); M.Fire("CHAT_MSG_MONEY", "You loot 40 Copper.")
     check("looting counts", MS.currentRun.progress.gold == 40, MS.currentRun.progress.gold)
     -- A /reload inside: the run is picked up while the game still says 0.
     MS:FlushSave()
@@ -137,7 +137,7 @@ if MS.Flavor.progressStats then
     M.Fire("PLAYER_MONEY"); M.Fire("PLAYER_XP_UPDATE"); M.RunTimers(2)      -- (events while loading)
     M.money, M.xp = 550040, 30000
     M.Fire("PLAYER_ENTERING_WORLD", false, true); M.RunTimers(8)
-    M.money = 550040 + 12; M.Fire("PLAYER_MONEY")
+    M.money = 550040 + 12; M.Fire("CHAT_MSG_MONEY", "You loot 12 Copper."); M.Fire("PLAYER_MONEY")
     M.xp = 30000 + 150; M.Fire("PLAYER_XP_UPDATE"); M.RunTimers(2)
     local p = MS.currentRun and MS.currentRun.progress
     check("after a /reload: only the 12 copper more", p and p.gold == 52, p and p.gold)

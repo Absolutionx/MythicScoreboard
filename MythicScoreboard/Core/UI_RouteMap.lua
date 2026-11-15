@@ -50,6 +50,8 @@ local function Clip(x1, y1, x2, y2)
     return x1 + t0 * dx, y1 + t0 * dy, x1 + t1 * dx, y1 + t1 * dy
 end
 
+local JUMPS = { hearth = true, recall = true, teleport = true }
+
 local function OnIt(x, y) return x >= 0 and x <= 1 and y >= 0 and y <= 1 end
 
 -- The route on a map: lines { x1, y1, x2, y2, how } and dots { x, y, last }.
@@ -63,8 +65,9 @@ function MS:RouteOnMap(mapID)
     for i, leg in ipairs(legs) do
         local to = leg.to
         local tx, ty = ToMap(to.c, to.x, to.y, mapID)
-        -- A boat or zeppelin crosses to another continent: no line.
-        if prev and prev.c == to.c and tx then
+        -- A boat or zeppelin crosses to another continent: no line. Nor for a
+        -- hearthstone or teleport: you aren't going across the map.
+        if prev and prev.c == to.c and tx and not JUMPS[leg.how] then
             local px, py = ToMap(prev.c, prev.x, prev.y, mapID)
             local x1, y1, x2, y2
             if px then x1, y1, x2, y2 = Clip(px, py, tx, ty) end

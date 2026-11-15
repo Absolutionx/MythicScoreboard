@@ -8,6 +8,12 @@ local UI = MS.UI
 local Art, Box, Btn, Outline, P, Solid = UI.Art, UI.Box, UI.Btn, UI.Outline, UI.P, UI.Solid
 local Text, Tint = UI.Text, UI.Tint
 
+-- The check boxes and choices: a plain dark box with a light mark, no colour.
+local BOX_FILL = { 0.035, 0.03, 0.026 }
+local BOX_LINE = { 0.33, 0.30, 0.27 }
+local BOX_LINE_HOVER = { 0.55, 0.51, 0.46 }
+local MARK = { 0.90, 0.87, 0.80 }
+
 local SETT_W, SROW = 236, 26     -- popup width, row height
 
 -- An on/off row with a check box.
@@ -15,16 +21,16 @@ local function MakeToggleRow(settPop, yOff, labelText, getFn, setFn, tip)
     local row = Btn(settPop)
     row:SetSize(SETT_W - 8, SROW)
     row:SetPoint("TOPLEFT", settPop, "TOPLEFT", 4, yOff)
-    local hov = Solid(row, "BACKGROUND", 0, P.bronze[1], P.bronze[2], P.bronze[3], 0.10)
+    local hov = Solid(row, "BACKGROUND", 0, 1, 0.94, 0.86, 0.05)
     hov:SetAllPoints(); hov:Hide()
 
     local box = CreateFrame("Frame", nil, row)
     box:SetSize(14, 14); box:SetPoint("LEFT", 8, 0)
-    local boxFill = Solid(box, "BACKGROUND", 0, 0.05, 0.04, 0.035, 1)
+    local boxFill = Solid(box, "BACKGROUND", 0, BOX_FILL[1], BOX_FILL[2], BOX_FILL[3], 1)
     boxFill:SetAllPoints()
-    local boxLine = Outline(box, P.ash2, 1, "BORDER")
+    local boxLine = Outline(box, BOX_LINE, 1, "BORDER")
     local mark = Art(box, "Check", "OVERLAY")
-    mark:SetSize(14, 14); mark:SetPoint("CENTER", 0, 0); Tint(mark, P.bronzeHi)
+    mark:SetSize(12, 12); mark:SetPoint("CENTER", 0, 0); Tint(mark, MARK)
 
     local lbl = Text(row, "regular", 14, P.ivory)
     lbl:SetPoint("LEFT", box, "RIGHT", 8, 0)
@@ -33,18 +39,13 @@ local function MakeToggleRow(settPop, yOff, labelText, getFn, setFn, tip)
     local function Refresh()
         local on = getFn and getFn() or false
         mark:SetShown(on)
-        boxLine:SetColor(on and P.bronze or P.ash2, 1)
-        if on then
-            boxFill:SetColorTexture(P.bronzeDk[1], P.bronzeDk[2], P.bronzeDk[3], 1)
-        else
-            boxFill:SetColorTexture(0.05, 0.04, 0.035, 1)
-        end
         local c = on and P.ivory or P.ash
         lbl:SetTextColor(c[1], c[2], c[3])
     end
     row:SetScript("OnClick", function() setFn(not getFn()); Refresh() end)
     row:SetScript("OnEnter", function()
         hov:Show()
+        boxLine:SetColor(BOX_LINE_HOVER, 1)
         if tip then
             GameTooltip:SetOwner(row, "ANCHOR_LEFT")
             GameTooltip:SetText(labelText)
@@ -52,7 +53,7 @@ local function MakeToggleRow(settPop, yOff, labelText, getFn, setFn, tip)
             GameTooltip:Show()
         end
     end)
-    row:SetScript("OnLeave", function() hov:Hide(); GameTooltip:Hide() end)
+    row:SetScript("OnLeave", function() hov:Hide(); boxLine:SetColor(BOX_LINE, 1); GameTooltip:Hide() end)
     return Refresh
 end
 
@@ -76,6 +77,8 @@ local TOGGLES = {
     { LK("Take flights automatically"), "AutoTakeFlights",
       LK("When the directions say to fly, talking to the flight master skips to the flight map and takes that flight. Hold Shift to pick your own."),
       MS.FLAVOR == "forever" },
+    { LK("Warn about blacklisted players"), "BlacklistWarn",
+      LK("A warning in chat and on screen when someone on your blacklist is in your group."), MS.Flavor.blacklist },
     { LK("Minimap button"), "MinimapButton",
       LK("Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap.") },
 }
@@ -113,6 +116,25 @@ local function HistoryLimitRow(settPop, yOff)
 end
 
 -- A divider and a small heading; returns where the next row goes.
+-- Opens the blacklist window (UI_Blacklist.lua).
+local function BlacklistRow(settPop, yOff)
+    local row = Btn(settPop)
+    row:SetSize(SETT_W - 8, SROW)
+    row:SetPoint("TOPLEFT", settPop, "TOPLEFT", 4, yOff)
+    local hov = Solid(row, "BACKGROUND", 0, 1, 0.94, 0.86, 0.05)
+    hov:SetAllPoints(); hov:Hide()
+    local lbl = Text(row, "regular", 14, P.ivory)
+    lbl:SetPoint("LEFT", 30, 0)
+    lbl:SetText(L["Blacklist"])
+    local n = Text(row, "regular", 13, P.ash, "RIGHT")
+    n:SetPoint("RIGHT", -10, 0)
+    row:SetScript("OnShow", function() n:SetText(#MS:BlacklistEntries()) end)
+    n:SetText(#MS:BlacklistEntries())
+    row:SetScript("OnClick", function() settPop:Hide(); MS:ShowBlacklist() end)
+    row:SetScript("OnEnter", function() hov:Show() end)
+    row:SetScript("OnLeave", function() hov:Hide() end)
+end
+
 local function Section(settPop, yOff, title)
     local sep = Solid(settPop, "ARTWORK", 0, P.line[1], P.line[2], P.line[3], 1)
     sep:SetPoint("TOPLEFT", settPop, "TOPLEFT", 10, yOff - 7)
@@ -139,12 +161,12 @@ local function ClearRuleRow(settPop, yOff, rule)
     local rowH = rule.note and SROW + 12 or SROW
     row:SetSize(SETT_W - 8, rowH)
     row:SetPoint("TOPLEFT", settPop, "TOPLEFT", 4, yOff)
-    local hov = Solid(row, "BACKGROUND", 0, P.bronze[1], P.bronze[2], P.bronze[3], 0.10)
+    local hov = Solid(row, "BACKGROUND", 0, 1, 0.94, 0.86, 0.05)
     hov:SetAllPoints(); hov:Hide()
     local ring = Art(row, "Ring", "ARTWORK", 0)
     ring:SetSize(15, 15); ring:SetPoint("LEFT", 8, 0)
     local dot = Art(row, "Disc", "ARTWORK", 1)
-    dot:SetSize(7, 7); dot:SetPoint("CENTER", ring); Tint(dot, P.bronzeHi)
+    dot:SetSize(7, 7); dot:SetPoint("CENTER", ring); Tint(dot, MARK)
     local lbl = Text(row, "regular", 14, P.ivory)
     lbl:SetPoint("LEFT", ring, "RIGHT", 8, 0)
     lbl:SetText(L[rule.label])
@@ -160,7 +182,7 @@ local function ClearRuleRow(settPop, yOff, rule)
     local function Refresh()
         local on = MS:GetClearRule() == key
         dot:SetShown(on)
-        Tint(ring, on and P.bronze or P.ash2)
+        Tint(ring, on and BOX_LINE_HOVER or BOX_LINE)
         local c = on and P.ivory or P.ash
         lbl:SetTextColor(c[1], c[2], c[3])
     end
@@ -201,6 +223,10 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
     end
     _ins(refreshers, HistoryLimitRow(settPop, yOff))
     yOff = yOff - SROW
+    if MS.Flavor.blacklist then
+        BlacklistRow(settPop, yOff)
+        yOff = yOff - SROW
+    end
 
     -- Difficulty choices (Forever has one difficulty, so none to choose).
     if MS.Flavor.difficulties then

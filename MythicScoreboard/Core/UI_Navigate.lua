@@ -34,6 +34,10 @@ local function StepText(leg)
     if leg.how == "zeppelin" then return _fmt(L["Take the zeppelin to %s"], to.name), to end
     if leg.how == "tram" then return _fmt(L["Take the tram to %s"], to.name), to end
     if leg.how == "airship" then return _fmt(L["Take the airship to %s"], to.name), to end
+    -- (No arrow: there's nowhere to walk.)
+    if leg.how == "hearth" then return _fmt(L["Use your Hearthstone (%s)"], to.name) end
+    if leg.how == "recall" then return _fmt(L["Cast Astral Recall (%s)"], to.name) end
+    if leg.how == "teleport" then return _fmt(L["Teleport to %s"], to.name) end
     if to.kind == "flight" then return _fmt(L["Run to the flight master: %s"], to.name), to end
     if to.kind == "dock" then
         local text = to.transport == "zeppelin" and L["Run to the zeppelin to %s"]
@@ -118,7 +122,7 @@ local function Build()
     frame:SetSize(220, 110)
     -- Where it was dragged to, or just above your character (the middle of
     -- the screen): its bottom a little over your head.
-    local pos = MythicScoreboardDB and MythicScoreboardDB.navPos
+    local pos = MS:GetSetting("navPos")
     if type(pos) == "table" and pos.x and pos.y then
         frame:SetPoint("BOTTOM", UIParent, "CENTER", pos.x, pos.y)
     else
@@ -145,10 +149,10 @@ local function Build()
         local ux, uy = UIParent:GetCenter()
         if cx and by and ux and uy then
             local s = self:GetEffectiveScale() / UIParent:GetEffectiveScale()
-            MythicScoreboardDB = MythicScoreboardDB or {}
-            MythicScoreboardDB.navPos = { x = math.floor(cx * s - ux + 0.5), y = math.floor(by * s - uy + 0.5) }
+            local at = { x = math.floor(cx * s - ux + 0.5), y = math.floor(by * s - uy + 0.5) }
+            MS:SetSetting("navPos", at)
             self:ClearAllPoints()
-            self:SetPoint("BOTTOM", UIParent, "CENTER", MythicScoreboardDB.navPos.x, MythicScoreboardDB.navPos.y)
+            self:SetPoint("BOTTOM", UIParent, "CENTER", at.x, at.y)
         end
     end)
     frame:SetScript("OnClick", function() if IsShiftKeyDown() then MS:StopNavigation() end end)
