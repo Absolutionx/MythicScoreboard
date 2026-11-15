@@ -25,6 +25,9 @@ MS.Flavor = {
     -- Runs record what they did for your character: experience and levels,
     -- mobs killed, quests, gold and reputation (Core/RunStats.lua).
     progressStats = false,
+    -- A blacklist of players, with warnings and red names in the group
+    -- finder (Core/Blacklist.lua, loaded only where this is on).
+    blacklist     = false,
 }
 MS.FLAVOR = MS.Flavor.name
 

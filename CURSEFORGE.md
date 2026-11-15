@@ -59,8 +59,9 @@ Every run is kept in a permanent archive, even after it drops out of history. Op
 - **Dungeon wings tracked separately:** Scarlet Monastery, Dire Maul, Stratholme and Blackrock Spire. Scarlet Monastery wings are recognised as you walk in, from the door you used, the room you're in or the first wing-only trash you kill
 - Running back after a wipe pauses the run; time logged out doesn't count
 - **Dungeon entrances on the world map,** with each dungeon's levels
-- **Directions to any dungeon:** click its marker for an arrow above your character, step-by-step directions using the flight paths you know (and boats and zeppelins between continents), the distance and the time left, plus the route drawn on the world map
+- **Directions to any dungeon:** click its marker for an arrow above your character, step-by-step directions using the flight paths you know, boats and zeppelins between continents, and your hearthstone, Astral Recall or mage teleports when they save time, with the distance and the time left, plus the route drawn on the world map
 - **Take flights automatically** (optional): talking to the flight master goes straight to the flight on your route
+- **A blacklist with notes:** right-click a player (in your group, the Looking For Group window or the scoreboard) to add them. You're warned when one is in your group, and their listings get a red border in Looking For Group
 
 ---
 
@@ -69,7 +70,7 @@ Every run is kept in a permanent archive, even after it drops out of history. Op
 - **Fully translated:** English, German, French, Spanish, Portuguese, Italian, Russian, Korean and Chinese (Simplified and Traditional), using the game's own fonts
 - **Light on your game:** nothing runs outside dungeons, and the windows are built only when you first open them
 - **Minimap button:** left-click for the scoreboard, right-click for the Stats page
-- **Your choice of when a run counts as cleared,** which difficulties to track and how many runs to keep
+- **Your choice of when a run counts as cleared,** which difficulties to track and how many runs to keep, shared by all your characters
 
 ---
 
@@ -86,5 +87,6 @@ Every run is kept in a permanent archive, even after it drops out of history. Op
 | `/sb lang <code>` | Show the addon in another language (`/sb lang off` to switch back) |
 | `/sb autoreset` | Reset the game's damage meter when you enter a dungeon |
 | `/sb clear` | Clear run history (your stats are kept) |
+| `/sb blacklist` | WoW Forever: your blacklist |
 | `/sb routedebug` | WoW Forever: why the directions chose their route |
 | `/sb help` | All commands |

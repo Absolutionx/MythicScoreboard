@@ -166,9 +166,11 @@ local function ScriptOf(text)
     end
 end
 
+-- (Body text is drawn in the medium weight: the regular one's thin strokes
+-- go soft at the sizes the addon uses.)
 local FONTS = {
     title    = MEDIA .. "Fonts\\Cinzel-Bold.ttf",
-    regular  = MEDIA .. "Fonts\\BarlowSemiCondensed-Regular.ttf",
+    regular  = MEDIA .. "Fonts\\BarlowSemiCondensed-Medium.ttf",
     medium   = MEDIA .. "Fonts\\BarlowSemiCondensed-Medium.ttf",
     semibold = MEDIA .. "Fonts\\BarlowSemiCondensed-SemiBold.ttf",
 }
@@ -205,6 +207,12 @@ local function Text(parent, kind, size, col, justify, flags, layer)
     SetFont(fs, kind, size, flags)
     col = col or P.ivory
     fs:SetTextColor(col[1], col[2], col[3], col[4] or 1)
+    -- A thin dark shadow keeps light text sharp on the dark stone (not
+    -- under dark text, which sits on bronze).
+    if col[1] * 0.3 + col[2] * 0.59 + col[3] * 0.11 > 0.3 then
+        fs:SetShadowOffset(1, -1)
+        fs:SetShadowColor(0, 0, 0, 0.85)
+    end
     fs:SetJustifyH(justify or "LEFT")
     fs:SetWordWrap(false)
     return fs

@@ -18,6 +18,9 @@ local RUN, FLY = 9, 30                       -- yards a second: mounted-ish, and
 local FLY_EXTRA = 20                         -- seconds: the flight master, take-off, landing
 local SAIL = 200                             -- seconds for a boat or zeppelin, with the wait
 local RIDE = { tram = 70 }                   -- shorter rides, with the wait
+local JUMP = 25                              -- seconds: a hearthstone or teleport's cast, and the loading screen
+local WORTH = { hearth = 180, recall = 120, teleport = 60 }   -- seconds one has to save to be used
+local HEARTHSTONE, ASTRAL_RECALL = 6948, 556 -- the item, and the shaman's spell (to the same place)
 local FLY_PATH = 1.3                         -- a flight follows its paths, not a straight line
 -- Running from one zone into another: zones are walled by hills, so the
 -- way round is longer than the straight line, and slower.
@@ -165,7 +168,20 @@ function MS:LearnFlightMap()
             _ins(list, { name = name:match("^([^,]+)") or name, x = x, y = y, known = state ~= 2 })
         end
     end
-    if #list > 0 then Learned()[continent] = list end
+    if #list > 0 then
+        Learned()[continent] = list
+        -- Where they stand, for the account's other characters on this side
+        -- (which ones each knows is still its own).
+        local side = MS:Side()
+        if side then
+            local acc = MS.AccountDB(true)
+            acc.flightSpots = acc.flightSpots or {}
+            acc.flightSpots[side] = acc.flightSpots[side] or {}
+            local kept = {}
+            for _, f in ipairs(list) do _ins(kept, { name = f.name, x = f.x, y = f.y }) end
+            acc.flightSpots[side][continent] = kept
+        end
+    end
 end
 
 if MS.FLAVOR == "forever" then
@@ -184,6 +200,16 @@ function MS:FlightMasters(continent)
     end
     local side = MS:Side()
     local out = {}
+    -- Another character on this side opened this continent's flight map:
+    -- where they really stand, taken as known.
+    local acc = MS.AccountDB()
+    local stood = acc and acc.flightSpots and side and acc.flightSpots[side] and acc.flightSpots[side][continent]
+    if stood then
+        for _, f in ipairs(stood) do
+            _ins(out, { name = f.name, x = f.x, y = f.y, known = true, assumed = true })
+        end
+        return out
+    end
     for _, f in ipairs(MS.ForeverData.FLIGHT_MASTERS or {}) do
         if not f.side or f.side == side then
             local c, x, y = MS:OnContinent(f.map, f.x, f.y)
@@ -214,9 +240,169 @@ local function Zone(place)
     return place.zone or nil
 end
 
+-- ── Your own ways across: hearthstone, Astral Recall, a mage's teleports ──
+-- Each only when it can be used right now: you have it, and it's off
+-- cooldown (a teleport: castable too, so with its rune and the mana).
+local function Ready(start, duration)
+    start, duration = MS.ReadableNumber(start), MS.ReadableNumber(duration)
+    if not (start and duration) then return true end
+    return duration <= 1.5 or start + duration - GetTime() <= 0       -- (1.5: only the global cooldown)
+end
+
+local function ItemReady(item)
+    local CItem, CCont = rawget(_G, "C_Item"), rawget(_G, "C_Container")
+    local count = (CItem and CItem.GetItemCount) or rawget(_G, "GetItemCount")
+    local okc, have = pcall(count or error, item)
+    if not (okc and (MS.ReadableNumber(have) or 0) > 0) then return false end
+    local cd = (CCont and CCont.GetItemCooldown) or rawget(_G, "GetItemCooldown")
+    if not cd then return true end
+    local ok, start, duration = pcall(cd, item)
+    return not ok or Ready(start, duration)
+end
+
+local function SpellReady(spell)
+    local known = rawget(_G, "IsPlayerSpell") or rawget(_G, "IsSpellKnown")
+    local okk, has = pcall(known or error, spell)
+    if not (okk and has == true) then return false end
+    local CSpell = rawget(_G, "C_Spell")
+    local usable = (CSpell and CSpell.IsSpellUsable) or rawget(_G, "IsUsableSpell")
+    if usable then
+        local oku, can = pcall(usable, spell)
+        if oku and can == false then return false end
+    end
+    if CSpell and CSpell.GetSpellCooldown then
+        local ok, info = pcall(CSpell.GetSpellCooldown, spell)
+        if ok and type(info) == "table" then return Ready(info.startTime, info.duration) end
+    end
+    local cd = rawget(_G, "GetSpellCooldown")
+    if not cd then return true end
+    local ok, start, duration = pcall(cd, spell)
+    return not ok or Ready(start, duration)
+end
+
+-- ── Where they land: learned from the game ─────────────────────────────
+-- The first time you hearth (or Astral Recall, or teleport) somewhere, the
+-- spot you arrive at is kept for the account; binding at an innkeeper keeps
+-- where you stand until then. MythicScoreboardAccountDB.landings:
+-- { inns = { [name] = { c, x, y } }, spells = { [spell] = { c, x, y } } }.
+local HEARTH_SPELL = 8690                    -- (the hearthstone's own cast)
+local function Landings()
+    local acc = MS.AccountDB(true)
+    acc.landings = acc.landings or {}
+    acc.landings.inns = acc.landings.inns or {}
+    acc.landings.spells = acc.landings.spells or {}
+    return acc.landings
+end
+
+local function BindName()
+    local Bind = rawget(_G, "GetBindLocation")
+    return Bind and MS.Readable(Bind()) or nil
+end
+
+local function Keep(kind, key, c, x, y)
+    if not (key and c and x and y) then return end
+    Landings()[kind][key] = { c = c, x = x, y = y }
+end
+
+local TELEPORT_SPELLS = {}
+for _, t in ipairs(MS.ForeverData.TELEPORTS or {}) do TELEPORT_SPELLS[t.spell] = true end
+
+-- After the cast: watch for the arrival (a loading screen, or a jump on
+-- the same continent), then keep where you are.
+local watching
+local ARRIVE_TRIES, FAR = 90, 150            -- once a second; yards that count as gone
+local function Watch(kind, key, from)
+    local token = {}
+    watching = token
+    local tries = 0
+    local function Look()
+        if watching ~= token then return end
+        tries = tries + 1
+        local c, x, y = MS:PlayerSpot()
+        local moved = x and from and (c ~= from.c or (MS:Yards(c, x, y, from.x, from.y) or 0) > FAR)
+        if x and (moved or not from) then
+            watching = nil
+            Keep(kind, key, c, x, y)
+            return
+        end
+        if tries < ARRIVE_TRIES then C_Timer.After(1, Look) else watching = nil end
+    end
+    C_Timer.After(1, Look)
+end
+
+function MS:OnTravelSpell(spell)
+    spell = MS.ReadableNumber(spell)
+    if not spell then return end
+    local c, x, y = MS:PlayerSpot()
+    local from = x and { c = c, x = x, y = y }
+    if spell == HEARTH_SPELL or spell == ASTRAL_RECALL then
+        local name = BindName()
+        if name then Watch("inns", name, from) end
+    elseif TELEPORT_SPELLS[spell] then
+        Watch("spells", spell, from)
+    end
+end
+
+function MS:OnHearthBound()
+    local c, x, y = MS:PlayerSpot()
+    local name = BindName()
+    -- (A spot from an actual arrival is the better one: kept if it's there.)
+    if name and not Landings().inns[name] then Keep("inns", name, c, x, y) end
+end
+
+if MS.FLAVOR == "forever" then
+    MS:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spell)
+        if unit == "player" then MS:OnTravelSpell(spell) end
+    end)
+    MS:On("HEARTHSTONE_BOUND", function() MS:OnHearthBound() end)
+end
+
+-- Where your hearthstone is set, as a place: learned, or the inn of that
+-- name in the shipped list. Or nil.
+function MS:HearthPlace()
+    local name = BindName()
+    if not name then return nil end
+    local acc = MS.AccountDB()
+    local seen = acc and acc.landings and acc.landings.inns and acc.landings.inns[name]
+    if seen then return { c = seen.c, x = seen.x, y = seen.y, name = name } end
+    local side = MS:Side()
+    for _, inn in ipairs(MS.ForeverData.INNS or {}) do
+        local named = inn[1] == name
+        for _, other in ipairs(inn.aka or {}) do named = named or other == name end
+        if named and (not inn.side or inn.side == side) then
+            local c, x, y = MS:OnContinent(inn.map, inn.x, inn.y)
+            if c then return { c = c, x = x, y = y, name = name } end
+        end
+    end
+end
+
+-- The places you can be at in a moment, from anywhere: { kind = "jump",
+-- how = "hearth" | "recall" | "teleport", c, x, y, name }.
+function MS:Jumps()
+    local out = {}
+    local hearth = MS:HearthPlace()
+    if hearth then
+        -- Astral Recall first: it's on the shorter cooldown.
+        local how = SpellReady(ASTRAL_RECALL) and "recall" or (ItemReady(HEARTHSTONE) and "hearth") or nil
+        if how then
+            _ins(out, { kind = "jump", how = how, c = hearth.c, x = hearth.x, y = hearth.y, name = hearth.name })
+        end
+    end
+    local acc = MS.AccountDB()
+    local landed = acc and acc.landings and acc.landings.spells or {}
+    for _, t in ipairs(MS.ForeverData.TELEPORTS or {}) do
+        local at = landed[t.spell]
+        if at and SpellReady(t.spell) then
+            _ins(out, { kind = "jump", how = "teleport", c = at.c, x = at.x, y = at.y, name = t[1] })
+        end
+    end
+    return out
+end
+
 -- ── The route ──────────────────────────────────────────────────────────────
--- Places to go through: you, the entrance, flight masters, docks.
-local function Places(from, to)
+-- Places to go through: you, the entrance, flight masters, docks, and where
+-- your hearthstone or a teleport puts you.
+local function Places(from, to, jumps)
     local side = MS:Side()
     local P = {
         { kind = "start", c = from.c, x = from.x, y = from.y },
@@ -241,6 +427,10 @@ local function Places(from, to)
             end
         end
     end
+    for _, j in ipairs(jumps and MS:Jumps() or {}) do
+        _ins(P, j)
+        continents[j.c] = true
+    end
     for c in pairs(continents) do
         for _, f in ipairs(MS:FlightMasters(c)) do
             -- One you haven't learned yet: you can still fly from it (talking
@@ -254,6 +444,11 @@ end
 -- Seconds from one place to another, and how: "run", "fly", "sail". Or nil.
 local function Leg(a, b)
     if a.kind == "dock" and a.other == b then return RIDE[a.transport] or SAIL, a.transport end
+    -- A hearthstone or teleport: from where you are now, and only from there.
+    if b.kind == "jump" then
+        if a.kind == "start" then return JUMP, b.how end
+        return nil
+    end
     if a.c ~= b.c then return nil end
     local yards = MS:Yards(a.c, a.x, a.y, b.x, b.y)
     if not yards then return nil end
@@ -268,10 +463,10 @@ local function Leg(a, b)
 end
 
 -- The quickest way from one spot to another ({ c, x, y }), as legs:
--- { how = "run" | "fly" | "boat" | "zeppelin" | "tram", to = place }. Or nil.
-function MS:PlanRoute(from, to)
-    if not (from and to and from.c and to.c) then return nil end
-    local P = Places(from, to)
+-- { how = "run" | "fly" | "boat" | "zeppelin" | "tram" | "airship" | "hearth" |
+-- "recall" | "teleport", to = place }. Or nil.
+local function Plan(from, to, jumps)
+    local P = Places(from, to, jumps)
     local dist, prev, how, done = {}, {}, {}, {}
     for i = 1, #P do dist[i] = _huge end
     dist[1] = 0
@@ -307,6 +502,18 @@ function MS:PlanRoute(from, to)
     return out, dist[2]
 end
 
+-- With your hearthstone or a teleport only when it saves real time: they
+-- have cooldowns, and aren't worth spending on a minute.
+function MS:PlanRoute(from, to, noJumps)
+    if not (from and to and from.c and to.c) then return nil end
+    local plain, plainSecs = Plan(from, to, false)
+    if noJumps then return plain, plainSecs end
+    local legs, secs = Plan(from, to, true)
+    local jump = legs and legs[1] and WORTH[legs[1].how]
+    if jump and plain and plainSecs - secs < jump then return plain, plainSecs end
+    return legs, secs
+end
+
 -- ── Why this way ───────────────────────────────────────────────────────────
 -- /sb routedebug: the route from here, each step's estimated time, and the
 -- best ways in by each flight master you could land at instead.
@@ -331,7 +538,7 @@ function MS:RouteDebug(goal, name)
         if f.known then
             local spot = { c = goal.c, x = f.x, y = f.y }
             local a, ta = MS:PlanRoute(from, spot)
-            local b, tb = MS:PlanRoute(spot, goal)
+            local b, tb = MS:PlanRoute(spot, goal, true)
             if a and b then
                 alts[#alts + 1] = { name = f.name, t = ta + tb, line = Line(a, ta) .. " | then " .. Line(b, tb) }
             end
@@ -341,4 +548,49 @@ function MS:RouteDebug(goal, name)
     for i = 1, math.min(4, #alts) do
         MS.Say(string.format("  via %s: %ds  [%s]", alts[i].name, alts[i].t, alts[i].line))
     end
+end
+
+-- ── /sb dumptravel ─────────────────────────────────────────────────────────
+-- Everything the game has told the addon about getting around, saved for
+-- the next /reload or logout (MythicScoreboardAccountDB.travelDump), to
+-- build the shipped lists from: each continent's flight masters as the game
+-- lists them, those learned from flight maps, and the landings.
+function MS:DumpTravel()
+    local acc = MS.AccountDB(true)
+    local dump = { side = MS:Side(), taxi = {}, flightSpots = acc.flightSpots, landings = acc.landings }
+    local continents = {}
+    for _, f in ipairs(MS.ForeverData.FLIGHT_MASTERS or {}) do
+        local c = MS:ContinentOf(f.map)
+        if c then continents[c] = true end
+    end
+    local c = MS:PlayerSpot()
+    if c then continents[c] = true end
+    local T = rawget(_G, "C_TaxiMap")
+    local n = 0
+    if T and T.GetTaxiNodesForMap then
+        for id in pairs(continents) do
+            local ok, nodes = pcall(T.GetTaxiNodesForMap, id)
+            if ok and type(nodes) == "table" then
+                local list = {}
+                for _, node in ipairs(nodes) do
+                    local x, y
+                    if node.position and node.position.GetXY then x, y = node.position:GetXY() end
+                    _ins(list, { name = MS.Readable(node.name), x = MS.ReadableNumber(x), y = MS.ReadableNumber(y),
+                                 faction = MS.ReadableNumber(node.faction) })
+                end
+                dump.taxi[id] = list
+                n = n + #list
+            end
+        end
+    end
+    acc.travelDump = dump
+    local inns, spells = 0, 0
+    for _ in pairs(acc.landings and acc.landings.inns or {}) do inns = inns + 1 end
+    for _ in pairs(acc.landings and acc.landings.spells or {}) do spells = spells + 1 end
+    local learned = 0
+    for _, side in pairs(acc.flightSpots or {}) do
+        for _, list in pairs(side) do learned = learned + #list end
+    end
+    MS.Say(string.format("dumptravel: %d flight masters from the game's list, %d from flight maps, %d inns, %d teleports. /reload to save.",
+        n, learned, inns, spells))
 end

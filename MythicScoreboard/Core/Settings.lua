@@ -1,6 +1,7 @@
 -- Every setting: its default, how it's read and how it's changed.
 --
--- Settings live in MythicScoreboardDB.settings (per character). Nothing else
+-- Settings live in MythicScoreboardAccountDB.settings (the account's, shared
+-- by every character; MythicScoreboardDB.settings is the same table). Nothing else
 -- reads or writes that table: other files use MS:GetSetting / MS:SetSetting,
 -- or the named getters below, which the settings popup calls.
 --
@@ -21,8 +22,11 @@ local DEFAULTS = {
     minimapButton           = true,
     startOnPull             = true,        -- dungeon runs: the clock starts at the first pull, not at the door
     autoTakeFlights         = false,       -- WoW Forever: take the flight the directions say to
+    blacklistWarn           = true,        -- WoW Forever: a warning when someone on your blacklist is in your group
     compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
     -- compactPos: no default (the frame starts near the top right)
+    -- windowPos:  no default (the scoreboard window starts in the middle)
+    -- navPos:     no default (the arrow starts just above your character)
     -- minimapAngle: no default (the button's resting place is its own)
     -- trackedDifficulties: { [group key] = bool }, defaults from MS.DIFF_GROUPS
 }
@@ -40,9 +44,23 @@ local function Store()
 end
 
 -- Fills in anything missing. Called once at load (Bootstrap.lua).
+--
+-- One set of settings for the whole account (MythicScoreboardAccountDB), so
+-- an alt starts with what you've already chosen. They used to be kept per
+-- character: the first character to log in after that brings its own along,
+-- and from then on every character uses the account's. (db.settings is the
+-- same table, so what reads it there still does; the copy saved with the
+-- character is only ever replaced by the account's.)
 function MS:InitSettings(db)
-    db.settings = type(db.settings) == "table" and db.settings or {}
+    local acc = MS.AccountDB(true)
+    if type(acc.settings) ~= "table" then
+        acc.settings = type(db.settings) == "table" and db.settings or {}
+    end
+    db.settings = acc.settings
     local s = db.settings
+    -- The arrow's place was kept beside the settings: with them now.
+    if s.navPos == nil and type(db.navPos) == "table" then s.navPos = db.navPos end
+    db.navPos = nil
     for k, v in pairs(DEFAULTS) do
         if s[k] == nil and not UNSAVED[k] then s[k] = v end
     end
@@ -92,6 +110,7 @@ MS.GetMobForcesNameplate,   MS.SetMobForcesNameplate   = Bool("showMobForcesName
 MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
 MS.GetAutoTakeFlights,      MS.SetAutoTakeFlights      = Bool("autoTakeFlights")
 MS.GetStartOnPull,          MS.SetStartOnPull          = Bool("startOnPull")
+MS.GetBlacklistWarn,        MS.SetBlacklistWarn        = Bool("blacklistWarn")
 
 -- The in-run frame's style (UI_Compact.lua); "off" hides it.
 MS.COMPACT_STYLES = { "compact", "detailed", "minimal" }

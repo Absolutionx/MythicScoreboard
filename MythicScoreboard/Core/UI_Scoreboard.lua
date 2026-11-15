@@ -266,6 +266,7 @@ end
 
 -- Whatever the core says changed, the scoreboard redraws (batched above).
 MS:OnChanged(function() MS:RefreshOverview() end)
+if MS.OnBlacklistChanged then MS:OnBlacklistChanged(function() MS:RefreshOverview() end) end
 
 local ROLE_ORDER = { TANK = 1, HEALER = 2, DAMAGER = 3 }
 

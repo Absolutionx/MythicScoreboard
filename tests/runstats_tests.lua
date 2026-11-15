@@ -18,7 +18,8 @@ local function wait(s) M.now = M.now + s; clock = clock + s end
 local WORLD, RFC = { "Orgrimmar", "none", 0 }, { "Ragefire Chasm", "party", 1 }
 local function zone(inst) M.instance = inst; M.Fire("PLAYER_ENTERING_WORLD", false, false); M.Fire("ZONE_CHANGED_NEW_AREA"); M.RunTimers(8) end
 local function xp(v, lvl) M.xp = v; if lvl then M.level = lvl; M.Fire("PLAYER_LEVEL_UP", lvl) end; M.Fire("PLAYER_XP_UPDATE", "player"); M.RunTimers(2) end
-local function money(v) M.money = v; M.Fire("PLAYER_MONEY"); M.RunTimers(1) end
+-- Coin looted: your money goes up, and the game's loot line with it.
+local function money(v) M.money = v; M.Fire("PLAYER_MONEY"); M.Fire("CHAT_MSG_MONEY", "You loot coin."); M.RunTimers(1) end
 
 M.timers = {}; MythicScoreboardDB, MythicScoreboardAccountDB = nil, nil
 M.xp, M.xpMax, M.level, M.money = 4000, 5000, 14, 10000
@@ -175,6 +176,46 @@ do
     local rfc
     for _, d in ipairs(st2.dungeons) do if d.name == e2.dungeon then rfc = d end end
     check("quest xp: in the stats", rfc and rfc.questXP == 11100, rfc and rfc.questXP)
+end
+
+-- Gold: only coin looted. Your money going up without the game's loot line
+-- (a vendor, a trade, mail) isn't loot; the line may come before or after.
+do
+    zone(WORLD); MS:AbandonRun(); M.RunTimers(2)
+    M.money = 100000
+    zone(RFC)
+    local p3 = MS.currentRun.progress
+    M.money = M.money + 5000; M.Fire("PLAYER_MONEY"); M.RunTimers(1)          -- sold something
+    check("gold: a sale isn't loot", (p3.gold or 0) == 0, p3.gold)
+    wait(10)
+    M.Fire("CHAT_MSG_MONEY", "You loot 30 Copper."); M.RunTimers(1)            -- the line first
+    M.money = M.money + 30; M.Fire("PLAYER_MONEY"); M.RunTimers(1)
+    check("gold: the loot line, then the coin", p3.gold == 30, p3.gold)
+    wait(10)
+    M.money = M.money + 45; M.Fire("PLAYER_MONEY"); M.RunTimers(1)             -- the coin first
+    M.Fire("CHAT_MSG_MONEY", "Your share of the loot is 45 Copper."); M.RunTimers(1)
+    check("gold: the coin, then the loot line", p3.gold == 75, p3.gold)
+    wait(10)
+    M.money = M.money + 900; M.Fire("PLAYER_MONEY"); M.RunTimers(1)            -- a trade, long after any loot
+    check("gold: money long after the last loot isn't loot", p3.gold == 75, p3.gold)
+    -- A quest's reward, told after the money moved, with a loot line near: still the quest's.
+    wait(10)
+    M.quests[#M.quests + 1] = { title = "Coin Quest", id = 601, done = false, xp = 10, money = 7000 }
+    M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+    M.Fire("QUEST_WATCH_UPDATE", 601)
+    M.Fire("CHAT_MSG_MONEY", "Received 70 Silver."); M.RunTimers(1)
+    M.money = M.money + 7000; M.Fire("PLAYER_MONEY"); M.RunTimers(1)
+    M.Fire("QUEST_TURNED_IN", 601, 10, 7000); M.RunTimers(1)
+    check("gold: a quest's reward isn't loot", p3.gold == 75, p3.gold)
+    -- And told before the money moves.
+    wait(10)
+    M.quests[#M.quests + 1] = { title = "Coin Quest II", id = 602, done = false, xp = 10, money = 3000 }
+    M.Fire("QUEST_LOG_UPDATE"); M.RunTimers(2)
+    M.Fire("QUEST_WATCH_UPDATE", 602)
+    M.Fire("QUEST_TURNED_IN", 602, 10, 3000); M.RunTimers(1)
+    M.Fire("CHAT_MSG_MONEY", "Received 30 Silver."); M.RunTimers(1)
+    M.money = M.money + 3000; M.Fire("PLAYER_MONEY"); M.RunTimers(1)
+    check("gold: a quest's reward, told first, isn't loot", p3.gold == 75, p3.gold)
 end
 
 io.stdout:write(("runstats_tests: %d passed, %d failed\n"):format(passes, fails))

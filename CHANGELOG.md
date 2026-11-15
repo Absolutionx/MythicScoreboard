@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.13.0
+
+### WoW Forever: a blacklist
+- **Keep a list of players you'd rather not group with, each with a note.** Right-click someone on their portrait, in chat, in the Looking For Group window or on the scoreboard and choose **Add to blacklist**. The same menu changes the note or removes them.
+- **A warning when one is in your group:** a line in chat with your note, a message on screen and a sound, once each time they join. Turn it off with **Warn about blacklisted players** in settings.
+- **Looking For Group:** a listing gets a red border when anyone in it is on your blacklist, and their name shows in red in the group's tooltip. Right-click a listing to blacklist the leader or anyone else in the group.
+- On the scoreboard their row gets a red border, and your note shows when you hover them anywhere.
+- **The list:** the skull button in the header, `/sb blacklist`, or Blacklist in settings. Click someone to change the note; the cross removes them. Shared by all your characters.
+
+### WoW Forever: directions
+- **Your hearthstone, Astral Recall and mage teleports** are used when they're ready and save real time. Where each one lands is learned the first time you use it, for all your characters; the main inns are built in.
+- **Flight masters:** the new ones in the Riverglades, Mount Hyjal and on Dun Morogh's coast, and Horde and Alliance spots where each side has its own. Opening a flight map now teaches all your characters on that side where they stand.
+
+### WoW Forever: gold
+- **Gold counts only coin you loot,** not vendor sales, trades, mail or quest rewards.
+
+### Everyone
+- **Settings are shared by all your characters,** so an alt starts with yours instead of the defaults.
+- **The scoreboard opens where you left it.**
+- **Sharper text** throughout, and plainer check boxes in settings.
+
 ## 2.12.1
 
 ### Fixes

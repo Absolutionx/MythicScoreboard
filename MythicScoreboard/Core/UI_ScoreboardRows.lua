@@ -112,6 +112,11 @@ local function RowOnEnter(self2)
     GameTooltip:SetOwner(self2, "ANCHOR_CURSOR_RIGHT", 12, 12)
     local r2, g2, b2 = ClassColor(pc.class)
     GameTooltip:SetText(DN(pc.name) or "?", r2, g2, b2)
+    local listed = MS.Flavor.blacklist and MS:BlacklistEntryForPlayer(pc)
+    if listed then
+        GameTooltip:AddLine(L["On your blacklist"], 1, 0.13, 0.13)
+        if (listed.note or "") ~= "" then GameTooltip:AddLine(listed.note, 1, 0.55, 0.55, true) end
+    end
     local spec, specRole
     if MS.SpecLabel then spec, specRole = MS.SpecLabel(pc.specID, pc.class) end
     if spec then
@@ -212,7 +217,26 @@ local function RowOnEnter(self2)
             end
         end
     end
+    if MS.Flavor.blacklist and rawget(_G, "MenuUtil") and not self2._isSelf then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["Right-click: blacklist"], 0.55, 0.55, 0.55)
+    end
     GameTooltip:Show()
+end
+
+-- Right-click a player: add to the blacklist, change the note, or remove.
+local function RowOnMouseUp(self2, button)
+    local pc = self2._player
+    local Menu = rawget(_G, "MenuUtil")
+    if button ~= "RightButton" or not pc or self2._isSelf or not MS.Flavor.blacklist
+        or not (Menu and Menu.CreateContextMenu) then return end
+    local name, realm = MS:BlacklistNameOfPlayer(pc)
+    if not name then return end
+    GameTooltip:Hide()
+    Menu.CreateContextMenu(self2, function(_, root)
+        root:CreateTitle(DN(pc.name) or name)
+        MS:AddBlacklistMenuItems(root, name, realm, pc.class)
+    end)
 end
 
 -- One player row (filled by FillRow). Made once per line; the scoreboard
@@ -233,6 +257,15 @@ local function MakeRow(parent)
     row._selfBg = Solid(row, "BACKGROUND", 2, P.bronze[1], P.bronze[2], P.bronze[3], 0.06)
     row._selfBg:SetAllPoints()
     row._selfLine = Outline(row, P.bronze, 0.6, "BORDER", 1)
+    -- On your blacklist (WoW Forever): a bright red border round the row.
+    row._listed = {}
+    for i = 1, 4 do row._listed[i] = Solid(row, "OVERLAY", 7, 1, 0.1, 0.1, 1) end
+    local l = row._listed
+    l[1]:SetPoint("TOPLEFT");    l[1]:SetPoint("TOPRIGHT");    l[1]:SetHeight(2)
+    l[2]:SetPoint("BOTTOMLEFT"); l[2]:SetPoint("BOTTOMRIGHT"); l[2]:SetHeight(2)
+    l[3]:SetPoint("TOPLEFT");    l[3]:SetPoint("BOTTOMLEFT");  l[3]:SetWidth(2)
+    l[4]:SetPoint("TOPRIGHT");   l[4]:SetPoint("BOTTOMRIGHT"); l[4]:SetWidth(2)
+    for i = 1, 4 do l[i]:Hide() end
 
     -- Class icon in a bronze frame
     local iconFrame = Solid(row, "ARTWORK", 0, 0, 0, 0, 1)
@@ -307,6 +340,7 @@ local function MakeRow(parent)
     row:EnableMouse(true)
     row:SetScript("OnEnter", RowOnEnter)
     row:SetScript("OnLeave", GameTooltip_Hide)
+    row:SetScript("OnMouseUp", RowOnMouseUp)
     return row
 end
 
@@ -430,6 +464,8 @@ local function FillRow(row, idx, p, isSelf, ctx)
 
     UI.SetNameText(row._nameFs, DN(p.name) or "?")
     row._nameFs:SetTextColor(cr * dim, cg * dim, cb * dim)
+    local listed = MS.Flavor.blacklist and MS:BlacklistEntryForPlayer(p) ~= nil
+    for i = 1, 4 do row._listed[i]:SetShown(listed) end
     if hasLeft then
         row._subFs:SetText(L["Left the group"])
     elseif (p.itemLevel or 0) > 0 then
@@ -508,6 +544,7 @@ local function FillRow(row, idx, p, isSelf, ctx)
 
     row._player = p
     row._run    = run
+    row._isSelf = isSelf
 end
 
 UI.Rows = {

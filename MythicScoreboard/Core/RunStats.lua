@@ -16,7 +16,11 @@
 --                the game said made progress in here, then
 --                complete (not ones already done: the log loads in pieces
 --                after a loading screen, and collapsed headers hide quests)
---   gold         money gained while the run is going (not while paused)
+--   gold         coin looted while the run is going (not while paused): a
+--                rise in your money that comes with the game's "You loot
+--                ..." / "Your share of the loot is ..." line. Selling to a
+--                vendor, a trade or mail don't come with one, and aren't
+--                counted; a quest's reward is kept on the quest's side
 --   rep          "Your reputation with <faction> has increased by N." in chat
 -- Only counted while the run is active; leaving and coming back starts each
 -- reading again from where you are, so time outside never counts.
@@ -90,14 +94,67 @@ local function OnXP()
     Changed(run)
 end
 
+-- Looted coin. Your money going up (PLAYER_MONEY) and the game's loot line
+-- (CHAT_MSG_MONEY) come a moment apart, in either order: a rise counts when
+-- the two are within LOOT_WINDOW of each other. A rise that is a quest's
+-- reward (its exact amount, just handed in) never counts as loot.
+local LOOT_WINDOW = 1.5
+local lootLineAt                 -- when the game last said you looted coin
+local waiting                    -- { amount, at }: a rise not yet known to be loot
+local lootCounted                    -- { amount, at }: the last rise lootCounted as loot
+local questGain                  -- { amount, at }: a quest's reward just given
+
+local function Near(at) return at ~= nil and math.abs(GetTime() - at) <= LOOT_WINDOW end
+
+local function CountLoot(run, amount)
+    Progress(run).gold = (Progress(run).gold or 0) + amount
+    lootCounted = { amount = amount, at = GetTime() }
+    Changed(run)
+end
+
 local function OnMoney()
     local run = MS.currentRun
     if not (run and MS.inDungeon and worldIn) then return end
     local m = ReadMoney()
     if not m then return end
-    if last.money and m > last.money then Progress(run).gold = Progress(run).gold + (m - last.money) end
+    local gain = last.money and m - last.money or 0
     last.money = m
-    Changed(run)
+    if gain <= 0 then return end
+    if questGain and Near(questGain.at) and questGain.amount == gain then
+        questGain = nil                                  -- the quest's reward: not loot
+    elseif Near(lootLineAt) then
+        CountLoot(run, gain)
+    else
+        -- Not known yet: the loot line may be a moment behind.
+        waiting = (waiting and Near(waiting.at)) and { amount = waiting.amount + gain, at = waiting.at }
+            or { amount = gain, at = GetTime() }
+    end
+end
+
+-- "You loot 5 Silver." / "Your share of the loot is ...": coin was looted.
+local function OnLootLine()
+    local run = MS.currentRun
+    if not (run and MS.inDungeon and worldIn) then return end
+    lootLineAt = GetTime()
+    if waiting and Near(waiting.at) then
+        local amount = waiting.amount
+        waiting = nil
+        CountLoot(run, amount)
+    end
+    waiting = nil
+end
+
+-- A quest handed in gave money: that rise is the quest's, whichever of the
+-- two the game tells first.
+local function OnQuestMoney(run, amount)
+    if waiting and Near(waiting.at) and waiting.amount == amount then
+        waiting = nil
+    elseif lootCounted and Near(lootCounted.at) and lootCounted.amount == amount then
+        Progress(run).gold = math.max(0, (Progress(run).gold or 0) - amount)
+        lootCounted = nil
+    else
+        questGain = { amount = amount, at = GetTime() }
+    end
 end
 
 -- ── Chat lines ─────────────────────────────────────────────────────────────
@@ -430,8 +487,9 @@ local function OnQuestLog()
 end
 
 -- A quest handed in inside the dungeon (some have their giver there). Its
--- reward also moved your XP bar and purse, which count as the dungeon's:
--- moved over to the quest's side, at what the game actually gave.
+-- reward also moved your XP bar, which counts as the dungeon's: moved over
+-- to the quest's side, at what the game actually gave. Its money is kept
+-- out of the looted coin (OnQuestMoney).
 local function OnQuestTurnedIn(questID, xpReward, moneyReward)
     local run = MS.currentRun
     questID = Plain(questID)
@@ -454,7 +512,7 @@ local function OnQuestTurnedIn(questID, xpReward, moneyReward)
         end
         if (moneyReward or 0) > 0 then
             r.g = moneyReward
-            p.gold = (p.gold or 0) - moneyReward
+            OnQuestMoney(run, moneyReward)
         end
         QuestTotals(p)
     end
@@ -468,6 +526,8 @@ local function OnEvent(event, ...)
         C_Timer.After(event == "PLAYER_LEVEL_UP" and 0.5 or 0, OnXP)
     elseif event == "PLAYER_MONEY" then
         OnMoney()
+    elseif event == "CHAT_MSG_MONEY" then
+        OnLootLine()
     elseif event == "CHAT_MSG_COMBAT_XP_GAIN" then
         OnXPLine((...))
     elseif event == "UNIT_HEALTH" then
@@ -509,7 +569,7 @@ MS:On("PLAYER_ENTERING_WORLD", function()
 end)
 
 -- Listened for only while a run is recording.
-local EVENTS = { "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "CHAT_MSG_COMBAT_XP_GAIN",
+local EVENTS = { "PLAYER_XP_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_MONEY", "CHAT_MSG_MONEY", "CHAT_MSG_COMBAT_XP_GAIN",
                  "CHAT_MSG_COMBAT_FACTION_CHANGE", "QUEST_LOG_UPDATE", "QUEST_TURNED_IN",
                  "QUEST_WATCH_UPDATE", "UI_INFO_MESSAGE",
                  "UNIT_HEALTH", "NAME_PLATE_UNIT_ADDED", "NAME_PLATE_UNIT_REMOVED", "UNIT_TARGET",

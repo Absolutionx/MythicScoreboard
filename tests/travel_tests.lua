@@ -321,6 +321,150 @@ Entrance.SetPassThroughButtons(marker, "RightButton")
 check("out of combat: marker pass-through set", marker._passThrough and marker._passThrough[1] == "RightButton")
 InCombatLockdown = function() return false end
 
+-- ── Your hearthstone, Astral Recall, a mage's teleports ───────────────────
+-- (Alpha at 0.1,0.1 and Beta at 0.9,0.9 on Kalimdor; Gamma on the other side.)
+local bind, bags, spells, cooldown = nil, {}, {}, {}
+rawset(_G, "GetBindLocation", function() return bind end)
+rawset(_G, "GetItemCount", function(id) return bags[id] or 0 end)
+rawset(_G, "GetItemCooldown", function(id) local c = cooldown[id]; return c and GetTime() or 0, c or 0 end)
+rawset(_G, "IsPlayerSpell", function(id) return spells[id] == true end)
+rawset(_G, "GetSpellCooldown", function(id) local c = cooldown[id]; return c and GetTime() or 0, c or 0 end)
+MS.ForeverData.INNS = {
+    { "Farside Inn", map = 1413, x = 0.85, y = 0.88, side = "Horde" },
+    { "Nearby Inn",  map = 1413, x = 0.14, y = 0.12, side = "Horde" },
+    { "Their Inn",   map = 1413, x = 0.85, y = 0.88, side = "Alliance" },
+}
+MS.ForeverData.TELEPORTS = { { "Gamma City", spell = 3567 } }
+-- No flights here, so the other way is a long run.
+MS.ForeverData.FLIGHT_MASTERS = {}
+MythicScoreboardDB.flights, MythicScoreboardAccountDB.flightSpots = nil, nil
+here = { 0.12, 0.12 }
+local goal = { c = KALIMDOR, x = 0.88, y = 0.9 }
+check("no hearthstone set: run", hows(MS:PlanRoute(from(), goal)) == "run", hows(MS:PlanRoute(from(), goal)))
+bind, bags[6948] = "Farside Inn", 1
+legs = MS:PlanRoute(from(), goal)
+check("hearthstone near the entrance: used", hows(legs) == "hearth,run", hows(legs))
+check("hearthstone: to the inn", legs[1].to.name == "Farside Inn" and math.abs(legs[1].to.x - 0.85) < 1e-6)
+check("without it when asked", hows(MS:PlanRoute(from(), goal, true)) == "run")
+cooldown[6948] = 3600
+check("on cooldown: not used", hows(MS:PlanRoute(from(), goal)) == "run")
+cooldown[6948] = nil; bags[6948] = 0
+check("no hearthstone in your bags: not used", hows(MS:PlanRoute(from(), goal)) == "run")
+spells[556] = true
+check("Astral Recall instead", hows(MS:PlanRoute(from(), goal)) == "recall,run", hows(MS:PlanRoute(from(), goal)))
+bags[6948] = 1
+check("both ready: Astral Recall (shorter cooldown)", hows(MS:PlanRoute(from(), goal)) == "recall,run")
+cooldown[556] = 900
+check("Astral Recall on cooldown: the hearthstone", hows(MS:PlanRoute(from(), goal)) == "hearth,run")
+cooldown[556] = 1.5
+check("only the global cooldown: still ready", hows(MS:PlanRoute(from(), goal)) == "recall,run")
+cooldown[556], spells[556] = nil, nil
+bind = "Their Inn"
+check("the other side's inn: not yours", hows(MS:PlanRoute(from(), goal)) == "run")
+MS.ForeverData.INNS[1].aka = { "Farside" }
+bind = "Farside"
+check("an inn by its other name: used", hows(MS:PlanRoute(from(), goal)) == "hearth,run", hows(MS:PlanRoute(from(), goal)))
+MS.ForeverData.INNS[1].aka = nil
+bind = "Somewhere Unknown"
+check("an inn not in the list: not used", hows(MS:PlanRoute(from(), goal)) == "run")
+-- Set close to where you are: nothing saved, so not spent.
+bind = "Nearby Inn"
+check("hearthstone that saves nothing: not used", hows(MS:PlanRoute(from(), goal)) == "run")
+bind = "Farside Inn"
+check("saving under three minutes: kept", hows(MS:PlanRoute(from(), { c = KALIMDOR, x = 0.2, y = 0.2 })) == "run")
+-- A teleport: across the sea with no boat.
+MS.ForeverData.TRANSPORTS = {}
+local over = { c = EK, x = 0.5, y = 0.5 }
+check("no way across", MS:PlanRoute(from(), over) == nil)
+spells[3567] = true
+check("a teleport never cast: where it lands not known yet", MS:PlanRoute(from(), over) == nil)
+-- Cast once: where you arrive is kept.
+local home = here
+local function arrive(map, spot)
+    M.RunTimers(1)                               -- (still casting, still here)
+    playerMap, here = map, spot
+    M.RunTimers(1)
+end
+M.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-1", 3567)
+arrive(1420, { 0.5, 0.52 })
+local spot = MythicScoreboardAccountDB.landings.spells[3567]
+check("teleport: landing kept", spot and spot.c == EK and math.abs(spot.y - 0.52) < 1e-6)
+playerMap, here = 1413, home
+legs = MS:PlanRoute(from(), over)
+check("a teleport you know: used", hows(legs) == "teleport,run", hows(legs))
+rawset(_G, "IsUsableSpell", function() return false end)   -- (no rune)
+check("a teleport you can't cast: not used", MS:PlanRoute(from(), over) == nil)
+rawset(_G, "IsUsableSpell", nil)
+-- On the arrow and the map: a step to read, no arrow to follow, no line.
+MS:NavigateTo({ name = "Over There", map = 1420, x = 0.5, y = 0.5 })
+local text = arrow.lastStep
+check("step text names the teleport", text and text:find("Gamma City", 1, true), text)
+local drawn = MS:RouteOnMap(EK)
+check("map: no line for the teleport", drawn and #drawn.lines == 1, drawn and #drawn.lines)
+MS:StopNavigation()
+bind, bags, spells = nil, {}, {}
+
+-- ── Learned from the game: inns, flight masters, for the whole account ──
+MythicScoreboardAccountDB.landings = nil
+MS.ForeverData.INNS = {}
+playerMap, here = 1413, { 0.12, 0.12 }
+bind, bags[6948] = "Farside Inn", 1
+check("an inn never landed at: not used", hows(MS:PlanRoute(from(), goal)) == "run")
+-- Someone else's spell: nothing.
+M.Fire("UNIT_SPELLCAST_SUCCEEDED", "party1", "cast-2", 8690)
+M.RunTimers(3)
+check("someone else hearthing: nothing kept", next(MythicScoreboardAccountDB.landings and MythicScoreboardAccountDB.landings.inns or {}) == nil)
+-- The hearthstone, cast and landed.
+M.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-3", 8690)
+arrive(1413, { 0.85, 0.88 })
+local inn = MythicScoreboardAccountDB.landings.inns["Farside Inn"]
+check("hearthed: the inn kept", inn and inn.c == KALIMDOR and math.abs(inn.x - 0.85) < 1e-6)
+playerMap, here = 1413, { 0.12, 0.12 }
+check("hearthed once: used from then on", hows(MS:PlanRoute(from(), goal)) == "hearth,run", hows(MS:PlanRoute(from(), goal)))
+-- A cast that never goes anywhere (interrupted after all): nothing kept.
+bind = "Stayed Inn"
+M.Fire("UNIT_SPELLCAST_SUCCEEDED", "player", "cast-4", 8690)
+M.RunTimers(95)
+check("never left: nothing kept", MythicScoreboardAccountDB.landings.inns["Stayed Inn"] == nil)
+-- Binding at an innkeeper: where you stand, until a landing says better.
+here = { 0.3, 0.3 }
+M.Fire("HEARTHSTONE_BOUND")
+check("bound: the spot kept", MythicScoreboardAccountDB.landings.inns["Stayed Inn"] ~= nil)
+bind = "Farside Inn"; here = { 0.2, 0.2 }
+M.Fire("HEARTHSTONE_BOUND")
+check("bound again: a real landing kept", math.abs(MythicScoreboardAccountDB.landings.inns["Farside Inn"].x - 0.85) < 1e-6)
+bind, bags = nil, {}
+
+-- Flight maps: an alt that never opened one uses where yours stand.
+local realNodes = C_TaxiMap.GetAllTaxiNodes
+C_TaxiMap.GetAllTaxiNodes = function()
+    return { { name = "Delta, Somewhere", position = V(0.4, 0.4), state = 1 },
+             { name = "Epsilon", position = V(0.6, 0.6), state = 2 } }
+end
+playerMap = 1413
+M.Fire("TAXIMAP_OPENED")
+C_TaxiMap.GetAllTaxiNodes = realNodes
+local acc = MythicScoreboardAccountDB
+check("flight map: spots kept for the account", acc.flightSpots and acc.flightSpots.Horde and #acc.flightSpots.Horde[KALIMDOR] == 2)
+MythicScoreboardDB.flights = nil                 -- (the alt)
+local fm = MS:FlightMasters(KALIMDOR)
+check("alt: your flight masters' spots", #fm == 2 and fm[1].name == "Delta" and fm[2].known == true, #fm)
+side = "Alliance"
+check("other side: not yours", #MS:FlightMasters(KALIMDOR) == 0, #MS:FlightMasters(KALIMDOR))
+side = "Horde"
+
+-- /sb dumptravel: what the game lists, saved.
+C_TaxiMap.GetTaxiNodesForMap = function(id)
+    if id == KALIMDOR then return { { name = "Alpha", position = V(0.1, 0.1), faction = 1 } } end
+    return {}
+end
+MS.ForeverData.FLIGHT_MASTERS = { { "Alpha", map = 1413, x = 0.1, y = 0.1, side = "Horde" } }
+MS:DumpTravel()
+local dump = acc.travelDump
+check("dump: the game's list", dump and dump.taxi[KALIMDOR] and dump.taxi[KALIMDOR][1].name == "Alpha" and dump.taxi[KALIMDOR][1].faction == 1)
+check("dump: landings and spots", dump and dump.landings == acc.landings and dump.flightSpots == acc.flightSpots)
+check("dump: said so", M.printed[#M.printed]:find("dumptravel: 1 flight", 1, true), M.printed[#M.printed])
+
 for _, p in ipairs(M.printed) do if p:find("error") then check("no errors", false, p) end end
 io.stdout:write(("travel_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)
