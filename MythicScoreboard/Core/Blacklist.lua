@@ -7,8 +7,9 @@ local _fmt, _lower, _ins = string.format, string.lower, table.insert
 -- Players you'd rather not group with, each with a note. Kept for the
 -- account (MythicScoreboardAccountDB.blacklist), so every character sees it:
 --   [key] = { name = "Jay-Stormrage", note = "...", added = time(), class = "SHAMAN" }
--- A warning when one is in your group, their name in red in the group
--- finder, and the note in their tooltips. The window: UI_Blacklist.lua.
+-- A warning when one is in your group or invites you, a red border round
+-- their listings in Looking For Group, and the note in their tooltips. The
+-- window: UI_Blacklist.lua.
 
 -- The key a player is kept under, and how their name is shown. Retail:
 -- name and realm (two players can share a name on different realms).
@@ -45,6 +46,13 @@ local function List(create)
     if create and type(acc.blacklist) ~= "table" then acc.blacklist = {} end
     return acc.blacklist
 end
+
+-- Anyone on it at all (nothing else is looked at until there is).
+local function AnyoneListed()
+    local list = List()
+    return list ~= nil and next(list) ~= nil
+end
+MS.BlacklistHasAnyone = AnyoneListed
 
 -- The entry for a player, or nil.
 function MS:BlacklistEntry(name, realm)
@@ -150,38 +158,76 @@ function MS:BlacklistEntryForUnit(unit)
 end
 
 -- ── In your group: a warning, once each time they join ────────────────────
-local warned = {}
+-- Who's been warned about in this group is kept with the character, so a
+-- /reload or a login with them still there doesn't warn again.
 local RED = "|cffff2020"
+local function Warned()
+    local db = rawget(_G, "MythicScoreboardDB")
+    if type(db) ~= "table" then return {} end
+    if type(db.blacklistWarned) ~= "table" then db.blacklistWarned = {} end
+    return db.blacklistWarned
+end
+
+local function Alert(text, note)
+    MS.Say(RED .. text .. ((note or "") ~= "" and (": " .. note) or "") .. "|r")
+    local frame = rawget(_G, "RaidWarningFrame")
+    local Notice = rawget(_G, "RaidNotice_AddMessage")
+    if frame and Notice then pcall(Notice, frame, text, { r = 1, g = 0.13, b = 0.13 }) end
+    local Sound, kit = rawget(_G, "PlaySound"), rawget(_G, "SOUNDKIT")
+    if Sound and kit and kit.RAID_WARNING then pcall(Sound, kit.RAID_WARNING) end
+end
 
 function MS:CheckGroupForBlacklist()
-    local present = {}
-    if IsInGroup and IsInGroup() then
+    local present, unsure = {}, false
+    local warned = Warned()
+    local grouped = IsInGroup and IsInGroup() or false
+    if AnyoneListed() and grouped then
+        local unknown = rawget(_G, "UNKNOWNOBJECT")
         for _, unit in ipairs(MS:GroupUnits()) do
             if unit ~= "player" then
                 local name, realm = UnitKeyName(unit)
+                local there = not UnitExists or UnitExists(unit)
+                if there and (not name or name == unknown) then unsure = true end
                 local key = name and MS.BlacklistKey(name, realm)
                 local e = key and MS:BlacklistEntry(name, realm)
                 if e then
                     present[key] = true
                     if not warned[key] and MS:GetBlacklistWarn() then
-                        local note = (e.note or "") ~= "" and (": " .. e.note) or ""
-                        MS.Say(RED .. _fmt(L["%s from your blacklist is in your group"], e.name) .. note .. "|r")
-                        local frame = rawget(_G, "RaidWarningFrame")
-                        local Notice = rawget(_G, "RaidNotice_AddMessage")
-                        if frame and Notice then
-                            pcall(Notice, frame, _fmt(L["%s from your blacklist is in your group"], e.name),
-                                { r = 1, g = 0.13, b = 0.13 })
-                        end
-                        local Sound, kit = rawget(_G, "PlaySound"), rawget(_G, "SOUNDKIT")
-                        if Sound and kit and kit.RAID_WARNING then pcall(Sound, kit.RAID_WARNING) end
+                        Alert(_fmt(L["%s from your blacklist is in your group"], e.name), e.note)
                     end
                 end
             end
         end
     end
-    for key in pairs(warned) do if not present[key] then warned[key] = nil end end
+    -- Gone from the group: warned about again if they come back. (While
+    -- some names aren't known yet, as just after a login, nobody's let go.)
+    for key in pairs(warned) do
+        if not present[key] and (not grouped or not unsure) then warned[key] = nil end
+    end
     for key in pairs(present) do warned[key] = true end
 end
+
+-- ── An invite from them: a warning before you accept ──────────────────────
+function MS:OnGroupInvite(inviter)
+    if not AnyoneListed() then return end
+    local name = Readable(inviter)
+    local e = name and MS:BlacklistEntry(name)
+    if not e then return end
+    Alert(_fmt(L["%s, who invited you, is on your blacklist"], e.name), e.note)
+    -- And under the game's invite box, once it's up.
+    C_Timer.After(0, function()
+        local Find = rawget(_G, "StaticPopup_FindVisible")
+        local dialog = Find and Find("PARTY_INVITE")
+        if dialog and MS.ShowBlacklistInviteWarning then
+            local ok, err = pcall(MS.ShowBlacklistInviteWarning, MS, dialog, e)
+            if not ok then MS:ReportError("Blacklist", err) end
+        end
+    end)
+end
+MS:On("PARTY_INVITE_REQUEST", function(_, inviter)
+    local ok, err = pcall(MS.OnGroupInvite, MS, inviter)
+    if not ok then MS:ReportError("Blacklist", err) end
+end)
 
 local function Check()
     MS:InvalidateGroupUnits()
@@ -205,7 +251,7 @@ local function NoteLines(tooltip, e)
 end
 
 local function UnitTooltip(tooltip)
-    if tooltip ~= rawget(_G, "GameTooltip") or not tooltip.GetUnit then return end
+    if not AnyoneListed() or tooltip ~= rawget(_G, "GameTooltip") or not tooltip.GetUnit then return end
     local ok, _, unit = pcall(tooltip.GetUnit, tooltip)
     unit = ok and Readable(unit)
     if not unit then return end
@@ -213,7 +259,7 @@ local function UnitTooltip(tooltip)
     if e then NoteLines(tooltip, e); tooltip:Show() end
 end
 
--- ── The group finder: their names in red ──────────────────────────────────
+-- ── The group finder: a red border round their listings ───────────────────
 local BRIGHT_RED = { 1, 0.1, 0.1 }
 local function Red(fs) if fs and fs.SetTextColor then fs:SetTextColor(BRIGHT_RED[1], BRIGHT_RED[2], BRIGHT_RED[3]) end end
 
@@ -271,6 +317,7 @@ end
 local function HookGroupFinder()
     -- Listings: the leader.
     Hook("LFGListSearchEntry_Update", function(entry)
+        if not AnyoneListed() then SetBorder(entry, false); return end
         local leader = LeaderOf(entry and entry.resultID)
         SetBorder(entry, leader and MS:BlacklistEntry(leader) ~= nil)
     end)
@@ -316,6 +363,7 @@ end
 MS._BlacklistMembersOf = MembersOf
 
 local function AnyListed(resultID)
+    if not AnyoneListed() then return false end
     for _, name in ipairs(MembersOf(resultID)) do
         if MS:BlacklistEntry(name) then return true end
     end
@@ -329,6 +377,7 @@ local function HookBrowse()
         if entry then SetBorder(entry, AnyListed(entry.resultID)) end
     end)
     Hook("LFGBrowseSearchEntryTooltip_UpdateAndShow", function(tip)
+        if not AnyoneListed() then return end
         local function RedIfListed(fs)
             local name = fs and fs.GetText and Readable(fs:GetText())
             if name and MS:BlacklistEntry(name) then Red(fs) end

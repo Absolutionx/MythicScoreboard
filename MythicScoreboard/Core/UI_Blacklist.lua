@@ -194,7 +194,7 @@ local function Build()
     local hint = Text(frame, "regular", 11, P.ash, "RIGHT")
     hint:SetPoint("BOTTOMRIGHT", -PAD - 2, 20)
     hint:SetPoint("LEFT", add, "RIGHT", 10, 0)
-    hint:SetText(L["Their names show in red in the group finder."])
+    hint:SetText(L["Groups with them get a red border in Looking For Group."])
 
     frame:SetScript("OnShow", UI.RefreshBlacklist)
     frame:Hide()
@@ -212,3 +212,34 @@ function MS:ToggleBlacklist()
 end
 
 MS:OnBlacklistChanged(function() UI.RefreshBlacklist() end)
+
+-- ── Under the game's invite box: who it is and your note ──────────────────
+local invite
+function MS.ShowBlacklistInviteWarning(_, dialog, e)
+    if not invite then
+        invite = CreateFrame("Frame", nil, UIParent)
+        invite:SetFrameStrata("DIALOG")
+        invite:SetSize(320, 52)
+        Solid(invite, "BACKGROUND", 0, 0.06, 0.03, 0.03, 0.95):SetAllPoints()
+        UI.Outline(invite, { 1, 0.13, 0.13 }, 1, "BORDER")
+        invite.title = Text(invite, "medium", 13, { 1, 0.27, 0.27 }, "CENTER")
+        invite.title:SetPoint("TOPLEFT", 10, -9); invite.title:SetPoint("TOPRIGHT", -10, -9)
+        invite.note = Text(invite, "regular", 12, P.ivory, "CENTER")
+        invite.note:SetPoint("TOPLEFT", invite.title, "BOTTOMLEFT", 0, -4)
+        invite.note:SetPoint("TOPRIGHT", invite.title, "BOTTOMRIGHT", 0, -4)
+        -- Gone with the invite box.
+        invite:SetScript("OnUpdate", function(box)
+            local d = box.dialog
+            if not (d and d:IsShown() and d.which == "PARTY_INVITE") then box:Hide() end
+        end)
+    end
+    invite.dialog = dialog
+    invite:ClearAllPoints()
+    invite:SetPoint("TOP", dialog, "BOTTOM", 0, -4)
+    invite:SetWidth(math.max(320, dialog:GetWidth() or 0))
+    invite.title:SetText(string.format(L["%s, who invited you, is on your blacklist"], e.name))
+    local note = e.note or ""
+    invite.note:SetText(note ~= "" and note or ("|cff8c8273" .. L["No note"] .. "|r"))
+    invite:Show()
+    return invite
+end

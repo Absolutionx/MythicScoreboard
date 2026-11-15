@@ -10,7 +10,7 @@
 -- Left-click opens the scoreboard, right-click changes the style,
 -- Shift-click posts the time left to your party, drag moves it.
 
-local _abs, _floor, _max, _min = math.abs, math.floor, math.max, math.min
+local _abs, _ceil, _floor, _max, _min = math.abs, math.ceil, math.floor, math.max, math.min
 local _fmt, _ins = string.format, table.insert
 
 local MS = _G["MythicScoreboard"]
@@ -92,6 +92,11 @@ local function OneLine(fs, w, size)
     fs:SetWordWrap(false); fs:SetMaxLines(1)
     fs:SetJustifyV("TOP")
     fs:SetSize(w, LineH(size))
+end
+-- How wide a line's text is, whatever width it's been given.
+local function TextWidth(fs)
+    local w = fs.GetUnboundedStringWidth and fs:GetUnboundedStringWidth() or fs:GetStringWidth()
+    return _ceil(w or 0)
 end
 local function Rule(key, y)
     local t = Bar(key, P.line)
@@ -511,17 +516,37 @@ local function RunCells(run, bosses, y)
     else
         _ins(cells, { L["Deaths"], deaths > 0 and CT(P.bloodHi, tostring(deaths)) or "0" })
     end
-    local col = (W - 2 * PAD) / #cells
+    -- Each column as wide as its label or number, the space left over shared
+    -- out between them (shrunk alike only when even that doesn't fit).
+    local inner = W - 2 * PAD
+    local labels, values, widths, total = {}, {}, {}, 0
     for i, c in ipairs(cells) do
-        local l = FS("rcl" .. i, "regular", 11, P.ash, "LEFT"); Place(l, PAD + (i - 1) * col, y)
-        OneLine(l, col - 4, 10); l:SetText(c[1])
-        local v = FS("rcv" .. i, "semibold", 14, P.ivory, "LEFT"); Place(v, PAD + (i - 1) * col, y - 13)
-        OneLine(v, col - 4, 13); v:SetText(c[2])
+        local l = FS("rcl" .. i, "regular", 11, P.ash, "LEFT")
+        local v = FS("rcv" .. i, "semibold", 14, P.ivory, "LEFT")
+        OneLine(l, inner, 10); l:SetText(c[1])
+        OneLine(v, inner, 13); v:SetText(c[2])
+        local wide = _max(TextWidth(l), TextWidth(v))
+        labels[i], values[i], widths[i] = l, v, wide
+        total = total + wide
+    end
+    local n = #cells
+    local gap = n > 1 and (inner - total) / (n - 1) or 0
+    local scale = 1
+    if gap < 6 then
+        gap = n > 1 and 6 or 0
+        scale = (inner - gap * (n - 1)) / total
+    end
+    local x = PAD
+    for i, c in ipairs(cells) do
+        local w = _floor(widths[i] * scale)
+        Place(labels[i], x, y); OneLine(labels[i], w + 2, 10)
+        Place(values[i], x, y - 13); OneLine(values[i], w + 2, 13)
         if c[1] == L["Experience"] then
             local hov = HoverArea("rchover", XPTooltip)
             hov.run = run
-            Place(hov, PAD + (i - 1) * col, y + 2); hov:SetSize(col, 32)
+            Place(hov, x, y + 2); hov:SetSize(w, 32)
         end
+        x = x + w + gap
     end
     return y - 34
 end
