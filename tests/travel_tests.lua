@@ -151,13 +151,14 @@ check("arrow: shown", arrow and arrow._shown)
 check("arrow: the step", arrow and arrow.lastStep == "Step 1 of 2: Fly to Beta", arrow and arrow.lastStep)
 check("arrow: points the way the flight goes", arrow and arrow.arrow._shown)
 onTaxi = true; MS:UpdateArrow()
-check("in the air", arrow.lastStep == "Flying to Beta", arrow.lastStep)
+check("in the air: where you land", arrow.lastStep:find("Step 1 of 2: Land at Beta", 1, true) == 1, arrow.lastStep)
+check("in the air: what comes next", arrow.lastStep:find("Then: Run to Razorfen Kraul", 1, true) ~= nil, arrow.lastStep)
 check("in the air: the arrow to where you land", arrow.arrow._shown)
 -- A /reload in the air: the same dungeon, no route yet. The flight's kept.
 check("in the air: the flight kept", MythicScoreboardDB.navFlying and MythicScoreboardDB.navFlying.name == "Beta")
 here = { 0.5, 0.5 }
 MS:NavigateTo({ name = "Razorfen Kraul", map = 1413, x = 0.88, y = 0.9 })
-check("reload in the air: still flying to Beta", arrow.lastStep == "Flying to Beta", arrow.lastStep)
+check("reload in the air: still landing at Beta", arrow.lastStep:find("Land at Beta", 1, true) ~= nil, arrow.lastStep)
 check("reload in the air: the arrow", arrow.arrow._shown)
 check("reload in the air: the yards", arrow.lastDist and arrow.lastDist:find("yards") ~= nil, arrow.lastDist)
 check("reload in the air: on the map too", MS:NavigationSteps() and MS:NavigationSteps()[1].how == "fly")
@@ -182,6 +183,41 @@ check("time left: shown", arrow.lastDist:find("|cffffd14d%d+:%d%d|r") ~= nil, ar
 check("clock: m:ss", MS._NavClock(75) == "1:15" and MS._NavClock(3725) == "1:02:05")
 here = { 0.88, 0.9 }; MS:UpdateArrow()
 check("there: done", MS:NavigationTarget() == nil)
+
+-- ── A flight of your own choosing ──────────────────────────────────────────
+-- Taken from the flight map by hand (not the route's): where it lands is
+-- kept, and the steps go on from there, on the arrow and the map.
+local realNodes = C_TaxiMap.GetAllTaxiNodes
+C_TaxiMap.GetAllTaxiNodes = function()
+    return { { name = "Alpha", slotIndex = 1, position = V(0.1, 0.1), state = 0 },
+             { name = "Delta, The Barrens", slotIndex = 3, position = V(0.5, 0.9), state = 1 } }
+end
+here, onTaxi = { 0.1, 0.1 }, false
+MS:StopNavigation()
+TakeTaxiNode(3)                                          -- (directions not shown yet)
+check("own flight: kept as it's taken", MythicScoreboardDB.navFlying and MythicScoreboardDB.navFlying.name == "Delta")
+onTaxi = true; here = { 0.3, 0.5 }
+MS:NavigateTo({ name = "Razorfen Kraul", map = 1413, x = 0.88, y = 0.9 })
+check("own flight: land at Delta", arrow.lastStep:find("Land at Delta", 1, true) ~= nil, arrow.lastStep)
+check("own flight: then on from there", arrow.lastStep:find("Then: ", 1, true) ~= nil, arrow.lastStep)
+local steps = MS:NavigationSteps()
+check("own flight: the steps from where it lands", steps and steps[1].how == "fly" and steps[1].to.name == "Delta" and #steps >= 2,
+    steps and hows(steps))
+check("own flight: the arrow to Delta", arrow.arrow._shown and arrow.lastDist:find("yards") ~= nil)
+local drawn = MS:RouteOnMap(KALIMDOR)
+check("own flight: drawn on the map", drawn and #drawn.lines >= 2, drawn and #drawn.lines)
+-- Directions stopped and started again in the air: still known.
+MS:StopNavigation()
+MS:NavigateTo({ name = "Razorfen Kraul", map = 1413, x = 0.88, y = 0.9 })
+check("own flight: kept over stopping", arrow.lastStep:find("Land at Delta", 1, true) ~= nil, arrow.lastStep)
+-- Landed: forgotten, and the steps from where you are.
+onTaxi = false; here = { 0.5, 0.9 }
+M.Fire("PLAYER_CONTROL_GAINED")
+check("own flight: landed, forgotten", MythicScoreboardDB.navFlying == nil)
+M.now = M.now + 5; MS:UpdateArrow()
+check("own flight: landed, on foot", arrow.lastStep and not arrow.lastStep:find("Land at", 1, true), arrow.lastStep)
+C_TaxiMap.GetAllTaxiNodes = realNodes
+MS:StopNavigation()
 
 -- Between looks at where you are, a frame only turns the arrow: it follows
 -- the way you face straight away, and nothing else is worked out.

@@ -116,25 +116,6 @@ local function HistoryLimitRow(settPop, yOff)
 end
 
 -- A divider and a small heading; returns where the next row goes.
--- Opens the blacklist window (UI_Blacklist.lua).
-local function BlacklistRow(settPop, yOff)
-    local row = Btn(settPop)
-    row:SetSize(SETT_W - 8, SROW)
-    row:SetPoint("TOPLEFT", settPop, "TOPLEFT", 4, yOff)
-    local hov = Solid(row, "BACKGROUND", 0, 1, 0.94, 0.86, 0.05)
-    hov:SetAllPoints(); hov:Hide()
-    local lbl = Text(row, "regular", 14, P.ivory)
-    lbl:SetPoint("LEFT", 30, 0)
-    lbl:SetText(L["Blacklist"])
-    local n = Text(row, "regular", 13, P.ash, "RIGHT")
-    n:SetPoint("RIGHT", -10, 0)
-    row:SetScript("OnShow", function() n:SetText(#MS:BlacklistEntries()) end)
-    n:SetText(#MS:BlacklistEntries())
-    row:SetScript("OnClick", function() settPop:Hide(); MS:ShowBlacklist() end)
-    row:SetScript("OnEnter", function() hov:Show() end)
-    row:SetScript("OnLeave", function() hov:Hide() end)
-end
-
 local function Section(settPop, yOff, title)
     local sep = Solid(settPop, "ARTWORK", 0, P.line[1], P.line[2], P.line[3], 1)
     sep:SetPoint("TOPLEFT", settPop, "TOPLEFT", 10, yOff - 7)
@@ -223,10 +204,6 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
     end
     _ins(refreshers, HistoryLimitRow(settPop, yOff))
     yOff = yOff - SROW
-    if MS.Flavor.blacklist then
-        BlacklistRow(settPop, yOff)
-        yOff = yOff - SROW
-    end
 
     -- Difficulty choices (Forever has one difficulty, so none to choose).
     if MS.Flavor.difficulties then

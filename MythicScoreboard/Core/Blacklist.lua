@@ -11,33 +11,20 @@ local _fmt, _lower, _ins = string.format, string.lower, table.insert
 -- their listings in Looking For Group, and the note in their tooltips. The
 -- window: UI_Blacklist.lua.
 
--- The key a player is kept under, and how their name is shown. Retail:
--- name and realm (two players can share a name on different realms).
--- WoW Forever: the two-part name ("Jay-Breezy").
-local function RealmPart(realm)
-    realm = Readable(realm)
-    if not realm or realm == "" then
-        local own = rawget(_G, "GetNormalizedRealmName") or rawget(_G, "GetRealmName")
-        realm = own and Readable(own()) or ""
-    end
-    return (realm:gsub("[%s'%-]", ""))
-end
+-- (WoW Forever only: Core/Flavor.lua's blacklist, and only its TOC loads
+-- this file.)
 
-function MS.BlacklistKey(name, realm)
+-- The key a player is kept under, and how their name is shown: the
+-- two-part name ("jay-breezy", "Jay Breezy"), however it was written. A
+-- surname given apart (a menu's "server") is put back on.
+function MS.BlacklistKey(name, surname)
     name = Readable(name)
     if type(name) ~= "string" or name == "" then return nil end
     name = name:gsub("^%s+", ""):gsub("%s+$", "")
-    if MS.Flavor.twoPartNames then
-        if realm and not name:find("[%s%-]") then name = name .. "-" .. realm end
-        local short = MS.ShortName(name)
-        if type(short) ~= "string" or short == "" then return nil end
-        return _lower(short), MS.DisplayName(short)
-    end
-    local base, rest = name:match("^([^%-]+)%-(.+)$")
-    if base then name, realm = base, rest end
-    local r = RealmPart(realm)
-    local display = r ~= "" and (name .. "-" .. r) or name
-    return _lower(display), display
+    if surname and not name:find("[%s%-]") then name = name .. "-" .. surname end
+    local short = MS.ShortName(name)
+    if type(short) ~= "string" or short == "" then return nil end
+    return _lower(short), MS.DisplayName(short)
 end
 
 local function List(create)
@@ -121,33 +108,19 @@ function MS:BlacklistEntries()
     return out
 end
 
--- A player from a run (the scoreboard): their name, and on retail their
--- realm from their GUID (the run keeps names without it).
+-- A player from a run (the scoreboard): their name.
 function MS:BlacklistNameOfPlayer(p)
     if type(p) ~= "table" or not p.name then return nil end
-    if MS.Flavor.twoPartNames then return p.name end
-    local realm
-    local Info = rawget(_G, "GetPlayerInfoByGUID")
-    if Info and p.guid then
-        local ok, _, _, _, _, _, _, r = pcall(Info, p.guid)
-        realm = ok and Readable(r) or nil
-    end
-    return p.name, realm
+    return p.name
 end
 
 function MS:BlacklistEntryForPlayer(p)
-    local name, realm = MS:BlacklistNameOfPlayer(p)
-    return name and MS:BlacklistEntry(name, realm) or nil
+    local name = MS:BlacklistNameOfPlayer(p)
+    return name and MS:BlacklistEntry(name) or nil
 end
 
 -- A unit's name, as the blacklist reads it.
-local function UnitKeyName(unit)
-    if MS.Flavor.twoPartNames then return MS:UnitPlayerName(unit) end
-    local name, realm = UnitName(unit)
-    name = Readable(name)
-    if not name then return nil end
-    return name, Readable(realm)
-end
+local function UnitKeyName(unit) return MS:UnitPlayerName(unit) end
 MS._BlacklistUnitName = UnitKeyName
 
 function MS:BlacklistEntryForUnit(unit)
@@ -259,7 +232,7 @@ local function UnitTooltip(tooltip)
     if e then NoteLines(tooltip, e); tooltip:Show() end
 end
 
--- ── The group finder: a red border round their listings ───────────────────
+-- ── Looking For Group: a red border round their listings ──────────────────
 local BRIGHT_RED = { 1, 0.1, 0.1 }
 local function Red(fs) if fs and fs.SetTextColor then fs:SetTextColor(BRIGHT_RED[1], BRIGHT_RED[2], BRIGHT_RED[3]) end end
 
@@ -296,13 +269,7 @@ local function LeaderOf(resultID)
     return ok and type(info) == "table" and Readable(info.leaderName) or nil
 end
 
-local function ApplicantName(appID, memberIdx)
-    local C = LFG()
-    if not (C and C.GetApplicantMemberInfo and appID and memberIdx) then return nil end
-    local ok, name = pcall(C.GetApplicantMemberInfo, appID, memberIdx)
-    return ok and Readable(name) or nil
-end
-MS._BlacklistLeaderOf, MS._BlacklistApplicantName = LeaderOf, ApplicantName
+MS._BlacklistLeaderOf = LeaderOf
 
 local hooked = {}
 local function Hook(name, fn)
@@ -311,32 +278,6 @@ local function Hook(name, fn)
     hooksecurefunc(name, function(...)
         local ok, err = pcall(fn, ...)
         if not ok then MS:ReportError("Blacklist", err) end
-    end)
-end
-
-local function HookGroupFinder()
-    -- Listings: the leader.
-    Hook("LFGListSearchEntry_Update", function(entry)
-        if not AnyoneListed() then SetBorder(entry, false); return end
-        local leader = LeaderOf(entry and entry.resultID)
-        SetBorder(entry, leader and MS:BlacklistEntry(leader) ~= nil)
-    end)
-    Hook("LFGListUtil_SetSearchEntryTooltip", function(tooltip, resultID)
-        local leader = LeaderOf(resultID)
-        local e = leader and MS:BlacklistEntry(leader)
-        if e and tooltip then NoteLines(tooltip, e); tooltip:Show() end
-    end)
-    -- Applicants to your group: each of them.
-    Hook("LFGListApplicationViewer_UpdateApplicantMember", function(member, appID, memberIdx)
-        local name = ApplicantName(appID, memberIdx)
-        if name and MS:BlacklistEntry(name) then Red(member and member.Name) end
-    end)
-    Hook("LFGListApplicantMember_OnEnter", function(member)
-        local parent = member and member.GetParent and member:GetParent()
-        local name = ApplicantName(parent and parent.applicantID, member and member.memberIdx)
-        local e = name and MS:BlacklistEntry(name)
-        local tip = rawget(_G, "GameTooltip")
-        if e and tip and tip:IsOwned(member) then NoteLines(tip, e); tip:Show() end
     end)
 end
 
@@ -431,10 +372,6 @@ local function HookBrowseMenu()
     populateHooked = true
     hooksecurefunc(Menu, "PopulateDescription", function(_, owner, root)
         local entry = BrowseEntryForMenu(owner)
-        if MS._menuDebug then
-            MS.Say(_fmt("menudebug: owner %s, listing %s", tostring(owner and owner.GetName and owner:GetName() or owner),
-                tostring(entry and entry.resultID)))
-        end
         if not entry then return end
         local ok, err = pcall(function()
             local names = MembersOf(entry.resultID)
@@ -455,23 +392,14 @@ local function HookBrowseMenu()
     end)
 end
 
--- Redrawn when the list changes, if the group finder is open.
+-- Redrawn when the list changes, if Looking For Group is open.
 local function RefreshGroupFinder()
-    local frame = rawget(_G, "LFGListFrame")
-    if not (frame and frame.IsVisible and frame:IsVisible()) then frame = nil end
-    local results = frame and frame.SearchPanel and frame.SearchPanel.ScrollBox
-    local Update = rawget(_G, "LFGListSearchEntry_Update")
-    if results and results.ForEachFrame and Update then
-        results:ForEachFrame(function(entry) pcall(Update, entry) end)
-    end
     local browse = rawget(_G, "LFGBrowseFrame")
     local BrowseUpdate = rawget(_G, "LFGBrowseSearchEntry_Update")
     local box = browse and browse.ScrollBox
     if box and box.ForEachFrame and BrowseUpdate and browse:IsVisible() then
         box:ForEachFrame(function(entry) pcall(BrowseUpdate, entry) end)
     end
-    local Refresh = rawget(_G, "LFGListApplicationViewer_UpdateResults")
-    if Refresh and frame and frame.ApplicationViewer then pcall(Refresh, frame.ApplicationViewer) end
 end
 MS:OnBlacklistChanged(RefreshGroupFinder)
 
@@ -486,10 +414,6 @@ local function MenuName(contextData)
         if okSelf and isSelf == true then return nil end
         return UnitKeyName(unit)
     end
-    if contextData.resultID then return LeaderOf(contextData.resultID) end
-    if contextData.applicantID and contextData.memberIdx then
-        return ApplicantName(contextData.applicantID, contextData.memberIdx)
-    end
     local name = Readable(contextData.name)
     if not name then return nil end
     return name, Readable(contextData.server)
@@ -499,7 +423,6 @@ local MENUS = {
     "MENU_UNIT_PLAYER", "MENU_UNIT_PARTY", "MENU_UNIT_RAID_PLAYER", "MENU_UNIT_RAID",
     "MENU_UNIT_FRIEND", "MENU_UNIT_ENEMY_PLAYER", "MENU_UNIT_TARGET", "MENU_UNIT_FOCUS",
     "MENU_UNIT_COMMUNITIES_GUILD_MEMBER", "MENU_UNIT_COMMUNITIES_MEMBER", "MENU_UNIT_GUILD",
-    "MENU_LFG_FRAME_SEARCH_ENTRY", "MENU_LFG_FRAME_MEMBER_APPLY",
 }
 
 -- Adds the blacklist choices to a menu (also the scoreboard's).
@@ -623,7 +546,6 @@ end
 MS:On("PLAYER_LOGIN", function()
     pcall(HookMenus)
     pcall(HookBrowseMenu)
-    pcall(HookGroupFinder)
     pcall(HookBrowse)
     local TDP = rawget(_G, "TooltipDataProcessor")
     local Enum_ = rawget(_G, "Enum")
@@ -635,5 +557,5 @@ MS:On("PLAYER_LOGIN", function()
         end)
     end
 end)
--- The group finder may load later.
-MS:On("ADDON_LOADED", function() pcall(HookGroupFinder); pcall(HookBrowse) end)
+-- Looking For Group may load later.
+MS:On("ADDON_LOADED", function() pcall(HookBrowse) end)

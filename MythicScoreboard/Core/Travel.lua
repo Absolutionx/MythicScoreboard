@@ -188,6 +188,44 @@ if MS.FLAVOR == "forever" then
     MS:On("TAXIMAP_OPENED", function() MS:LearnFlightMap() end)
 end
 
+-- Where a flight from the open flight map goes: { kind = "flight", name,
+-- c, x, y } for its slot (TakeTaxiNode's), or nil.
+function MS:TaxiNodeSpot(slot)
+    slot = MS.ReadableNumber(slot)
+    if not slot then return nil end
+    local T, C = rawget(_G, "C_TaxiMap"), MapAPI()
+    local continent
+    if C and C.GetBestMapForUnit then
+        local ok, map = pcall(C.GetBestMapForUnit, "player")
+        continent = ok and MS:ContinentOf(MS.ReadableNumber(map))
+    end
+    if not continent then return nil end
+    local name
+    if T and T.GetAllTaxiNodes then
+        local ok, nodes = pcall(T.GetAllTaxiNodes, continent)
+        for _, n in ipairs(ok and type(nodes) == "table" and nodes or {}) do
+            if MS.ReadableNumber(n.slotIndex) == slot then
+                name = MS.Readable(n.name)
+                local x, y
+                if n.position and n.position.GetXY then x, y = n.position:GetXY() end
+                x, y = MS.ReadableNumber(x), MS.ReadableNumber(y)
+                name = name and (name:match("^([^,]+)") or name)
+                if name and x and y then return { kind = "flight", name = name, c = continent, x = x, y = y } end
+            end
+        end
+    end
+    -- By its name, from the flight masters known on this continent.
+    local Name = rawget(_G, "TaxiNodeName")
+    if not name and Name then
+        local ok, n = pcall(Name, slot)
+        name = ok and MS.Readable(n) or nil
+    end
+    name = name and (name:match("^([^,]+)") or name)
+    for _, f in ipairs(name and MS:FlightMasters(continent) or {}) do
+        if f.name == name then return { kind = "flight", name = name, c = continent, x = f.x, y = f.y } end
+    end
+end
+
 -- Flight masters on a continent for your side: { name, x, y, known }.
 function MS:FlightMasters(continent)
     local learned = Learned()[continent]

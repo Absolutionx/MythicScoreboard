@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.13.1
+
+### WoW Forever
+- **Directions in the air:** click a dungeon marker while you're on a flight and the steps start from where you'll land ("Land at Crossroads", then what comes next), with the arrow and the line on the map. Works for any flight you take, not just the ones the directions picked.
+- **Blacklist: a warning when someone on it invites you,** with your note shown under the invite box before you accept.
+- The warning about a blacklisted player in your group no longer repeats after a `/reload` or relog while they're still with you.
+- The blacklist is now opened from the skull button in the header (the settings row is gone); the warning toggle stays in settings.
+- The hint at the bottom of the blacklist window now fits.
+
+### Everyone
+- **The in-run frame's bottom row** sizes each column to fit, so "Gold looted" is no longer cut off and the spacing is even.
+
 ## 2.13.0
 
 ### WoW Forever: a blacklist
