@@ -67,6 +67,92 @@ end
 UI.BuildChrome = BuildChrome
 
 -- ── The window ─────────────────────────────────────────────────────────────
+-- ── Size and lock ──────────────────────────────────────────────────────────
+-- A window grows and shrinks as a whole (everything keeps its place), from
+-- its top-left corner, which stays where it is. posKey: the setting its
+-- place is kept in.
+function UI.ScaleFrame(f, s, posKey)
+    if not (f and s) then return end
+    local left, top, old = f:GetLeft(), f:GetTop(), f:GetEffectiveScale()
+    f:SetScale(s)
+    if left and top and old then
+        local new = f:GetEffectiveScale()
+        f:ClearAllPoints()
+        f:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left * old / new, top * old / new)
+        local p, _, rp, x, y = f:GetPoint()
+        if p and posKey then MS:SetSetting(posKey, { p, rp, math.floor(x + 0.5), math.floor(y + 0.5) }) end
+    end
+end
+
+function UI.ApplyWindowScale(s)
+    UI.ScaleFrame(UI.frame, s or MS:GetWindowScale(), "windowPos")
+end
+
+-- The corner to drag to resize a window. o: { get, set (the saved size),
+-- min, max, posKey, setting (the size's setting key), shown (when the
+-- corner shows), shownBy (settings that change that) }.
+function UI.MakeResizeGrip(f, o)
+    local grip = CreateFrame("Button", nil, f)
+    grip:SetSize(16, 16)
+    grip:SetPoint("BOTTOMRIGHT", -3, 3)
+    grip:SetFrameLevel(f:GetFrameLevel() + 20)
+    local art = grip:CreateTexture(nil, "ARTWORK")
+    art:SetAllPoints()
+    art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    local lit = grip:CreateTexture(nil, "HIGHLIGHT")
+    lit:SetAllPoints()
+    lit:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    local dragging
+    grip:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" or not o.shown() then return end
+        dragging = true
+        art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+        self:SetScript("OnUpdate", function()
+            -- The size that puts this corner under the cursor.
+            local cx = GetCursorPosition()
+            local left, eff = f:GetLeft(), f:GetEffectiveScale()
+            local base = UIParent:GetEffectiveScale()
+            if not (cx and left and eff and base and base > 0) then return end
+            local want = (cx - left * eff) / f:GetWidth()
+            local sc = math.max(o.min, math.min(o.max, want / base))
+            if math.abs(sc - f:GetScale()) > 0.004 then UI.ScaleFrame(f, sc, o.posKey) end
+        end)
+    end)
+    grip:SetScript("OnMouseUp", function(self)
+        if not dragging then return end
+        dragging = false
+        art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        self:SetScript("OnUpdate", nil)
+        o.set(f:GetScale())
+    end)
+    grip:SetScript("OnEnter", function(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Drag to resize"])
+        GameTooltip:Show()
+    end)
+    grip:SetScript("OnLeave", GameTooltip_Hide)
+    function grip.Update() grip:SetShown(o.shown() and true or false) end
+    grip.Update()
+    for _, key in ipairs(o.shownBy or {}) do MS:OnSettingChanged(key, grip.Update) end
+    MS:OnSettingChanged(o.setting, function(v)
+        if not dragging and math.abs((tonumber(v) or 1) - f:GetScale()) > 0.004 then
+            UI.ScaleFrame(f, o.get(), o.posKey)
+        end
+    end)
+    return grip
+end
+
+function UI.BuildResizeGrip(f)
+    f.ResizeGrip = UI.MakeResizeGrip(f, {
+        get = function() return MS:GetWindowScale() end,
+        set = function(v) MS:SetWindowScale(v) end,
+        min = MS.WINDOW_SCALE_MIN, max = MS.WINDOW_SCALE_MAX,
+        posKey = "windowPos", setting = "windowScale",
+        shown = function() return not MS:GetWindowLocked() end, shownBy = { "windowLocked" },
+    })
+    return f.ResizeGrip
+end
+
 local function BuildWindow()
     sbFrame = CreateFrame("Frame", "MythicScoreboardFrame", UIParent)
     UI.frame = sbFrame
@@ -78,7 +164,9 @@ local function BuildWindow()
     sbFrame:SetToplevel(true)
     sbFrame:SetMovable(true); sbFrame:EnableMouse(true)
     sbFrame:RegisterForDrag("LeftButton")
-    sbFrame:SetScript("OnDragStart", sbFrame.StartMoving)
+    sbFrame:SetScript("OnDragStart", function(self)
+        if not MS:GetWindowLocked() then self:StartMoving() end
+    end)
     sbFrame:SetScript("OnDragStop", function(self)
         self:StopMovingOrSizing()
         -- Where it was put: kept for next time.
@@ -99,6 +187,7 @@ local function BuildWindow()
         if sbFrame.SettingsPopup then sbFrame.SettingsPopup:Hide() end
     end)
     sbFrame:SetClampedToScreen(true)             -- (never off the screen, whatever was saved)
+    sbFrame:SetScale(MS:GetWindowScale())        -- (its size first: the place is in its own units)
     local pos = MS:GetSetting("windowPos")
     if type(pos) == "table" and pos[1] then
         sbFrame:SetPoint(pos[1], UIParent, pos[2] or pos[1], pos[3] or 0, pos[4] or 0)
@@ -107,6 +196,7 @@ local function BuildWindow()
     end
     sbFrame:Hide()
     tinsert(UISpecialFrames, "MythicScoreboardFrame")
+    UI.BuildResizeGrip(sbFrame)
 
     BuildChrome(sbFrame)
 end
@@ -567,9 +657,10 @@ local function DemoRun(up)
     local myName = MS:UnitPlayerName("player") or UNKNOWN or "You"
     local _, myClass = UnitClass("player")
     local mySpec
-    if GetSpecialization and GetSpecializationInfo then
-        local ok, idx = pcall(GetSpecialization)
-        if ok and idx then local ok2, id = pcall(GetSpecializationInfo, idx); mySpec = ok2 and id or nil end
+    local Spec, SpecInfo = rawget(_G, "GetSpecialization"), rawget(_G, "GetSpecializationInfo")
+    if Spec and SpecInfo then
+        local ok, idx = pcall(Spec)
+        if ok and idx then local ok2, id = pcall(SpecInfo, idx); mySpec = ok2 and id or nil end
     end
     local role = MS.SpecLabel and select(2, MS.SpecLabel(mySpec, myClass)) or "DAMAGER"
     local group = {

@@ -396,3 +396,18 @@ T["%s, who invited you, is on your blacklist"] = "%s, que te ha invitado, está 
 T["Right-click: blacklist"] = "Clic derecho: lista negra"
 T["Warn about blacklisted players"] = "Avisar de jugadores en la lista negra"
 T["Someone else in this group"] = "Otra persona de este grupo"
+
+-- Settings: window and groups
+T["Directions"] = "Indicaciones"
+T["Drag to resize"] = "Arrastra para cambiar el tamaño"
+T["During a run"] = "Durante una partida"
+T["Lock the window"] = "Bloquear la ventana"
+T["Stops the scoreboard being moved or resized, and hides its resize corner."] = "Impide mover o cambiar el tamaño del marcador y oculta su esquina de tamaño."
+T["Window"] = "Ventana"
+T["Window size"] = "Tamaño de la ventana"
+T["Hide the preview"] = "Ocultar la vista previa"
+T["Preview the in-run frame"] = "Vista previa del marco de partida"
+T["Shows the in-run frame with a sample run, so you can drag it where you want it and resize it from its corner."] = "Muestra el marco de partida con una partida de ejemplo, para colocarlo donde quieras y cambiar su tamaño desde la esquina."
+T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "Haz clic derecho en el marco para otra vista. Arrástralo para moverlo, o su esquina para cambiar el tamaño."
+T["Reset size"] = "Restablecer tamaño"
+T["Done"] = "Listo"

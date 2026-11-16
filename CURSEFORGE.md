@@ -24,7 +24,7 @@ A small frame that shows how the run is going while you play. It's on by default
 
 **Three styles:** detailed, compact and a single line. Right-click to switch, left-click to open the scoreboard, Shift-click to post the time left to your party.
 
-Try it anywhere with `/sb compact demo`: it plays out a sample run in fast-forward, with a different dungeon each time.
+Try it anywhere with **Preview the in-run frame** in settings (or `/sb compact demo`): it plays out a sample run in fast-forward, so you can drag it into place and resize it from its corner.
 
 ---
 
@@ -69,6 +69,7 @@ Every run is kept in a permanent archive, even after it drops out of history. Op
 
 - **Fully translated:** English, German, French, Spanish, Portuguese, Italian, Russian, Korean and Chinese (Simplified and Traditional), using the game's own fonts
 - **Light on your game:** nothing runs outside dungeons, and the windows are built only when you first open them
+- **Resize and lock the scoreboard:** drag its corner to make it bigger or smaller, or lock it in place
 - **Minimap button:** left-click for the scoreboard, right-click for the Stats page
 - **Your choice of when a run counts as cleared,** which difficulties to track and how many runs to keep, shared by all your characters
 

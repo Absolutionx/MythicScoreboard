@@ -644,8 +644,16 @@ local function PostTimeLeft(run)
     if not ok then MS.Say(L["Couldn't post to party chat here."]) end
 end
 
+local previewStyle                     -- the preview's view until you pick one (detailed)
+local function ShownStyle()
+    local style = MS:GetCompactStyle()
+    if demo and previewStyle then return previewStyle end
+    if demo and style == "off" then return "detailed" end
+    return style
+end
+
 local function NextStyle()
-    local cur = MS:GetCompactStyle()
+    local cur = ShownStyle()
     for i, s in ipairs(MS.COMPACT_STYLES) do
         if s == cur then return MS.COMPACT_STYLES[i % #MS.COMPACT_STYLES + 1] end
     end
@@ -667,6 +675,7 @@ local function Build()
     f:RegisterForDrag("LeftButton")
     f:RegisterForClicks("LeftButtonUp", "RightButtonUp")
     UI.BuildChrome(f, 44)                -- the scoreboard window's stone and bronze
+    f:SetScale(MS:GetCompactScale())     -- (its size first: the place is in its own units)
     local pos = MS:GetSetting("compactPos")
     if type(pos) == "table" and pos[1] then
         f:SetPoint(pos[1], UIParent, pos[2] or pos[1], pos[3] or 0, pos[4] or 0)
@@ -679,7 +688,9 @@ local function Build()
         if self._moved then self._moved = nil; return end
         local run = demo or MS.currentRun
         if button == "RightButton" then
-            MS:SetCompactStyle(NextStyle())
+            local nextStyle = NextStyle()
+            previewStyle = nil                -- (the view picked: the one used from now on)
+            MS:SetCompactStyle(nextStyle)
             MS.Say(_fmt(L["In-run frame: %s"], L[STYLE_NAMES[MS:GetCompactStyle()]]))
         elseif IsShiftKeyDown() and run then
             PostTimeLeft(run)
@@ -687,6 +698,15 @@ local function Build()
             MS:ShowScoreboard()
         end
     end))
+
+    -- Resized by its corner while the preview's up (not in the way in a run).
+    f.ResizeGrip = UI.MakeResizeGrip(f, {
+        get = function() return MS:GetCompactScale() end,
+        set = function(v) MS:SetCompactScale(v) end,
+        min = MS.COMPACT_SCALE_MIN, max = MS.COMPACT_SCALE_MAX,
+        posKey = "compactPos", setting = "compactScale",
+        shown = function() return demo ~= nil end,
+    })
 
     -- The clock moves on its own: a redraw four times a second while shown.
     local wait = 0
@@ -702,16 +722,28 @@ end
 -- times a second and from other code (settings, run changes), so nothing in
 -- it may throw: an error is said once in chat and the frame carries on.
 local function Refresh(self)
-    local style = self:GetCompactStyle()
+    local style = ShownStyle()
     local run = demo or (self.inDungeon and self.currentRun)
-    if demo and style == "off" then style = "compact" end
     if not run or style == "off" then
-        if f then f:Hide() end
+        if f then
+            f:Hide()
+            if f.ResizeGrip then f.ResizeGrip.Update() end
+            if f.PreviewBar then f.PreviewBar:Hide() end
+        end
         return
     end
     if not f then Build() end
     if run == demo then DemoAt(demo) end
+    -- The preview: in front of the scoreboard and its settings, so it can be
+    -- seen and moved; in a run, back where it sits.
+    local strata = demo and "FULLSCREEN_DIALOG" or "MEDIUM"
+    if f:GetFrameStrata() ~= strata then
+        f:SetFrameStrata(strata)
+        if demo then f:SetFrameLevel(100); f:Raise() end
+    end
     f:Show()
+    if f.ResizeGrip then f.ResizeGrip.Update() end
+    if demo then MS:ShowCompactPreviewBar() elseif f.PreviewBar then f.PreviewBar:Hide() end
     Draw(run, style)
 end
 function MS:RefreshCompact()
@@ -975,12 +1007,65 @@ end
 
 MS._CompactDemo = function() return demo end     -- for tests
 
+-- Under the preview: how to change it, and buttons to put its size back
+-- and to finish.
+local function SmallButton(parent, label)
+    local b = UI.Btn(parent)
+    UI.Box(b, true)
+    local t = Text(b, "medium", 12, P.ivory, "CENTER")
+    t:SetAllPoints(); t:SetText(label)
+    b:SetSize(math.ceil(t:GetStringWidth()) + 24, 22)
+    return b
+end
+
+function MS:ShowCompactPreviewBar()
+    if not f then return end
+    local bar = f.PreviewBar
+    if not bar then
+        bar = CreateFrame("Frame", nil, UIParent)
+        bar:SetFrameStrata("FULLSCREEN_DIALOG")
+        bar:SetSize(300, 64)
+        UI.Box(bar)
+        bar.hint = Text(bar, "regular", 12, P.ivory, "CENTER")
+        bar.hint:SetWordWrap(true)
+        bar.hint:SetPoint("TOPLEFT", 10, -8); bar.hint:SetPoint("TOPRIGHT", -10, -8)
+        bar.hint:SetText(L["Right-click the frame for another view. Drag it to move it, or its corner to resize it."])
+        local reset = SmallButton(bar, L["Reset size"])
+        local done = SmallButton(bar, L["Done"])
+        reset:SetPoint("BOTTOMRIGHT", bar, "BOTTOM", -4, 8)
+        done:SetPoint("BOTTOMLEFT", bar, "BOTTOM", 4, 8)
+        reset:SetScript("OnClick", function() MS:SetCompactScale(1) end)
+        done:SetScript("OnClick", function() if demo then MS:ToggleCompactPreview() end end)
+        bar.reset, bar.done = reset, done
+        f.PreviewBar = bar
+    end
+    bar:ClearAllPoints()
+    bar:SetPoint("TOP", f, "BOTTOM", 0, -6)
+    bar:Show()
+end
+
+-- The preview (the settings' button): the sample run, to move and resize
+-- the frame outside a run, in the detailed view until you pick another. On
+-- or off; returns whether it's on.
+function MS:ToggleCompactPreview()
+    if demo then
+        demo, previewStyle = nil, nil
+    else
+        local ok, r = pcall(DemoRun)
+        if not ok then MS:ReportError("In-run frame", r); return false end
+        demo, previewStyle = r, "detailed"
+    end
+    self:RefreshCompact()
+    return demo ~= nil
+end
+function MS:IsCompactPreviewOn() return demo ~= nil end
+
 -- /sb compact [demo | compact | detailed | minimal | off]
 function MS:CompactCommand(arg)
     arg = (arg or ""):lower()
     if arg == "demo" then
         if demo then
-            demo = nil
+            demo, previewStyle = nil, nil
         else
             local ok, r = pcall(DemoRun)
             if not ok then MS:ReportError("In-run frame", r); return end
@@ -998,7 +1083,7 @@ end
 
 MS:OnChanged(function() MS:RefreshCompact() end)
 MS:WatchRunState(function(state)
-    if state == "active" then demo = nil end      -- a real run takes the frame
+    if state == "active" then demo, previewStyle = nil, nil end      -- a real run takes the frame
     MS:RefreshCompact()
 end)
 MS:OnSettingChanged("compactStyle", function() MS:RefreshCompact() end)

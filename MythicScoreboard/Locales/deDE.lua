@@ -396,3 +396,18 @@ T["%s, who invited you, is on your blacklist"] = "%s, der dich eingeladen hat, s
 T["Right-click: blacklist"] = "Rechtsklick: Sperrliste"
 T["Warn about blacklisted players"] = "Vor Spielern auf der Sperrliste warnen"
 T["Someone else in this group"] = "Jemand anderes in dieser Gruppe"
+
+-- Settings: window and groups
+T["Directions"] = "Wegbeschreibung"
+T["Drag to resize"] = "Ziehen zum Ändern der Größe"
+T["During a run"] = "Während eines Laufs"
+T["Lock the window"] = "Fenster sperren"
+T["Stops the scoreboard being moved or resized, and hides its resize corner."] = "Verhindert, dass die Anzeigetafel verschoben oder in der Größe geändert wird, und blendet ihre Größenecke aus."
+T["Window"] = "Fenster"
+T["Window size"] = "Fenstergröße"
+T["Hide the preview"] = "Vorschau ausblenden"
+T["Preview the in-run frame"] = "Vorschau des Lauf-Fensters"
+T["Shows the in-run frame with a sample run, so you can drag it where you want it and resize it from its corner."] = "Zeigt das Lauf-Fenster mit einem Beispiellauf, damit du es verschieben und an seiner Ecke in der Größe ändern kannst."
+T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "Rechtsklicke auf das Fenster für eine andere Ansicht. Ziehe es, um es zu verschieben, oder an seiner Ecke, um die Größe zu ändern."
+T["Reset size"] = "Größe zurücksetzen"
+T["Done"] = "Fertig"
