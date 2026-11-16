@@ -10,7 +10,6 @@ local fails, passes = 0, 0
 local function check(name, cond, detail)
     if cond then passes = passes + 1 else fails = fails + 1; io.stdout:write("FAIL ", name, "  ", tostring(detail or ""), "\n") end
 end
-local forever = MS.FLAVOR == "forever"
 if not MS.Flavor.blacklist then
     -- Retail: no blacklist at all.
     check("retail: not loaded", MS.AddToBlacklist == nil and MS.ShowBlacklist == nil)
@@ -44,29 +43,17 @@ M.Fire("PLAYER_LOGIN")
 M.RunTimers(3)
 
 -- ── Names ──────────────────────────────────────────────────────────────────
-if forever then
-    local k1, d1 = MS.BlacklistKey("Akasha Dawnfire")
-    local k2 = MS.BlacklistKey("Akasha-Dawnfire")
-    local k3 = MS.BlacklistKey("Akasha", "Dawnfire")
-    check("Forever: one key for every form", k1 == "akasha-dawnfire" and k2 == k1 and k3 == k1, tostring(k1) .. " " .. tostring(k2) .. " " .. tostring(k3))
-    check("Forever: shown with a space", d1 == "Akasha Dawnfire", d1)
-else
-    local k1, d1 = MS.BlacklistKey("Akasha")
-    local k2 = MS.BlacklistKey("Akasha-Forever")
-    local k3 = MS.BlacklistKey("Akasha", "Forever")
-    check("retail: your realm when none is given", k1 == "akasha-forever" and k2 == k1 and k3 == k1, tostring(k1) .. " " .. tostring(k2))
-    check("retail: shown with the realm", d1 == "Akasha-Forever", d1)
-    local k4 = MS.BlacklistKey("Akasha-Area 52")
-    local k5 = MS.BlacklistKey("Akasha", "Area52")
-    check("retail: realm spaces don't matter", k4 == k5 and k4 == "akasha-area52", tostring(k4))
-    check("retail: another realm, another player", k4 ~= k1)
-end
+local k1, d1 = MS.BlacklistKey("Akasha Dawnfire")
+local k2 = MS.BlacklistKey("Akasha-Dawnfire")
+local k3 = MS.BlacklistKey("Akasha", "Dawnfire")
+check("Forever: one key for every form", k1 == "akasha-dawnfire" and k2 == k1 and k3 == k1, tostring(k1) .. " " .. tostring(k2) .. " " .. tostring(k3))
+check("Forever: shown with a space", d1 == "Akasha Dawnfire", d1)
 check("no name: no key", MS.BlacklistKey(nil) == nil and MS.BlacklistKey("") == nil)
 
 -- ── Adding, the note, removing ─────────────────────────────────────────────
 local changes = 0
 MS:OnBlacklistChanged(function() changes = changes + 1 end)
-local akasha = forever and "Akasha Dawnfire" or "Akasha"
+local akasha = "Akasha Dawnfire"
 M.printed = {}
 MS:AddToBlacklist(akasha, nil, "Left after the first wipe", "MAGE")
 local e = MS:BlacklistEntry(akasha)
@@ -88,7 +75,7 @@ local function said(text)
     for _, line in ipairs(M.printed) do if line:find(text, 1, true) then n = n + 1 end end
     return n
 end
-local shown = forever and "Akasha Dawnfire" or "Akasha-Forever"
+local shown = "Akasha Dawnfire"
 check("in your group: said in chat", said(shown .. " from your blacklist is in your group") == 1, table.concat(M.printed, " / "))
 check("in your group: the note too", said("Left after the first wipe") == 1)
 check("in your group: on screen", #warnings == 1 and warnings[1]:find(shown, 1, true))
@@ -109,9 +96,9 @@ M.roster.party1 = saved; M.groupSize = 5; M.Fire("GROUP_ROSTER_UPDATE")
 check("warning off: nothing", said("from your blacklist") == 2 and #warnings == 2)
 MS:SetBlacklistWarn(true)
 -- Added while they're already with you: said straight away.
-local girthy = forever and "Girthy Stone" or "Girthy"
+local girthy = "Girthy Stone"
 MS:AddToBlacklist(girthy, nil, "")
-check("added while in the group: said", said((forever and "Girthy Stone" or "Girthy-Forever") .. " from your blacklist") == 1)
+check("added while in the group: said", said(("Girthy Stone") .. " from your blacklist") == 1)
 
 -- A /reload (or a login) with them still in the group: not said again.
 local before = said("from your blacklist")
@@ -142,44 +129,13 @@ tooltipCall(tip)
 check("tooltip: nothing for others", #tipLines == 0)
 tip.AddLine, tip.GetUnit = realAdd, realGetUnit
 
--- ── The group finder: red names ────────────────────────────────────────────
+-- ── Looking For Group ──────────────────────────────────────────────────────
 local function FontString()
     return { SetTextColor = function(fs, r, g, b) fs.color = { r, g, b } end }
 end
-local results = { [7] = { leaderName = forever and "Akasha-Dawnfire" or "Akasha" }, [8] = { leaderName = "Skip" } }
-local applicants = { [21] = { forever and "Girthy-Stone" or "Girthy", "Skip" } }
-rawset(_G, "C_LFGList", {
-    GetSearchResultInfo = function(id) return results[id] end,
-    GetApplicantMemberInfo = function(id, i) return applicants[id] and applicants[id][i] end,
-})
-rawset(_G, "LFGListSearchEntry_Update", function(entry) entry.Name:SetTextColor(1, 1, 1) end)
-rawset(_G, "LFGListApplicationViewer_UpdateApplicantMember", function(member) member.Name:SetTextColor(0.5, 0.5, 1) end)
-M.Fire("ADDON_LOADED", "Blizzard_GroupFinder")
+local results = {}
+rawset(_G, "C_LFGList", { GetSearchResultInfo = function(id) return results[id] end })
 local function Bordered(frame) local b = frame._msBlacklistBorder; return b ~= nil and b[1]:IsShown() end
-local listing = CreateFrame("Button"); listing.resultID, listing.Name = 7, FontString()
-LFGListSearchEntry_Update(listing)
-check("listing by a blacklisted leader: red border", Bordered(listing))
-check("listing: the name as the game drew it", listing.Name.color[2] == 1)
-local other = CreateFrame("Button"); other.resultID, other.Name = 8, FontString()
-LFGListSearchEntry_Update(other)
-check("anyone else's listing: no border", not Bordered(other))
-local member = { Name = FontString() }
-LFGListApplicationViewer_UpdateApplicantMember(member, 21, 1)
-check("applicant on your blacklist: red", member.Name.color[1] == 1 and member.Name.color[2] < 0.2)
-local member2 = { Name = FontString() }
-LFGListApplicationViewer_UpdateApplicantMember(member2, 21, 2)
-check("other applicant: as the game drew it", member2.Name.color[1] == 0.5)
--- Hooked once, whatever loads after.
-M.Fire("ADDON_LOADED", "SomethingElse")
-local calls = 0
-local realRed = listing.Name.SetTextColor
-listing.Name.SetTextColor = function(...) calls = calls + 1; return realRed(...) end
-LFGListSearchEntry_Update(listing)
-check("hooked once", calls == 1, calls)
--- The same frame reused for another listing: the border goes.
-listing.resultID = 8
-LFGListSearchEntry_Update(listing)
-check("frame reused: border gone", not Bordered(listing))
 
 -- ── Forever's Looking For Group window ─────────────────────────────────────
 -- Listing 30: Kul Dotha leads, Akasha (on the list) is in it. Listing 31: no one listed.
@@ -207,6 +163,20 @@ local withListed, clean = Entry(30), Entry(31)
 LFGBrowseSearchEntry_Update(withListed); LFGBrowseSearchEntry_Update(clean)
 check("LFG window: someone listed in the group: red border", Bordered(withListed))
 check("LFG window: no one listed: no border", not Bordered(clean))
+check("LFG window: the name as the game drew it", withListed.Name.color[2] == 1)
+-- The same frame reused for another listing: the border goes.
+withListed.resultID = 31
+LFGBrowseSearchEntry_Update(withListed)
+check("frame reused: border gone", not Bordered(withListed))
+withListed.resultID = 30
+LFGBrowseSearchEntry_Update(withListed)
+-- Hooked once, whatever loads after.
+M.Fire("ADDON_LOADED", "SomethingElse")
+local calls = 0
+local realColor = clean.Name.SetTextColor
+clean.Name.SetTextColor = function(...) calls = calls + 1; return realColor(...) end
+LFGBrowseSearchEntry_Update(clean)
+check("hooked once", calls == 1, calls)
 -- The member tooltip: their name in red.
 local function Named(text) local fs = FontString(); fs.GetText = function() return text end; return fs end
 local memberFrames = { { Name = Named("Akasha Dawnfire") }, { Name = Named("Jake Hole") } }
@@ -279,10 +249,7 @@ root = Root()
 menus.MENU_UNIT_PARTY(nil, root, { unit = "party4pet" })
 check("menu: not a pet", #root.items == 0)
 root = Root()
-menus.MENU_LFG_FRAME_SEARCH_ENTRY(nil, root, { resultID = 7 })
-check("menu: a listing's leader", #root.items == 2)
-root = Root()
-menus.MENU_UNIT_FRIEND(nil, root, { name = "Skip", server = forever and nil or "Forever" })
+menus.MENU_UNIT_FRIEND(nil, root, { name = "Skip", server = nil })
 check("menu: a name from chat", #root.items == 1)
 
 -- Remove from the menu.
@@ -341,7 +308,6 @@ do
     C_LFGList.GetSearchResultInfo = function(...) looked = looked + 1; return realInfo(...) end
     local e = CreateFrame("Button"); e.Name = FontString(); e.resultID = 30
     LFGBrowseSearchEntry_Update(e)
-    LFGListSearchEntry_Update(e)
     check("empty list: listings not looked at", looked == 0, looked)
     check("empty list: no border", e._msBlacklistBorder == nil)
     C_LFGList.GetSearchResultInfo = realInfo

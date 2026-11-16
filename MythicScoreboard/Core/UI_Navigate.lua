@@ -21,7 +21,7 @@ local AT_YARDS = 15                          -- this close to a flight master or
 local REPLAN = 2                             -- seconds between working out the route again
 local REFRESH = 0.1                          -- seconds between looking where you are (the turn: every frame)
 
-local frame, target, plan, planAt, inAir
+local frame, target, plan, planAt, inAir, airFor
 local P = UI and UI.P
 
 -- ── The steps ──────────────────────────────────────────────────────────────
@@ -255,17 +255,25 @@ function MS:UpdateArrow()
     if not (frame and target) then return end
     local OnTaxi = rawget(_G, "UnitOnTaxi")
     if OnTaxi and OnTaxi("player") then                  -- in the air: where you'll land, how far, how long
-        local leg = plan and plan[1]
-        local dest = leg and leg.how == "fly" and leg.to
-        if dest then
-            Flying(dest)
-        else
-            -- No flight in the route (a /reload in the air): the one taken,
-            -- kept, then the rest of the way from where it lands.
-            dest = Flying()
-            if dest and target.spot then
-                plan = { { how = "fly", to = dest },
-                         { how = "run", to = { kind = "end", c = target.spot.c, x = target.spot.x, y = target.spot.y, name = target.name } } }
+        -- Where this flight lands: the one taken (any flight: kept as it's
+        -- taken, and over a /reload), or the route's.
+        local dest = Flying()
+        if not dest then
+            local leg = plan and plan[1]
+            dest = leg and leg.how == "fly" and leg.to or nil
+            if dest then Flying(dest) end
+        end
+        -- The rest of the way from there, worked out once for this flight.
+        if dest and target.spot then
+            local key = _fmt("%s:%s:%.4f:%.4f", dest.name or "", tostring(dest.c), dest.x, dest.y)
+            if airFor ~= key then
+                airFor = key
+                local landing = { c = dest.c, x = dest.x, y = dest.y }
+                plan = { { how = "fly", to = dest } }
+                for _, leg in ipairs(Steps(MS:PlanRoute(landing, target.spot), landing)) do plan[#plan + 1] = leg end
+                if #plan == 1 then
+                    plan[2] = { how = "run", to = { kind = "end", c = target.spot.c, x = target.spot.x, y = target.spot.y, name = target.name } }
+                end
                 RouteChanged()
             end
         end
@@ -273,7 +281,15 @@ function MS:UpdateArrow()
         local here = x and { c = c, x = x, y = y }
         -- Not known where it lands: the arrow to the dungeon itself.
         local spot = dest or target.spot
-        SetText(frame.step, "lastStep", dest and _fmt(L["Flying to %s"], dest.name) or "")
+        local text = ""
+        if dest then
+            text = _fmt(L["Land at %s"], dest.name)
+            if plan and #plan > 1 then
+                text = _fmt(L["Step %d of %d"], 1, #plan) .. ": " .. text
+                    .. "\n|cffbbbbbb" .. _fmt(L["Then: %s"], (StepText(plan[2]))) .. "|r"
+            end
+        end
+        SetText(frame.step, "lastStep", text)
         local turn, yards, bearing
         if here and spot and here.c == spot.c then turn, yards, bearing = MS:TurnTo(here, spot) end
         if turn then Point(turn, bearing) else NoPoint() end
@@ -283,7 +299,7 @@ function MS:UpdateArrow()
     end
     -- Landed: the flight's done. (Not before seeing it: at a login in the air
     -- the game may not say so straight away.)
-    if inAir then inAir = false; Flying(false) end
+    if inAir then inAir, airFor, planAt = false, nil, nil; Flying(false) end
     local c, x, y = MS:PlayerSpot()
     local here = x and { c = c, x = x, y = y }
     local goal = target.spot
@@ -329,7 +345,7 @@ function MS:NavigateTo(t)
     target = { name = t.name, map = t.map, x = t.x, y = t.y }
     local c, x, y = MS:OnContinent(t.map, t.x, t.y)
     target.spot = c and { c = c, x = x, y = y, name = t.name } or nil
-    plan, planAt = nil, nil
+    plan, planAt, airFor = nil, nil, nil
     SaveTarget()
     Build()
     frame.lastStep, frame.lastDist = nil, nil
@@ -340,9 +356,8 @@ function MS:NavigateTo(t)
 end
 
 function MS:StopNavigation()
-    target, plan, planAt = nil, nil, nil
+    target, plan, planAt, airFor = nil, nil, nil, nil
     SaveTarget()
-    Flying(false)
     if frame then frame:Hide() end
     RouteChanged()
 end
@@ -419,6 +434,24 @@ MS:On("TAXIMAP_OPENED", function()
     if MS.RefreshRouteMap then MS:RefreshRouteMap() end
 end)
 MS:On("TAXIMAP_CLOSED", function() planAt = nil end)
+
+-- Landed (with the directions shown or not): that flight's over.
+MS:On("PLAYER_CONTROL_GAINED", function()
+    local OnTaxi = rawget(_G, "UnitOnTaxi")
+    if not (OnTaxi and OnTaxi("player")) then Flying(false); airFor = nil end
+end)
+
+-- Any flight taken (the addon's or your own choice): where it lands, kept,
+-- so the steps carry on from there.
+if MS.FLAVOR == "forever" and type(rawget(_G, "TakeTaxiNode")) == "function" then
+    hooksecurefunc("TakeTaxiNode", function(slot)
+        local ok, spot = pcall(MS.TaxiNodeSpot, MS, slot)
+        if ok and spot then
+            Flying(spot)
+            airFor = nil
+        end
+    end)
+end
 
 -- Talking to a flight master with a flight next on the way: straight past
 -- the chat to the flight map, which then takes the flight (above). The

@@ -671,9 +671,6 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         MS:KillDebug()
     elseif cmd == "wingdebug" and MS.WingDebug then
         MS:WingDebug(true)
-    elseif cmd == "menudebug" and MS.ShowBlacklist then
-        MS._menuDebug = not MS._menuDebug
-        MS.Say("menudebug " .. (MS._menuDebug and "on" or "off"))
     elseif (cmd == "blacklist" or cmd == "bl") and MS.ShowBlacklist then
         MS:ShowBlacklist()
     elseif cmd == "dumptravel" and MS.DumpTravel then

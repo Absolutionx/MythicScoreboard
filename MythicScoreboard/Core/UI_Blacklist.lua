@@ -191,9 +191,12 @@ local function Build()
     local add = TextButton(frame, L["Add a player"])
     add:SetPoint("BOTTOMLEFT", PAD, 14)
     add:SetScript("OnClick", function() MS:AskBlacklistName() end)
-    local hint = Text(frame, "regular", 11, P.ash, "RIGHT")
-    hint:SetPoint("BOTTOMRIGHT", -PAD - 2, 20)
-    hint:SetPoint("LEFT", add, "RIGHT", 10, 0)
+    -- Beside the button, on up to two lines.
+    local hint = Text(frame, "regular", 11, P.ash, "LEFT")
+    hint:SetWordWrap(true)
+    if hint.SetMaxLines then hint:SetMaxLines(2) end
+    hint:SetPoint("LEFT", add, "RIGHT", 12, 0)
+    hint:SetWidth(W - 2 * PAD - add:GetWidth() - 12)
     hint:SetText(L["Groups with them get a red border in Looking For Group."])
 
     frame:SetScript("OnShow", UI.RefreshBlacklist)
