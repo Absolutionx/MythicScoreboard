@@ -411,3 +411,4 @@ T["Shows the in-run frame with a sample run, so you can drag it where you want i
 T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "Rechtsklicke auf das Fenster für eine andere Ansicht. Ziehe es, um es zu verschieben, oder an seiner Ecke, um die Größe zu ändern."
 T["Reset size"] = "Größe zurücksetzen"
 T["Done"] = "Fertig"
+T["Right-click to reset the size."] = "Rechtsklick setzt die Größe zurück."

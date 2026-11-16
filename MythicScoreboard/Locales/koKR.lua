@@ -411,3 +411,4 @@ T["Shows the in-run frame with a sample run, so you can drag it where you want i
 T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "창을 오른쪽 클릭하면 다른 보기로 바뀝니다. 끌어서 옮기거나 모서리를 끌어 크기를 바꾸세요."
 T["Reset size"] = "크기 초기화"
 T["Done"] = "완료"
+T["Right-click to reset the size."] = "오른쪽 클릭하면 크기가 초기화됩니다."

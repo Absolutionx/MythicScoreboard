@@ -104,6 +104,7 @@ function UI.MakeResizeGrip(f, o)
     lit:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     local dragging
     grip:SetScript("OnMouseDown", function(self, button)
+        if button == "RightButton" and o.shown() then o.set(1); return end      -- back to its usual size
         if button ~= "LeftButton" or not o.shown() then return end
         dragging = true
         art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
@@ -128,6 +129,7 @@ function UI.MakeResizeGrip(f, o)
     grip:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L["Drag to resize"])
+        GameTooltip:AddLine(L["Right-click to reset the size."], 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end)
     grip:SetScript("OnLeave", GameTooltip_Hide)
