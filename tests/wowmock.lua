@@ -18,7 +18,7 @@ local NOOP_METHODS = {
     AddDoubleLine=1, AddLine=1, AddMaskTexture=1, EnableMouse=1, EnableMouseWheel=1, Play=1,
     Raise=1, RegisterForClicks=1, RegisterForDrag=1, SetAllPoints=1, SetAlpha=1, SetBackdrop=1,
     SetBlendMode=1, SetClampedToScreen=1, SetColorTexture=1, SetDesaturated=1, SetDuration=1,
-    SetFormattedText=1, SetFrameLevel=1, SetFrameStrata=1, SetFromAlpha=1, SetGradient=1,
+    SetFormattedText=1, SetFrameLevel=1, SetFromAlpha=1, SetGradient=1,
     SetHighlightTexture=1, SetHyperlink=1, SetJustifyH=1, SetJustifyV=1, SetLooping=1, SetMaxLines=1,
     SetMovable=1, SetObeyStepOnDrag=1, SetOrientation=1, SetRotation=1, SetScrollChild=1,
     SetShadowColor=1, SetShadowOffset=1, SetSmoothing=1, SetSnapToPixelGrid=1, SetTexCoord=1,
@@ -94,6 +94,8 @@ function Widget:GetCenter() return 0, 0 end
 function Widget:GetEffectiveScale() return 1 end
 function Widget:GetScale() return self._scale or 1 end
 function Widget:SetScale(s) self._scale = s end
+function Widget:SetFrameStrata(st) self._strata = st end
+function Widget:GetFrameStrata() return self._strata or "MEDIUM" end
 function Widget:GetObjectType() return self._kind end
 function Widget:GetName() return nil end
 function Widget:GetNumPoints() return self._points end

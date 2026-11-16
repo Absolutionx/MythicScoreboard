@@ -53,6 +53,45 @@ check("dragged: kept", type(pos) == "table" and pos[1] == "TOPLEFT" and pos[2] =
     pos and table.concat(pos, " "))
 check("dragged: the account's", acc.settings.windowPos == pos)
 
+-- ── Locked: it stays put, and can't be resized ─────────────────────────────
+local moved = 0
+win.StartMoving = function() moved = moved + 1 end
+win:GetScript("OnDragStart")(win)
+check("unlocked: it moves", moved == 1, moved)
+local grip = win.ResizeGrip
+check("unlocked: the resize corner", grip and grip:IsShown())
+MS:SetWindowLocked(true)
+win:GetScript("OnDragStart")(win)
+check("locked: it doesn't move", moved == 1, moved)
+check("locked: no resize corner", not grip:IsShown())
+check("locked: the account's", acc.settings.windowLocked == true)
+MS:SetWindowLocked(false)
+check("unlocked again: the corner's back", grip:IsShown())
+
+-- ── Its size ───────────────────────────────────────────────────────────────
+check("size: 100% to start", MS:GetWindowScale() == 1 and win:GetScale() == 1)
+MS:SetWindowScale(0.8)
+check("size: set, applied", math.abs(win:GetScale() - 0.8) < 1e-6, win:GetScale())
+MS:SetWindowScale(3); check("size: no more than 140%", MS:GetWindowScale() == 1.4)
+MS:SetWindowScale(0.1); check("size: no less than 60%", MS:GetWindowScale() == 0.6)
+MS:SetWindowScale(1)
+-- Dragging the corner: the size that puts it under the cursor, kept on letting go.
+M.cursor = { win:GetWidth() * 1.2, 0 }
+grip:GetScript("OnMouseDown")(grip, "LeftButton")
+grip:GetScript("OnUpdate")(grip, 0.01)
+check("corner dragged: bigger", math.abs(win:GetScale() - 1.2) < 0.01, win:GetScale())
+grip:GetScript("OnMouseUp")(grip)
+check("corner let go: kept", math.abs(MS:GetWindowScale() - 1.2) < 0.01, MS:GetWindowScale())
+-- Locked: the corner does nothing.
+MS:SetWindowLocked(true)
+M.cursor = { win:GetWidth() * 0.7, 0 }
+grip:GetScript("OnMouseDown")(grip, "LeftButton")
+check("locked: the corner does nothing", grip:GetScript("OnUpdate") == nil)
+MS:SetWindowLocked(false)
+MS:SetWindowScale(1)
+-- A new session: the size first, then the place.
+check("size: the account's", acc.settings.windowScale == 1)
+
 for _, line in ipairs(M.printed or {}) do if line:find("error") then check("no errors", false, line) end end
 io.stdout:write(("account_settings_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

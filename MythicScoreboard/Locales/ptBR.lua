@@ -396,3 +396,18 @@ T["%s, who invited you, is on your blacklist"] = "%s, que convidou você, está 
 T["Right-click: blacklist"] = "Botão direito: lista negra"
 T["Warn about blacklisted players"] = "Avisar sobre jogadores da lista negra"
 T["Someone else in this group"] = "Outra pessoa deste grupo"
+
+-- Settings: window and groups
+T["Directions"] = "Rotas"
+T["Drag to resize"] = "Arraste para redimensionar"
+T["During a run"] = "Durante uma corrida"
+T["Lock the window"] = "Travar a janela"
+T["Stops the scoreboard being moved or resized, and hides its resize corner."] = "Impede que o placar seja movido ou redimensionado e oculta seu canto de redimensionar."
+T["Window"] = "Janela"
+T["Window size"] = "Tamanho da janela"
+T["Hide the preview"] = "Ocultar a prévia"
+T["Preview the in-run frame"] = "Prévia do quadro da corrida"
+T["Shows the in-run frame with a sample run, so you can drag it where you want it and resize it from its corner."] = "Mostra o quadro da corrida com uma corrida de exemplo, para você arrastá-lo para onde quiser e redimensioná-lo pelo canto."
+T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "Clique com o botão direito no quadro para outra visualização. Arraste-o para mover, ou o canto para redimensionar."
+T["Reset size"] = "Redefinir tamanho"
+T["Done"] = "Pronto"

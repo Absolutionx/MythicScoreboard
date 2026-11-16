@@ -1,16 +1,20 @@
 # Changelog
 
-## 2.13.1
+## 2.14.0
+
+### Everyone
+- **Resize the scoreboard:** drag its bottom-right corner, from 60% to 140%. Everything grows and shrinks together, and the size is kept.
+- **Lock the window** in settings stops the scoreboard being moved or resized.
+- **Settings rearranged** into two columns of groups: Window, During a run, Run history, and (on WoW Forever) when a run counts as cleared, Directions and Blacklist. Window size has its own − / + too.
+- **Preview the in-run frame** from settings: it shows with a sample run in the detailed view, in front of everything, so you can place it outside a run. Drag it to move it, drag its corner to resize it (60% to 160%), right-click for another view. **Reset size** and **Done** sit under it.
+- **The in-run frame's bottom row** sizes each column to fit, so "Gold looted" is no longer cut off and the spacing is even.
 
 ### WoW Forever
 - **Directions in the air:** click a dungeon marker while you're on a flight and the steps start from where you'll land ("Land at Crossroads", then what comes next), with the arrow and the line on the map. Works for any flight you take, not just the ones the directions picked.
 - **Blacklist: a warning when someone on it invites you,** with your note shown under the invite box before you accept.
 - The warning about a blacklisted player in your group no longer repeats after a `/reload` or relog while they're still with you.
-- The blacklist is now opened from the skull button in the header (the settings row is gone); the warning toggle stays in settings.
+- The blacklist is now opened from the skull button in the header; its warning toggle is under Blacklist in settings.
 - The hint at the bottom of the blacklist window now fits.
-
-### Everyone
-- **The in-run frame's bottom row** sizes each column to fit, so "Gold looted" is no longer cut off and the spacing is even.
 
 ## 2.13.0
 

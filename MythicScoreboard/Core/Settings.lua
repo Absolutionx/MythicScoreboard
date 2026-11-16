@@ -22,6 +22,9 @@ local DEFAULTS = {
     minimapButton           = true,
     startOnPull             = true,        -- dungeon runs: the clock starts at the first pull, not at the door
     autoTakeFlights         = false,       -- WoW Forever: take the flight the directions say to
+    windowLocked            = false,       -- the scoreboard can't be dragged or resized
+    windowScale             = 1,           -- the scoreboard's size (0.6 to 1.4)
+    compactScale            = 1,           -- the in-run frame's size (0.6 to 1.6)
     blacklistWarn           = true,        -- WoW Forever: a warning when someone on your blacklist is in your group
     compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
     -- compactPos: no default (the frame starts near the top right)
@@ -111,6 +114,31 @@ MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
 MS.GetAutoTakeFlights,      MS.SetAutoTakeFlights      = Bool("autoTakeFlights")
 MS.GetStartOnPull,          MS.SetStartOnPull          = Bool("startOnPull")
 MS.GetBlacklistWarn,        MS.SetBlacklistWarn        = Bool("blacklistWarn")
+-- (Off unless turned on.)
+function MS:GetWindowLocked() return self:GetSetting("windowLocked") == true end
+function MS:SetWindowLocked(v) self:SetSetting("windowLocked", v and true or false) end
+
+-- The scoreboard's size: 60% to 140%, kept to whole percents.
+MS.WINDOW_SCALE_MIN, MS.WINDOW_SCALE_MAX = 0.6, 1.4
+function MS:GetWindowScale()
+    local s = tonumber(self:GetSetting("windowScale")) or 1
+    return _max(MS.WINDOW_SCALE_MIN, _min(MS.WINDOW_SCALE_MAX, s))
+end
+function MS:SetWindowScale(s)
+    s = _floor((tonumber(s) or 1) * 100 + 0.5) / 100
+    self:SetSetting("windowScale", _max(MS.WINDOW_SCALE_MIN, _min(MS.WINDOW_SCALE_MAX, s)))
+end
+
+-- The in-run frame's size: 60% to 160%.
+MS.COMPACT_SCALE_MIN, MS.COMPACT_SCALE_MAX = 0.6, 1.6
+function MS:GetCompactScale()
+    local s = tonumber(self:GetSetting("compactScale")) or 1
+    return _max(MS.COMPACT_SCALE_MIN, _min(MS.COMPACT_SCALE_MAX, s))
+end
+function MS:SetCompactScale(s)
+    s = _floor((tonumber(s) or 1) * 100 + 0.5) / 100
+    self:SetSetting("compactScale", _max(MS.COMPACT_SCALE_MIN, _min(MS.COMPACT_SCALE_MAX, s)))
+end
 
 -- The in-run frame's style (UI_Compact.lua); "off" hides it.
 MS.COMPACT_STYLES = { "compact", "detailed", "minimal" }

@@ -184,6 +184,51 @@ local n = 0
 for _ in pairs(seen) do n = n + 1 end
 check("random: more than one dungeon", n > 1, n)
 
+-- ── The preview (settings' button): move and resize outside a run ─────────
+if MS._CompactDemo() then MS:ToggleCompactPreview() end
+check("preview: off to start", not MS:IsCompactPreviewOn())
+MS.inDungeon, MS.currentRun = false, nil; MS:RefreshCompact()
+MS:SetCompactStyle("off")
+check("preview: on", MS:ToggleCompactPreview() == true and frame()._shown)
+check("preview: shown even with the frame turned off", frame()._shown)
+check("preview: in front of the scoreboard and settings", frame():GetFrameStrata() == "FULLSCREEN_DIALOG")
+local grip = frame().ResizeGrip
+check("preview: the resize corner", grip and grip:IsShown())
+M.cursor = { frame():GetWidth() * 1.3, 0 }
+grip:GetScript("OnMouseDown")(grip, "LeftButton")
+grip:GetScript("OnUpdate")(grip, 0.01)
+grip:GetScript("OnMouseUp")(grip)
+check("preview: resized and kept", math.abs(MS:GetCompactScale() - 1.3) < 0.01 and math.abs(frame():GetScale() - 1.3) < 0.01,
+    MS:GetCompactScale())
+check("preview: off again", MS:ToggleCompactPreview() == false and not frame()._shown)
+MS:SetCompactScale(5); check("size: no more than 160%", MS:GetCompactScale() == 1.6)
+MS:SetCompactScale(1)
+-- Opens in the detailed view, whatever's picked; a right-click picks another.
+MS:SetCompactStyle("minimal")
+MS:ToggleCompactPreview()
+check("preview: the detailed view", frame()._h > 28, frame()._h)
+local bar = frame().PreviewBar
+check("preview: the tips under it", bar and bar:IsShown() and bar.hint:GetText():find("Right%-click") ~= nil)
+frame():GetScript("OnClick")(frame(), "RightButton"); M.RunTimers(1)
+check("preview: right-click picks the next view", MS:GetCompactStyle() == "minimal", MS:GetCompactStyle())
+-- (Detailed's next is minimal: the view picked, kept.)
+frame():GetScript("OnClick")(frame(), "RightButton"); M.RunTimers(1)
+check("preview: and on round", MS:GetCompactStyle() == "compact", MS:GetCompactStyle())
+-- Reset size; Done.
+MS:SetCompactScale(1.4)
+bar.reset:GetScript("OnClick")(bar.reset)
+check("reset size: back to 100%", MS:GetCompactScale() == 1 and math.abs(frame():GetScale() - 1) < 1e-6)
+bar.done:GetScript("OnClick")(bar.done)
+check("done: the preview's gone", not MS:IsCompactPreviewOn() and not frame()._shown and not bar:IsShown())
+
+-- In a run: no resize corner in the way.
+MS:SetCompactStyle("compact")
+MS:ToggleCompactPreview(); MS:ToggleCompactPreview()
+check("outside the preview: no corner", not grip:IsShown())
+MS.inDungeon, MS.currentRun = true, MS.NewRunData(); MS:RefreshCompact()
+check("in a run: back where it sits", frame():GetFrameStrata() == "MEDIUM", frame():GetFrameStrata())
+MS.inDungeon, MS.currentRun = false, nil; MS:RefreshCompact()
+
 for _, p in ipairs(M.printed) do if p:find("error") then check("no errors", false, p) end end
 
 io.stdout:write(("compact_tests: %d passed, %d failed\n"):format(passes, fails))

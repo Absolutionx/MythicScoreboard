@@ -396,3 +396,18 @@ T["%s, who invited you, is on your blacklist"] = "당신을 초대한 %s 님은 
 T["Right-click: blacklist"] = "오른쪽 클릭: 차단 목록"
 T["Warn about blacklisted players"] = "차단 목록 플레이어 경고"
 T["Someone else in this group"] = "이 파티의 다른 사람"
+
+-- Settings: window and groups
+T["Directions"] = "길 안내"
+T["Drag to resize"] = "끌어서 크기 조절"
+T["During a run"] = "던전 진행 중"
+T["Lock the window"] = "창 잠금"
+T["Stops the scoreboard being moved or resized, and hides its resize corner."] = "점수판을 옮기거나 크기를 바꿀 수 없게 하고 크기 조절 모서리를 숨깁니다."
+T["Window"] = "창"
+T["Window size"] = "창 크기"
+T["Hide the preview"] = "미리보기 숨기기"
+T["Preview the in-run frame"] = "진행 창 미리보기"
+T["Shows the in-run frame with a sample run, so you can drag it where you want it and resize it from its corner."] = "예시 진행으로 진행 창을 보여 주어, 원하는 곳으로 끌어 옮기고 모서리로 크기를 바꿀 수 있게 합니다."
+T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "창을 오른쪽 클릭하면 다른 보기로 바뀝니다. 끌어서 옮기거나 모서리를 끌어 크기를 바꾸세요."
+T["Reset size"] = "크기 초기화"
+T["Done"] = "완료"

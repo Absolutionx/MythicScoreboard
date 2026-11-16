@@ -396,3 +396,18 @@ T["%s, who invited you, is on your blacklist"] = "邀請你的 %s 在你的黑�
 T["Right-click: blacklist"] = "右鍵：黑名單"
 T["Warn about blacklisted players"] = "黑名單玩家警告"
 T["Someone else in this group"] = "該隊伍中的其他人"
+
+-- Settings: window and groups
+T["Directions"] = "路線指引"
+T["Drag to resize"] = "拖曳以調整大小"
+T["During a run"] = "副本進行中"
+T["Lock the window"] = "鎖定視窗"
+T["Stops the scoreboard being moved or resized, and hides its resize corner."] = "禁止移動或調整計分板大小，並隱藏調整大小的角。"
+T["Window"] = "視窗"
+T["Window size"] = "視窗大小"
+T["Hide the preview"] = "隱藏預覽"
+T["Preview the in-run frame"] = "預覽副本內框架"
+T["Shows the in-run frame with a sample run, so you can drag it where you want it and resize it from its corner."] = "以示例副本顯示副本內框架，方便拖到想要的位置並從角落調整大小。"
+T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "右鍵點擊框架切換檢視。拖曳以移動，拖曳角落以調整大小。"
+T["Reset size"] = "重設大小"
+T["Done"] = "完成"
