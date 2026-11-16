@@ -142,12 +142,12 @@ local function HistoryLimitRow(settPop, yOff)
         function(d) MS:SetHistoryLimit(MS:GetHistoryLimit() + d) end)
 end
 
--- The window's size, 10% a click.
+-- The window's size, 5% a click (from the nearest 5%).
 local function ScaleRow(settPop, yOff)
     return StepperRow(settPop, yOff, L["Window size"],
         function() return math.floor(MS:GetWindowScale() * 100 + 0.5) .. "%" end,
         function(d)
-            local s = math.floor(MS:GetWindowScale() * 10 + 0.5) / 10 + d * 0.1
+            local s = math.floor(MS:GetWindowScale() * 20 + 0.5) / 20 + d * 0.05
             MS:SetWindowScale(s)
         end)
 end
