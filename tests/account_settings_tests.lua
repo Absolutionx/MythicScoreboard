@@ -100,6 +100,14 @@ local reset = pop and pop.ResetScaleBtn
 check("settings: a Reset size button", reset ~= nil)
 if reset then reset:GetScript("OnClick")(reset) end
 check("settings: Reset size: 100%", MS:GetWindowScale() == 1)
+-- Window size: 5% a click.
+MS:SetWindowScale(1)
+local plusStep = (function()
+    MS:SetWindowScale(math.floor(MS:GetWindowScale() * 20 + 0.5) / 20 + 0.05)
+    return MS:GetWindowScale()
+end)()
+check("window size: 5% a click", math.abs(plusStep - 1.05) < 1e-6, plusStep)
+MS:SetWindowScale(1)
 -- A new session: the size first, then the place.
 check("size: the account's", acc.settings.windowScale == 1)
 

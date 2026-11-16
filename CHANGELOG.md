@@ -5,7 +5,7 @@
 ### Everyone
 - **Resize the scoreboard:** drag its bottom-right corner, from 60% to 140%. Everything grows and shrinks together, and the size is kept. **Reset size** in settings (or right-clicking the corner) puts it back.
 - **Lock the window** in settings stops the scoreboard being moved or resized.
-- **Settings rearranged** into two columns of groups: Window, During a run, Run history, and (on WoW Forever) when a run counts as cleared, Directions and Blacklist. Window size has its own − / + too.
+- **Settings rearranged** into two columns of groups: Window, During a run, Run history, and (on WoW Forever) when a run counts as cleared, Directions and Blacklist. Window size has its own − / + too, 5% a click.
 - **Preview the in-run frame** from settings: it shows with a sample run in the detailed view, in front of everything, so you can place it outside a run. Drag it to move it, drag its corner to resize it (60% to 160%), right-click for another view. **Reset size** and **Done** sit under it (right-clicking its corner resets the size too).
 - **The in-run frame's bottom row** sizes each column to fit, so "Gold looted" is no longer cut off and the spacing is even.
 
