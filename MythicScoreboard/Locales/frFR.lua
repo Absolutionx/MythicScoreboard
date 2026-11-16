@@ -411,3 +411,4 @@ T["Shows the in-run frame with a sample run, so you can drag it where you want i
 T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "Clic droit sur le cadre pour une autre vue. Faites-le glisser pour le déplacer, ou son coin pour le redimensionner."
 T["Reset size"] = "Taille par défaut"
 T["Done"] = "Terminé"
+T["Right-click to reset the size."] = "Clic droit pour rétablir la taille."

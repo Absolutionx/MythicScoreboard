@@ -70,6 +70,7 @@ local GROUPS = {
         T(LK("Lock the window"), "WindowLocked",
           LK("Stops the scoreboard being moved or resized, and hides its resize corner.")),
         { kind = "scale" },
+        { kind = "resetScale" },
         T(LK("Open after a run"), "AutoOpenOnComplete", LK("Opens the scoreboard when you finish a dungeon.")),
         T(LK("Minimap button"), "MinimapButton",
           LK("Left-click opens the scoreboard, right-click your stats. Drag it to move it around the minimap.")),
@@ -174,6 +175,19 @@ local function PreviewRow(settPop, yOff)
     return Refresh
 end
 
+-- Puts the scoreboard back to its usual size.
+local function ResetScaleRow(settPop, yOff)
+    local b = Btn(settPop)
+    b:SetSize(COL_W - 24, 22)
+    b:SetPoint("TOPLEFT", settPop, "TOPLEFT", (settPop.colX or 0) + 12, yOff - 2)
+    Box(b, true)
+    local t = Text(b, "medium", 13, P.ivory, "CENTER")
+    t:SetAllPoints(); t:SetText(L["Reset size"])
+    b:SetScript("OnClick", function() MS:SetWindowScale(1); settPop.Refresh() end)
+    settPop.ResetScaleBtn = b
+    return function() end
+end
+
 -- A group's heading, in its column; returns where its first row goes.
 local function Heading(settPop, yOff, title)
     local hdr = Text(settPop, "medium", 12, P.bronzeHi)
@@ -266,6 +280,8 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
                     yOff = yOff - SROW
                 elseif r.kind == "preview" then
                     _ins(refreshers, PreviewRow(settPop, yOff)); yOff = yOff - SROW - 4
+                elseif r.kind == "resetScale" then
+                    _ins(refreshers, ResetScaleRow(settPop, yOff)); yOff = yOff - SROW - 4
                 elseif r.kind == "scale" then
                     _ins(refreshers, ScaleRow(settPop, yOff)); yOff = yOff - SROW
                 elseif r.kind == "limit" then

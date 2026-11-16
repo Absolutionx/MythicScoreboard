@@ -411,3 +411,4 @@ T["Shows the in-run frame with a sample run, so you can drag it where you want i
 T["Right-click the frame for another view. Drag it to move it, or its corner to resize it."] = "右键点击框体切换视图。拖动以移动，拖动角落以调整大小。"
 T["Reset size"] = "重置大小"
 T["Done"] = "完成"
+T["Right-click to reset the size."] = "右键点击重置大小。"

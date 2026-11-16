@@ -89,6 +89,17 @@ grip:GetScript("OnMouseDown")(grip, "LeftButton")
 check("locked: the corner does nothing", grip:GetScript("OnUpdate") == nil)
 MS:SetWindowLocked(false)
 MS:SetWindowScale(1)
+-- Right-click the corner: back to 100%.
+MS:SetWindowScale(1.3)
+grip:GetScript("OnMouseDown")(grip, "RightButton")
+check("right-click the corner: 100% again", MS:GetWindowScale() == 1 and math.abs(win:GetScale() - 1) < 1e-6)
+-- Settings' Reset size button.
+MS:SetWindowScale(0.7)
+local pop = win.SettingsPopup
+local reset = pop and pop.ResetScaleBtn
+check("settings: a Reset size button", reset ~= nil)
+if reset then reset:GetScript("OnClick")(reset) end
+check("settings: Reset size: 100%", MS:GetWindowScale() == 1)
 -- A new session: the size first, then the place.
 check("size: the account's", acc.settings.windowScale == 1)
 
