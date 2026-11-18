@@ -227,6 +227,30 @@ function MS:TaxiNodeSpot(slot)
 end
 
 -- Flight masters on a continent for your side: { name, x, y, known }.
+-- Every flight master on a continent as the game lists them, for your side
+-- (and both sides' shared ones): { name, x, y, known (assumed) }. Or nil
+-- when the game won't say.
+local FACTION = { Horde = 1, Alliance = 2 }
+function MS:GameFlightMasters(continent, side)
+    local T = rawget(_G, "C_TaxiMap")
+    if not (T and T.GetTaxiNodesForMap and continent) then return nil end
+    local ok, nodes = pcall(T.GetTaxiNodesForMap, continent)
+    if not (ok and type(nodes) == "table" and nodes[1]) then return nil end
+    local mine = FACTION[side or ""]
+    local out = {}
+    for _, n in ipairs(nodes) do
+        local name = MS.Readable(n.name)
+        local faction = MS.ReadableNumber(n.faction) or 0
+        local x, y
+        if n.position and n.position.GetXY then x, y = n.position:GetXY() end
+        x, y = MS.ReadableNumber(x), MS.ReadableNumber(y)
+        if name and x and y and not name:find("^zz") and (faction == 0 or not mine or faction == mine) then
+            _ins(out, { name = name:match("^([^,]+)") or name, x = x, y = y, known = true, assumed = true })
+        end
+    end
+    return out[1] and out or nil
+end
+
 function MS:FlightMasters(continent)
     local learned = Learned()[continent]
     if learned then
@@ -238,6 +262,9 @@ function MS:FlightMasters(continent)
     end
     local side = MS:Side()
     local out = {}
+    -- The game's own list (any time, anywhere): exact, and this side's only.
+    local live = MS:GameFlightMasters(continent, side)
+    if live then return live end
     -- Another character on this side opened this continent's flight map:
     -- where they really stand, taken as known.
     local acc = MS.AccountDB()

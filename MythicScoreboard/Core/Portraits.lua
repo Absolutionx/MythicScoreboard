@@ -4,16 +4,14 @@
 -- medallion shows. In order:
 --   1. the journal's creature icon (retail: saved per encounter)
 --   2. a model ID learned from the journal or in play (below)
---   3. Forever's bundled table (Data/BossPortraits.lua, via Forever.lua)
 -- and nil when there's nothing: the medallion shows a crest.
 --
--- Main source: the game's Encounter Journal, read on entering an instance.
--- WoW Forever has no journal for its dungeons and uses the bundled table in
--- Data/BossPortraits.lua instead (see MS:ForeverBossArt in Core/Forever.lua).
---
--- As a last resort the game is asked for a boss's model ID whenever the addon
--- gets a look at it: encounter start, target, mouseover, nameplate, corpse.
--- Midnight usually hides this; when it does, nothing is recorded.
+-- Retail: the game's Encounter Journal, read on entering an instance.
+-- WoW Forever has no journal for its dungeons: each boss's model is learned
+-- the first time the addon gets a look at it (encounter start, target,
+-- mouseover, nameplate). The game hides a unit's model, but not which
+-- creature it is, and it will say what any creature looks like: so the
+-- creature's number is read off the unit, and its model asked for.
 --
 -- IDs are saved account-wide and medallions draw a portrait the game renders
 -- from its own model. No artwork ships with the addon.
@@ -113,21 +111,77 @@ end
 -- ── Learning from live units ───────────────────────────────────────────────
 -- Hidden model used only to ask the game for a unit's model ID.
 local probe
-local function DisplayIDForUnit(unit)
-    if not UnitExists(unit) then return nil end
+local function Probe()
     if not probe then
         probe = CreateFrame("PlayerModel", nil, UIParent)
         probe:SetSize(1, 1)
         probe:SetPoint("TOPLEFT", UIParent, "TOPLEFT", -100, 100)  -- off-screen
         probe:SetAlpha(0)
     end
+    return probe
+end
+local function DisplayIDForUnit(unit)
+    if not UnitExists(unit) then return nil end
+    Probe()
     if not pcall(probe.SetUnit, probe, unit) then return nil end
     local ok, id = pcall(probe.GetDisplayInfo, probe)
     if not ok or Secret(id) or type(id) ~= "number" or id <= 0 then return nil end
     return id
 end
 
-local function Learn(name, id, src)
+-- The creature a unit is (the number in its GUID), or nil.
+local function NpcIDForUnit(unit)
+    local guid = Safe(UnitGUID, unit)
+    if type(guid) ~= "string" then return nil end
+    -- "Creature-0-server-instance-zone-npc-spawn"
+    local kind, id = guid:match("^(%a+)%-[^%-]*%-[^%-]*%-[^%-]*%-[^%-]*%-(%d+)")
+    if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+    return tonumber(id)
+end
+
+local Learn     -- below
+
+-- A creature's model: asked of the game one at a time (the hidden model
+-- shows each creature in turn; its model can take a moment to load).
+local queue, busy = {}, false
+local LOOKS, LOOK_EVERY = 8, 0.25
+local function AskNext()
+    if busy then return end
+    local job = table.remove(queue, 1)
+    if not job then return end
+    busy = true
+    Probe()
+    pcall(probe.ClearModel, probe)
+    if not pcall(probe.SetCreature, probe, job.npc) then busy = false; return AskNext() end
+    local tries = 0
+    local function Look()
+        tries = tries + 1
+        local ok, id = pcall(probe.GetDisplayInfo, probe)
+        if ok and not Secret(id) and type(id) == "number" and id > 0 then
+            for _, n in ipairs(job.names) do Learn(n, id, job.src) end
+            busy = false
+            return AskNext()
+        end
+        if tries < LOOKS then C_Timer.After(LOOK_EVERY, Look) else busy = false; AskNext() end
+    end
+    Look()
+end
+
+local function AskCreature(npc, names, src)
+    if not npc or not names[1] then return end
+    -- Kept with the names, so it's known which creature each boss is.
+    local db = DB()
+    db.npc = db.npc or {}
+    for _, n in ipairs(names) do
+        local key = Norm(n)
+        if key then db.npc[key] = npc end
+    end
+    for _, job in ipairs(queue) do if job.npc == npc then return end end
+    queue[#queue + 1] = { npc = npc, names = names, src = src }
+    AskNext()
+end
+
+function Learn(name, id, src)
     local key = Norm(name)
     if not key or not id then return end
     local db = DB()
@@ -171,9 +225,16 @@ local function TryUnit(unit, src, alsoAs)
     local name = UnitName(unit)
     if Secret(name) or type(name) ~= "string" then name = nil end
     local id = DisplayIDForUnit(unit)
-    if not id then return end
-    if name then Learn(name, id, src) end
-    if alsoAs and alsoAs ~= name then Learn(alsoAs, id, src) end
+    if id then
+        if name then Learn(name, id, src) end
+        if alsoAs and alsoAs ~= name then Learn(alsoAs, id, src) end
+        return
+    end
+    -- The model's hidden (WoW Forever): ask by which creature it is.
+    local names = {}
+    if name then names[#names + 1] = name end
+    if alsoAs and alsoAs ~= name then names[#names + 1] = alsoAs end
+    AskCreature(NpcIDForUnit(unit), names, src)
 end
 
 -- Units seen outside the encounter: only bosses, and only if not known yet.
@@ -305,10 +366,33 @@ end
 -- ── The answer ─────────────────────────────────────────────────────────────
 -- What a boss's medallion shows: "icon", texture | "display", model ID |
 -- "file", path | nil.
+-- Which creature a boss is: met on this account, or in the built-in list
+-- (Data/ForeverBossNpcs.lua). Or nil.
+local _shipped
+function MS:BossNpcID(name, aliases)
+    if not _shipped then
+        _shipped = {}
+        local fd = MS.ForeverData
+        for n, id in pairs(fd and fd.BOSS_NPCS or {}) do
+            local key = Norm(n)
+            if key then _shipped[key] = id end
+        end
+    end
+    local db = MythicScoreboardPortraitsDB
+    local met = db and db.npc or {}
+    local keys = { Norm(name) }
+    for _, a in ipairs(aliases or {}) do keys[#keys + 1] = Norm(a) end
+    for _, k in ipairs(keys) do
+        if k and (met[k] or _shipped[k]) then return met[k] or _shipped[k] end
+    end
+end
+
+local _askedFor = {}       -- npc -> true: asked this session (once is enough)
+
 function MS:BossPortrait(boss, run)
     if not boss then return nil end
     local icon = CachedIcon(boss)
-    if not icon and not MS.ForeverBossArt then
+    if not icon and MS.FLAVOR ~= "forever" then
         BuildJournalIndex()                 -- saved runs from before icons were kept
         icon = CachedIcon(boss)
     end
@@ -316,8 +400,36 @@ function MS:BossPortrait(boss, run)
     local aliases = MS.ForeverBossAliases and MS:ForeverBossAliases(boss, run)
     local learned = MS:LearnedBossDisplay(boss, aliases)
     if learned then return "display", learned end
-    if MS.ForeverBossArt then return MS:ForeverBossArt(boss, run) end
+    -- Not seen yet, but which creature it is is known: ask the game, and the
+    -- medallion is drawn again when the answer comes.
+    local npc = boss.name and MS:BossNpcID(boss.name, aliases)
+    if npc and not _askedFor[npc] then
+        _askedFor[npc] = true
+        local names = { boss.name }
+        for _, a in ipairs(aliases or {}) do names[#names + 1] = a end
+        AskCreature(npc, names, "known")
+    end
     return nil
+end
+
+-- ── /sb bosses: which Forever bosses are known, which are still to meet ───
+function MS:BossNpcReport()
+    local known, total, missing = 0, 0, {}
+    local names = {}
+    for key in pairs(MS.FOREVER_DUNGEONS or {}) do names[#names + 1] = key end
+    table.sort(names)
+    for _, key in ipairs(names) do
+        local def = MS.FOREVER_DUNGEONS[key]
+        local miss = {}
+        for _, b in ipairs(def.bosses or {}) do
+            total = total + 1
+            if MS:BossNpcID(b.name, b.aka) then known = known + 1 else miss[#miss + 1] = b.name end
+        end
+        if miss[1] then missing[#missing + 1] = key .. ": " .. table.concat(miss, ", ") end
+    end
+    MS.Say(string.format("Bosses known: %d of %d.", known, total))
+    for _, line in ipairs(missing) do MS.Say("  " .. line) end
+    return known, total
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────

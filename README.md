@@ -10,7 +10,7 @@ timeline, and keeps permanent stats across all your characters.
 |---|---|
 | `MythicScoreboard/` | The addon, exactly as it goes in `Interface\AddOns` |
 | `MythicScoreboard/MythicScoreboard.toc` | Retail (Midnight) |
-| `MythicScoreboard/MythicScoreboard_Forever.toc` | WoW Forever (adds `Forever.lua`, `BossPortraits.lua`) |
+| `MythicScoreboard/MythicScoreboard_Forever.toc` | WoW Forever (adds `Forever.lua` and the Forever data) |
 | `tests/` | Test suites, run outside the game against a mock of the WoW API |
 | `tests/wowmock.lua` | The mock WoW API the tests run on |
 | `tests/fixtures/` | Real saved data used by some tests |

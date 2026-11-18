@@ -38,13 +38,13 @@ if forever then
     -- 1. Ruins of Lordaeron in the order it was actually played.
     reset(); zone(RUINS)
     for _, b in ipairs({ "Witherfang", "The Butcher", "Viktor the Vile" }) do wait(200); kill(b) end
-    check("final boss third: not cleared yet", not MS.currentRun.completed and MS.currentRun.finalDown)
+    check("optional boss third: not cleared yet", not MS.currentRun.completed and not MS.currentRun.finalDown)
     wait(100); kill("The Abandoned")
     -- 2. A reload in between keeps everything.
     reload()
     local run = MS.currentRun
     check("reload restores run", run and run.dungeonName == "Ruins of Lordaeron" and #run.bosses == 4)
-    check("reload keeps finalDown", run and run.finalDown == true)
+    check("reload keeps the kills", run and run.bosses[4].name == "The Abandoned")
     check("reload keeps boss order", run and run.bosses[3].name == "Viktor the Vile")
     wait(200); kill("Bjork"); wait(300); kill("Rath'mael")
     check("cleared after the last required boss", MS.currentRun.completed == true)
@@ -69,7 +69,7 @@ if forever then
 
     -- 4. Final boss down, optional ones skipped, leave: cleared.
     reset(); zone(RUINS)
-    wait(100); kill("Witherfang"); wait(100); kill("Viktor the Vile")
+    wait(100); kill("Witherfang"); wait(100); kill("Rath'mael")
     local lastKill = MS.currentRun.bosses[2].killTime
     wait(300)
     zone(WORLD)
@@ -209,7 +209,7 @@ end
 if forever then
     -- Final boss down: abandoning still abandons (not "cleared on leave").
     reset(); zone(RUINS)
-    wait(60); kill("Viktor the Vile")
+    wait(60); kill("Rath'mael")
     check("final down", MS.currentRun.finalDown)
     MS:AbandonRun()
     check("final-down run abandoned, not cleared", MythicScoreboardDB.runs[1].completed == false)

@@ -372,7 +372,7 @@ setmetatable(_G, {
     end,
 })
 -- Globals the addon reads but which legitimately may be nil.
-for _, k in ipairs({ "MythicScoreboardDB", "MythicScoreboardPortraitsDB", "MythicScoreboardAccountDB", "DungeonDataNS",
+for _, k in ipairs({ "MythicScoreboardDB", "MythicScoreboardPortraitsDB", "MythicScoreboardAccountDB",
                      "SLASH_MYTHICSCOREBOARD1", "SLASH_MYTHICSCOREBOARD2", "SlashCmdList",
                      "EncounterJournal", "C_ChallengeMode", "C_MythicPlus", "MythicScoreboardFrame", "MythicScoreboard" }) do
     allowed[k] = true

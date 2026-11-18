@@ -4,10 +4,10 @@ local MS = _G["MythicScoreboard"]
 -- Flight masters and the boats and zeppelins between the continents, each on
 -- its zone's map (x, y from 0 to 1), for Core/Travel.lua.
 --
--- Flight masters: classic's positions, close, not exact; the game corrects
--- them: open any flight map and the addon learns every flight master on that
--- continent, where it really stands and which ones you know (Travel.lua,
--- TAXIMAP_OPENED). Boats, zeppelins and the tram: where you board.
+-- Flight masters: as the game lists them (/sb dumptravel), on each
+-- continent's map, both sides. Only used when the game won't say: the
+-- directions read its list live (Travel.lua), and opening a flight map
+-- adds which ones you know. Boats, zeppelins and the tram: where you board.
 --
 -- Inns and teleports: where you land is learned from the game the first
 -- time you hearth or teleport there (Travel.lua), for every character on
@@ -20,81 +20,79 @@ local D = MS.ForeverData or {}
 MS.ForeverData = D
 
 D.FLIGHT_MASTERS = {
-    -- Kalimdor, Horde
-    { "Orgrimmar",              map = 1454, x = 0.451, y = 0.639, side = "Horde" },
-    { "Crossroads",             map = 1413, x = 0.515, y = 0.303, side = "Horde" },
-    { "Camp Taurajo",           map = 1413, x = 0.444, y = 0.591, side = "Horde" },
-    { "Thunder Bluff",          map = 1456, x = 0.470, y = 0.498, side = "Horde" },
-    { "Sun Rock Retreat",       map = 1442, x = 0.451, y = 0.598, side = "Horde" },
-    { "Splintertree Post",      map = 1440, x = 0.732, y = 0.616, side = "Horde" },
-    { "Zoram'gar Outpost",      map = 1440, x = 0.122, y = 0.338, side = "Horde" },
-    { "Shadowprey Village",     map = 1443, x = 0.216, y = 0.741, side = "Horde" },
-    { "Freewind Post",          map = 1441, x = 0.451, y = 0.491, side = "Horde" },
-    { "Brackenwall Village",    map = 1445, x = 0.356, y = 0.319, side = "Horde" },
-    { "Camp Mojache",           map = 1444, x = 0.754, y = 0.443, side = "Horde" },
-    { "Valormok",               map = 1447, x = 0.220, y = 0.496, side = "Horde" },
-    { "Bloodvenom Post",        map = 1448, x = 0.344, y = 0.539, side = "Horde" },
-    { "Moonglade",              map = 1450, x = 0.321, y = 0.666, side = "Horde" },
-    -- Kalimdor, Alliance
-    { "Rut'theran Village",     map = 1438, x = 0.584, y = 0.940, side = "Alliance" },
-    { "Auberdine",              map = 1439, x = 0.363, y = 0.456, side = "Alliance" },
-    { "Astranaar",              map = 1440, x = 0.344, y = 0.480, side = "Alliance" },
-    { "Stonetalon Peak",        map = 1442, x = 0.364, y = 0.072, side = "Alliance" },
-    { "Nijel's Point",          map = 1443, x = 0.647, y = 0.105, side = "Alliance" },
-    { "Thalanaar",              map = 1444, x = 0.895, y = 0.459, side = "Alliance" },
-    { "Feathermoon Stronghold", map = 1444, x = 0.302, y = 0.432, side = "Alliance" },
-    { "Theramore",              map = 1445, x = 0.675, y = 0.513, side = "Alliance" },
-    { "Talonbranch Glade",      map = 1448, x = 0.625, y = 0.242, side = "Alliance" },
-    { "Talrendis Point",        map = 1447, x = 0.119, y = 0.776, side = "Alliance" },
-    { "Moonglade",              map = 1450, x = 0.481, y = 0.673, side = "Alliance" },
-    -- Kalimdor, both: one flight master for everyone, or one for each side
-    { "Ratchet",                map = 1413, x = 0.631, y = 0.372 },
-    { "Marshal's Refuge",       map = 1449, x = 0.452, y = 0.058 },
-    { "Gadgetzan",              map = 1446, x = 0.516, y = 0.255, side = "Horde" },
-    { "Gadgetzan",              map = 1446, x = 0.510, y = 0.293, side = "Alliance" },
-    { "Everlook",               map = 1452, x = 0.605, y = 0.363, side = "Horde" },
-    { "Everlook",               map = 1452, x = 0.623, y = 0.366, side = "Alliance" },
-    { "Cenarion Hold",          map = 1451, x = 0.488, y = 0.367, side = "Horde" },
-    { "Cenarion Hold",          map = 1451, x = 0.507, y = 0.346, side = "Alliance" },
-    -- Mount Hyjal (WoW Forever)
-    { "Summit of Eternity",     map = 2482, x = 0.686, y = 0.441 },
-    { "Tainted Foothills",      map = 2482, x = 0.551, y = 0.825 },
-    -- Eastern Kingdoms, Horde
-    { "Undercity",              map = 1458, x = 0.633, y = 0.485, side = "Horde" },
-    { "The Sepulcher",          map = 1421, x = 0.456, y = 0.426, side = "Horde" },
-    { "Tarren Mill",            map = 1424, x = 0.601, y = 0.186, side = "Horde" },
-    { "Hammerfall",             map = 1417, x = 0.730, y = 0.326, side = "Horde" },
-    { "Revantusk Village",      map = 1425, x = 0.817, y = 0.818, side = "Horde" },
-    { "Kargath",                map = 1418, x = 0.040, y = 0.448, side = "Horde" },
-    { "Flame Crest",            map = 1428, x = 0.656, y = 0.242, side = "Horde" },
-    { "Stonard",                map = 1435, x = 0.461, y = 0.548, side = "Horde" },
-    { "Grom'gol Base Camp",     map = 1434, x = 0.325, y = 0.294, side = "Horde" },
-    -- Eastern Kingdoms, Alliance
-    { "Stormwind",              map = 1453, x = 0.663, y = 0.621, side = "Alliance" },
-    { "Ironforge",              map = 1455, x = 0.555, y = 0.477, side = "Alliance" },
-    { "Sentinel Hill",          map = 1436, x = 0.566, y = 0.526, side = "Alliance" },
-    { "Lakeshire",              map = 1433, x = 0.306, y = 0.594, side = "Alliance" },
-    { "Darkshire",              map = 1431, x = 0.775, y = 0.443, side = "Alliance" },
-    { "Thelsamar",              map = 1432, x = 0.339, y = 0.509, side = "Alliance" },
-    { "Menethil Harbor",        map = 1437, x = 0.095, y = 0.597, side = "Alliance" },
-    { "Southshore",             map = 1424, x = 0.493, y = 0.523, side = "Alliance" },
-    { "Refuge Pointe",          map = 1417, x = 0.458, y = 0.461, side = "Alliance" },
-    { "Aerie Peak",             map = 1425, x = 0.111, y = 0.462, side = "Alliance" },
-    { "Chillwind Camp",         map = 1422, x = 0.429, y = 0.851, side = "Alliance" },
-    { "Morgan's Vigil",         map = 1428, x = 0.843, y = 0.683, side = "Alliance" },
-    { "Nethergarde Keep",       map = 1419, x = 0.655, y = 0.243, side = "Alliance" },
-    -- Eastern Kingdoms, one for each side
-    { "Booty Bay",              map = 1434, x = 0.268, y = 0.770, side = "Horde" },
-    { "Booty Bay",              map = 1434, x = 0.274, y = 0.778, side = "Alliance" },
-    { "Thorium Point",          map = 1427, x = 0.348, y = 0.306, side = "Horde" },
-    { "Thorium Point",          map = 1427, x = 0.378, y = 0.306, side = "Alliance" },
-    { "Light's Hope Chapel",    map = 1423, x = 0.802, y = 0.570, side = "Horde" },
-    { "Light's Hope Chapel",    map = 1423, x = 0.816, y = 0.592, side = "Alliance" },
-    -- The Riverglades and Dun Morogh's coast (WoW Forever)
-    { "Rog'mar",                map = 2548, x = 0.596, y = 0.451, side = "Horde" },
-    { "Farholde Keep",          map = 2548, x = 0.606, y = 0.814, side = "Alliance" },
-    { "Powderfuse Port",        map = 2548, x = 0.790, y = 0.523 },
-    { "Tidegear Coast",         map = 1426, x = 0.190, y = 0.152 },
+    -- Kalimdor
+    { "Bloodvenom Post",       map = 1414, x = 0.4729, y = 0.3151, side = "Horde" },
+    { "Brackenwall Village",   map = 1414, x = 0.5410, y = 0.6500, side = "Horde" },
+    { "Camp Mojache",          map = 1414, x = 0.4584, y = 0.7019, side = "Horde" },
+    { "Camp Taurajo",          map = 1414, x = 0.5149, y = 0.6188, side = "Horde" },
+    { "Cenarion Hold",         map = 1414, x = 0.4410, y = 0.7994, side = "Horde" },
+    { "Crossroads",            map = 1414, x = 0.5343, y = 0.5397, side = "Horde" },
+    { "Everlook",              map = 1414, x = 0.5891, y = 0.2440, side = "Horde" },
+    { "Freewind Post",         map = 1414, x = 0.5294, y = 0.7422, side = "Horde" },
+    { "Gadgetzan",             map = 1414, x = 0.5665, y = 0.8091, side = "Horde" },
+    { "Moonglade",             map = 1414, x = 0.5215, y = 0.2172, side = "Horde" },
+    { "Nighthaven",            map = 1414, x = 0.5291, y = 0.2043, side = "Horde" },
+    { "Orgrimmar",             map = 1414, x = 0.5810, y = 0.4534, side = "Horde" },
+    { "Shadowprey Village",    map = 1414, x = 0.3751, y = 0.5938, side = "Horde" },
+    { "Splintertree Post",     map = 1414, x = 0.5324, y = 0.4279, side = "Horde" },
+    { "Sun Rock Retreat",      map = 1414, x = 0.4355, y = 0.4823, side = "Horde" },
+    { "Thunder Bluff",         map = 1414, x = 0.4630, y = 0.5705, side = "Horde" },
+    { "Valormok",              map = 1414, x = 0.5831, y = 0.3725, side = "Horde" },
+    { "Zoram'gar Outpost",     map = 1414, x = 0.4367, y = 0.3842, side = "Horde" },
+    { "Astranaar",             map = 1414, x = 0.4716, y = 0.4065, side = "Alliance" },
+    { "Auberdine",             map = 1414, x = 0.4486, y = 0.2633, side = "Alliance" },
+    { "Cenarion Hold",         map = 1414, x = 0.4428, y = 0.7974, side = "Alliance" },
+    { "Everlook",              map = 1414, x = 0.5926, y = 0.2446, side = "Alliance" },
+    { "Feathermoon",           map = 1414, x = 0.3730, y = 0.7000, side = "Alliance" },
+    { "Gadgetzan",             map = 1414, x = 0.5653, y = 0.8162, side = "Alliance" },
+    { "Moonglade",             map = 1414, x = 0.5314, y = 0.2177, side = "Alliance" },
+    { "Nighthaven",            map = 1414, x = 0.5291, y = 0.2041, side = "Alliance" },
+    { "Nijel's Point",         map = 1414, x = 0.4277, y = 0.5161, side = "Alliance" },
+    { "Rut'theran Village",    map = 1414, x = 0.4409, y = 0.1694, side = "Alliance" },
+    { "Stonetalon Peak",       map = 1414, x = 0.4240, y = 0.4125, side = "Alliance" },
+    { "Talonbranch Glade",     map = 1414, x = 0.5167, y = 0.2688, side = "Alliance" },
+    { "Talrendis Point",       map = 1414, x = 0.5692, y = 0.4108, side = "Alliance" },
+    { "Thalanaar",             map = 1414, x = 0.4849, y = 0.7048, side = "Alliance" },
+    { "Theramore",             map = 1414, x = 0.5865, y = 0.6777, side = "Alliance" },
+    { "Marshal's Refuge",      map = 1414, x = 0.4948, y = 0.7709 },
+    { "Ratchet",               map = 1414, x = 0.5663, y = 0.5582 },
+    { "Summit of Eternity",    map = 1414, x = 0.5536, y = 0.3064 },
+    { "Tainted Foothills",     map = 1414, x = 0.5408, y = 0.3427 },
+    -- Eastern Kingdoms
+    { "Booty Bay",             map = 1415, x = 0.4401, y = 0.9337, side = "Horde" },
+    { "Flame Crest",           map = 1415, x = 0.5167, y = 0.6380, side = "Horde" },
+    { "Grom'gol",              map = 1415, x = 0.4504, y = 0.8472, side = "Horde" },
+    { "Hammerfall",            map = 1415, x = 0.5539, y = 0.3572, side = "Horde" },
+    { "Kargath",               map = 1415, x = 0.5165, y = 0.6009, side = "Horde" },
+    { "Light's Hope Chapel",   map = 1415, x = 0.6047, y = 0.2190, side = "Horde" },
+    { "Revantusk Village",     map = 1415, x = 0.5887, y = 0.3453, side = "Horde" },
+    { "Rog'mar",               map = 1415, x = 0.5904, y = 0.6558, side = "Horde" },
+    { "Stonard",               map = 1415, x = 0.5477, y = 0.7638, side = "Horde" },
+    { "Tarren Mill",           map = 1415, x = 0.4790, y = 0.3182, side = "Horde" },
+    { "The Sepulcher",         map = 1415, x = 0.4109, y = 0.2978, side = "Horde" },
+    { "Thorium Point",         map = 1415, x = 0.4858, y = 0.5975, side = "Horde" },
+    { "Undercity",             map = 1415, x = 0.4469, y = 0.2513, side = "Horde" },
+    { "Aerie Peak",            map = 1415, x = 0.5114, y = 0.3061, side = "Alliance" },
+    { "Booty Bay",             map = 1415, x = 0.4414, y = 0.9349, side = "Alliance" },
+    { "Chillwind Camp",        map = 1415, x = 0.4952, y = 0.2785, side = "Alliance" },
+    { "Darkshire",             map = 1415, x = 0.4904, y = 0.7663, side = "Alliance" },
+    { "Farholde Keep",         map = 1415, x = 0.5918, y = 0.7061, side = "Alliance" },
+    { "Ironforge",             map = 1415, x = 0.4874, y = 0.5237, side = "Alliance" },
+    { "Lakeshire",             map = 1415, x = 0.5179, y = 0.7200, side = "Alliance" },
+    { "Light's Hope Chapel",   map = 1415, x = 0.6063, y = 0.2214, side = "Alliance" },
+    { "Menethil Harbor",       map = 1415, x = 0.4768, y = 0.4798, side = "Alliance" },
+    { "Morgan's Vigil",        map = 1415, x = 0.5323, y = 0.6746, side = "Alliance" },
+    { "Nethergarde Keep",      map = 1415, x = 0.5522, y = 0.7917, side = "Alliance" },
+    { "Refuge Pointe",         map = 1415, x = 0.5260, y = 0.3710, side = "Alliance" },
+    { "Sentinel Hill",         map = 1415, x = 0.4251, y = 0.7711, side = "Alliance" },
+    { "Southshore",            map = 1415, x = 0.4692, y = 0.3485, side = "Alliance" },
+    { "Stormwind",             map = 1415, x = 0.4409, y = 0.6946, side = "Alliance" },
+    { "Thelsamar",             map = 1415, x = 0.5378, y = 0.5492, side = "Alliance" },
+    { "Thorium Point",         map = 1415, x = 0.4877, y = 0.5974, side = "Alliance" },
+    { "Crown Guard Tower",     map = 1415, x = 0.5585, y = 0.2390 },
+    { "Eastwall Tower",        map = 1415, x = 0.5893, y = 0.2117 },
+    { "Northpass Tower",       map = 1415, x = 0.5763, y = 0.1857 },
+    { "Plaguewood Tower",      map = 1415, x = 0.5412, y = 0.1904 },
 }
 
 -- Inns, by the name the game gives your hearthstone's place (the town, not
@@ -105,7 +103,7 @@ D.INNS = {
     -- Kalimdor
     { "Orgrimmar",              map = 1454, x = 0.541, y = 0.685, side = "Horde" },          -- Gryshka
     { "Razor Hill",             map = 1411, x = 0.516, y = 0.417, side = "Horde" },          -- Grosk
-    { "Crossroads",             map = 1413, x = 0.520, y = 0.299, side = "Horde", aka = { "The Crossroads" } },  -- Boorand Plainswind
+    { "Crossroads",             map = 1414, x = 0.5356, y = 0.5385, side = "Horde", aka = { "The Crossroads" } },  -- Boorand Plainswind
     { "Camp Taurajo",           map = 1413, x = 0.455, y = 0.590, side = "Horde" },          -- Byula
     { "Ratchet",                map = 1413, x = 0.620, y = 0.394 },                          -- Wiley
     { "Bloodhoof Village",      map = 1412, x = 0.459, y = 0.642, side = "Horde" },          -- Kauth
@@ -116,10 +114,10 @@ D.INNS = {
     { "Darnassus",              map = 1457, x = 0.674, y = 0.156, side = "Alliance" },       -- Saelienne
     { "Theramore Isle",         map = 1445, x = 0.666, y = 0.452, side = "Alliance", aka = { "Theramore" } },  -- Janene
     { "Feathermoon Stronghold", map = 1444, x = 0.310, y = 0.435, side = "Alliance", aka = { "Feathermoon" } },  -- Shyria
-    { "Gadgetzan",              map = 1446, x = 0.525, y = 0.279 },                          -- Fizzgrimble
+    { "Gadgetzan",              map = 1414, x = 0.5681, y = 0.8136 },                          -- Fizzgrimble
     { "Everlook",               map = 1452, x = 0.614, y = 0.388 },                          -- Vizzie
     { "Cenarion Hold",          map = 1451, x = 0.519, y = 0.392 },                          -- Calandrath
-    { "Camp Mojache",           map = 1444, x = 0.748, y = 0.452, side = "Horde" },          -- Greul
+    { "Camp Mojache",           map = 1414, x = 0.4572, y = 0.7034, side = "Horde" },          -- Greul
     { "Splintertree Post",      map = 1440, x = 0.740, y = 0.621, side = "Horde" },          -- Kaylisk
     { "Sun Rock Retreat",       map = 1442, x = 0.474, y = 0.620, side = "Horde" },          -- Jayka
     { "Brackenwall Village",    map = 1445, x = 0.365, y = 0.322, side = "Horde" },          -- "Little" Logok

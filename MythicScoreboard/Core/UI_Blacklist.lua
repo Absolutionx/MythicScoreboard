@@ -226,8 +226,10 @@ function MS.ShowBlacklistInviteWarning(_, dialog, e)
         Solid(invite, "BACKGROUND", 0, 0.06, 0.03, 0.03, 0.95):SetAllPoints()
         UI.Outline(invite, { 1, 0.13, 0.13 }, 1, "BORDER")
         invite.title = Text(invite, "medium", 13, { 1, 0.27, 0.27 }, "CENTER")
+        invite.title:SetWordWrap(true)
         invite.title:SetPoint("TOPLEFT", 10, -9); invite.title:SetPoint("TOPRIGHT", -10, -9)
         invite.note = Text(invite, "regular", 12, P.ivory, "CENTER")
+        invite.note:SetWordWrap(true)
         invite.note:SetPoint("TOPLEFT", invite.title, "BOTTOMLEFT", 0, -4)
         invite.note:SetPoint("TOPRIGHT", invite.title, "BOTTOMRIGHT", 0, -4)
         -- Gone with the invite box.
@@ -243,6 +245,9 @@ function MS.ShowBlacklistInviteWarning(_, dialog, e)
     invite.title:SetText(string.format(L["%s, who invited you, is on your blacklist"], e.name))
     local note = e.note or ""
     invite.note:SetText(note ~= "" and note or ("|cff8c8273" .. L["No note"] .. "|r"))
+    -- Long names and notes wrap; the box grows to fit them.
+    local h = (invite.title:GetStringHeight() or 14) + (invite.note:GetStringHeight() or 13)
+    invite:SetHeight(math.max(52, math.ceil(h) + 24))
     invite:Show()
     return invite
 end

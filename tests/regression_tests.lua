@@ -407,7 +407,7 @@ if forever then
     MS:AbandonRun(); zone(WORLD)
     M.subzone = nil
     -- No map and no room name inside (WoW Forever): the door you walked in
-    -- by. Two doors are known; another is learned from its bosses.
+    -- by. None is built in: each is learned from the bosses fought inside.
     local px, py = 0, 0
     C_Map.GetPlayerMapPosition = function() return { GetXY = function() return px, py end } end
     local function walkIn(x, y)
@@ -416,7 +416,14 @@ if forever then
         uiMap = nil; zone(SM)
     end
     walkIn(0.8536, 0.3240)
+    check("wing: a door not learned yet", MS.currentRun.wingName == nil, MS.currentRun.wingName)
+    wait(30); kill("Houndmaster Loksey")
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8536, 0.3240)
     check("wing: the Library door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library", MS:RunTitle(MS.currentRun))
+    MS:AbandonRun(); zone(WORLD)
+    walkIn(0.8481, 0.3035)
+    wait(30); kill("Interrogator Vishas")
     MS:AbandonRun(); zone(WORLD)
     walkIn(0.8481, 0.3035)
     check("wing: the Graveyard door", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
@@ -443,7 +450,7 @@ if forever then
     check("wing: another door, another run", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Library"
         and #MS.currentRun.bosses == 0, MS:RunTitle(MS.currentRun))
     -- The first wing-only trash killed says which wing: by name (the XP or
-    -- "dies" line) or by NPC ID (UNIT_DIED); shared trash doesn't vote.
+    -- "dies" line); shared trash doesn't vote.
     rawset(_G, "UNITDIESOTHER", "%s dies.")
     MS:AbandonRun(); zone(WORLD)
     walkIn(0.8536, 0.3240)                                   -- the Library door...
@@ -457,8 +464,8 @@ if forever then
     M.subzone = nil
     MS:AbandonRun(); zone(WORLD)
     walkIn(0.8700, 0.3400)
-    M.Fire("UNIT_DIED", "Creature-0-1-189-1-4283-0000AAAA")
-    check("wing: by NPC ID", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
+    M.Fire("CHAT_MSG_COMBAT_HOSTILE_DEATH", "Scarlet Scryer dies.")
+    check("wing: Graveyard trash", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
     MS:AbandonRun(); zone(WORLD)
     walkIn(0.8700, 0.3400)
     check("wing: the door learned from trash", MS:RunTitle(MS.currentRun) == "Scarlet Monastery: Graveyard", MS:RunTitle(MS.currentRun))
