@@ -1,4 +1,5 @@
 local MS = _G["MythicScoreboard"]
+local L = MS.L
 
 -- ── The way to a dungeon, on the world map (WoW Forever) ──────────────────
 -- While the arrow shows the way (Core/UI_Navigate.lua), the world map draws
@@ -71,9 +72,9 @@ function MS:RouteOnMap(mapID)
             local px, py = ToMap(prev.c, prev.x, prev.y, mapID)
             local x1, y1, x2, y2
             if px then x1, y1, x2, y2 = Clip(px, py, tx, ty) end
-            if x1 then _ins(lines, { x1, y1, x2, y2, how = leg.how }) end
+            if x1 then _ins(lines, { x1, y1, x2, y2, how = leg.how, step = i }) end
         end
-        if tx and OnIt(tx, ty) then _ins(dots, { tx, ty, last = i == #legs }) end
+        if tx and OnIt(tx, ty) then _ins(dots, { tx, ty, last = i == #legs, step = i }) end
         prev = to
     end
     return { lines = lines, dots = dots }
@@ -234,6 +235,65 @@ end
 MS:On("PLAYER_LOGIN", function() pcall(AddProvider) end)
 MS:On("ADDON_LOADED", function(_, name)
     if name == "Blizzard_WorldMap" then pcall(AddProvider) end
+end)
+
+-- ── Hovering the route: that step ─────────────────────────────────────────
+-- The drawing never takes the mouse (the map's clicks and markers are under
+-- it), so the map is watched instead: the mouse within a few pixels of a
+-- line or a dot shows that step in a tooltip at the cursor ("Step 2 of 3:
+-- Fly to Crossroads"; a dot, the step after it too). Not over a marker or
+-- anything else with its own tooltip.
+local HOVER_EVERY, NEAR = 0.05, 8
+local hover
+local function HoverStep()
+    local map = rawget(_G, "WorldMapFrame")
+    local canvas = map and map.GetCanvas and map:GetCanvas()
+    local scroll = map and map.ScrollContainer
+    local GT = rawget(_G, "GameTooltip")
+    local owned = GT and GT:IsShown() and GT:GetOwner() == hover
+    local step, kind
+    if canvas and scroll and MS:NavigationTarget() and scroll:IsMouseOver() and scroll.GetNormalizedCursorPosition then
+        local x, y = scroll:GetNormalizedCursorPosition()
+        local scale = canvas:GetEffectiveScale()
+        if x and y then
+            step, kind = MS:RouteStepAt(map:GetMapID(), x, y, canvas:GetWidth() * scale, canvas:GetHeight() * scale, NEAR)
+        end
+    end
+    if not step then
+        if owned then GT:Hide() end
+        hover.step = nil
+        return
+    end
+    if GT:IsShown() and not owned then return end          -- a marker's own tooltip
+    if owned and hover.step == step and hover.kind == kind then return end
+    hover.step, hover.kind = step, kind
+    local steps = MS:NavigationSteps() or {}
+    GT:SetOwner(hover, "ANCHOR_CURSOR")
+    GT:SetText(string.format(L["Step %d of %d"], step, #steps), 1, 0.82, 0)
+    GT:AddLine(MS:NavigationStepText(step) or "", 1, 1, 1, true)
+    if kind == "dot" and steps[step + 1] then
+        GT:AddLine(string.format(L["Then: %s"], MS:NavigationStepText(step + 1) or ""), 0.73, 0.73, 0.73, true)
+    end
+    GT:Show()
+end
+
+local function AddHover()
+    local map = rawget(_G, "WorldMapFrame")
+    if hover or not map then return end
+    hover = CreateFrame("Frame", nil, map)
+    hover:SetSize(1, 1); hover:SetPoint("CENTER")
+    local wait = 0
+    hover:SetScript("OnUpdate", function(_, elapsed)
+        wait = wait - (elapsed or 0)
+        if wait > 0 then return end
+        wait = HOVER_EVERY
+        local ok, err = pcall(HoverStep)
+        if not ok then MS:ReportError("Route", err); hover:SetScript("OnUpdate", nil) end
+    end)
+end
+MS:On("PLAYER_LOGIN", function() pcall(AddHover) end)
+MS:On("ADDON_LOADED", function(_, name)
+    if name == "Blizzard_WorldMap" then pcall(AddHover) end
 end)
 
 -- A new route (or none): drawn again if the map's open.

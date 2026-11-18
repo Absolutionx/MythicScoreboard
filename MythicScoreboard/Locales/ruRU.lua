@@ -344,7 +344,6 @@ T["No result"] = "Нет результата"
 -- The in-run frame
 T["In-run frame"] = "Окно забега"
 T["A small frame with the clock, bosses and deaths while you're in a run. Right-click it to change its style; drag it to move it."] = "Небольшое окно со временем, боссами и смертями во время забега. Щелчок правой кнопкой меняет вид; перетащите, чтобы переместить."
-T["Left-click: open the scoreboard"] = "ЛКМ: открыть таблицу"
 T["%s left"] = "осталось %s"
 T["+%d in %s"] = "+%d через %s"
 T["Behind the timer"] = "Не успеваем"
@@ -424,3 +423,11 @@ T["Right-click the frame for another view. Drag it to move it, or its corner to 
 T["Reset size"] = "Сбросить размер"
 T["Done"] = "Готово"
 T["Right-click to reset the size."] = "Щелчок правой кнопкой сбрасывает размер."
+
+-- Map search
+T["Search dungeons and zones"] = "Поиск подземелий и зон"
+T["Zone"] = "Зона"
+T["Nothing called that."] = "Ничего с таким названием."
+T["Enter or click: show it on the map. The arrow, or Shift-Enter: directions."] = "Enter или щелчок — показать на карте. Стрелка или Shift-Enter — проложить путь."
+T["Alt-click anywhere on the map: directions to that spot. Alt-click the route to clear it."] = "Alt-щелчок в любом месте карты — путь к этой точке. Alt-щелчок по маршруту — убрать его."
+T["Talk to the flight master: %s"] = "Поговорите с распорядителем полетов: %s"

@@ -333,7 +333,6 @@ T["No result"] = "결과 없음"
 -- The in-run frame
 T["In-run frame"] = "진행 창"
 T["A small frame with the clock, bosses and deaths while you're in a run. Right-click it to change its style; drag it to move it."] = "진행 중에 시간, 우두머리, 죽음을 보여주는 작은 창입니다. 오른쪽 클릭으로 모양을 바꾸고, 끌어서 옮길 수 있습니다."
-T["Left-click: open the scoreboard"] = "왼쪽 클릭: 점수판 열기"
 T["%s left"] = "%s 남음"
 T["+%d in %s"] = "+%d까지 %s"
 T["Behind the timer"] = "시간 초과"
@@ -412,3 +411,11 @@ T["Right-click the frame for another view. Drag it to move it, or its corner to 
 T["Reset size"] = "크기 초기화"
 T["Done"] = "완료"
 T["Right-click to reset the size."] = "오른쪽 클릭하면 크기가 초기화됩니다."
+
+-- Map search
+T["Search dungeons and zones"] = "던전 및 지역 검색"
+T["Zone"] = "지역"
+T["Nothing called that."] = "그런 이름은 없습니다."
+T["Enter or click: show it on the map. The arrow, or Shift-Enter: directions."] = "Enter 또는 클릭: 지도에 표시. 화살표 또는 Shift-Enter: 길 안내."
+T["Alt-click anywhere on the map: directions to that spot. Alt-click the route to clear it."] = "지도 아무 곳이나 Alt-클릭: 그 위치까지 길 안내. 경로를 Alt-클릭하면 지웁니다."
+T["Talk to the flight master: %s"] = "비행 조련사와 대화하세요: %s"

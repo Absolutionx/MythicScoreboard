@@ -1,5 +1,20 @@
 # Changelog
 
+## 2.15.0
+
+### WoW Forever
+- **Search the world map:** a box on the world map finds any dungeon or zone by its name, part of it, or its usual short name ("RFC", "BRD", "SM"). Pick one (Enter or a click) and the map opens there, with the dungeon's entrance marker pulsing. The arrow at the end of a row, or Shift-Enter, gives directions straight away. Up and Down (or Tab) move through the list; Escape clears it.
+- **Directions to anywhere:** Alt-click any spot on the world map for directions there. Alt-click the route to clear it.
+- **Hover the route** on the map to see which step a line or stop is, and what comes after it.
+- Directions now tell you to talk to the flight master before a flight, instead of skipping to the flight itself.
+- **Boss portraits are back** for every WoW Forever dungeon, built in, so they show on the timeline before you've ever met the boss. A model seen in play still takes over. Magmatus (Hall of Thanes) and the Lordaeron Captain (Ruins of Lordaeron) show a crest until they're known.
+- **More bosses on the timeline:** optional bosses (Mana Wraith, Kroog, Obsidian Sentinel, Theka the Martyr, Nekrum Gutchewer, Sergeant Bly, Hydromancer Velratha, the six Sunken Temple troll minibosses, Pusillin, Malor the Zealous, Ezra Grimm) and summoned ones (Death Knight Darkreaver, Kormok, Theldren, Baron Aquanis). None of them count toward clearing a dungeon.
+- Deathless Marrow (The Drowned City) is recognised when the game calls the fight "Deathless Guardians", and Arcanic Enigma (City of Dalaran) when it's called "Mana Elemental", so both get their portrait and count as killed.
+- `/sb bosses check` asks the game to name each boss's creature, to catch a wrong ID.
+
+### Everyone
+- German and French: the minimap button's "open" and "close" tooltips use the same word for the scoreboard.
+
 ## 2.14.1
 
 ### WoW Forever

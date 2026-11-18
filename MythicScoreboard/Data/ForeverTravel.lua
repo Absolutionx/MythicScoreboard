@@ -114,10 +114,10 @@ D.INNS = {
     { "Darnassus",              map = 1457, x = 0.674, y = 0.156, side = "Alliance" },       -- Saelienne
     { "Theramore Isle",         map = 1445, x = 0.666, y = 0.452, side = "Alliance", aka = { "Theramore" } },  -- Janene
     { "Feathermoon Stronghold", map = 1444, x = 0.310, y = 0.435, side = "Alliance", aka = { "Feathermoon" } },  -- Shyria
-    { "Gadgetzan",              map = 1414, x = 0.5681, y = 0.8136 },                          -- Fizzgrimble
+    { "Gadgetzan",              map = 1414, x = 0.5681, y = 0.8136 },                        -- Fizzgrimble
     { "Everlook",               map = 1452, x = 0.614, y = 0.388 },                          -- Vizzie
     { "Cenarion Hold",          map = 1451, x = 0.519, y = 0.392 },                          -- Calandrath
-    { "Camp Mojache",           map = 1414, x = 0.4572, y = 0.7034, side = "Horde" },          -- Greul
+    { "Camp Mojache",           map = 1414, x = 0.4572, y = 0.7034, side = "Horde" },        -- Greul
     { "Splintertree Post",      map = 1440, x = 0.740, y = 0.621, side = "Horde" },          -- Kaylisk
     { "Sun Rock Retreat",       map = 1442, x = 0.474, y = 0.620, side = "Horde" },          -- Jayka
     { "Brackenwall Village",    map = 1445, x = 0.365, y = 0.322, side = "Horde" },          -- "Little" Logok

@@ -333,7 +333,6 @@ T["No result"] = "无结果"
 -- The in-run frame
 T["In-run frame"] = "副本计时窗"
 T["A small frame with the clock, bosses and deaths while you're in a run. Right-click it to change its style; drag it to move it."] = "副本进行中显示时间、首领和死亡的小窗口。右键点击切换样式，拖动以移动。"
-T["Left-click: open the scoreboard"] = "左键：打开计分板"
 T["%s left"] = "剩余 %s"
 T["+%d in %s"] = "+%d 还剩 %s"
 T["Behind the timer"] = "已超时"
@@ -412,3 +411,11 @@ T["Right-click the frame for another view. Drag it to move it, or its corner to 
 T["Reset size"] = "重置大小"
 T["Done"] = "完成"
 T["Right-click to reset the size."] = "右键点击重置大小。"
+
+-- Map search
+T["Search dungeons and zones"] = "搜索地下城和区域"
+T["Zone"] = "区域"
+T["Nothing called that."] = "没有这个名字的地方。"
+T["Enter or click: show it on the map. The arrow, or Shift-Enter: directions."] = "回车或点击：在地图上显示。箭头或Shift-回车：显示路线。"
+T["Alt-click anywhere on the map: directions to that spot. Alt-click the route to clear it."] = "在地图任意位置Alt-点击：显示前往该处的路线。Alt-点击路线可将其清除。"
+T["Talk to the flight master: %s"] = "与飞行管理员交谈：%s"

@@ -366,24 +366,45 @@ end
 -- ── The answer ─────────────────────────────────────────────────────────────
 -- What a boss's medallion shows: "icon", texture | "display", model ID |
 -- "file", path | nil.
--- Which creature a boss is: met on this account, or in the built-in list
--- (Data/ForeverBossNpcs.lua). Or nil.
-local _shipped
-function MS:BossNpcID(name, aliases)
-    if not _shipped then
-        _shipped = {}
+-- The built-in boss list (Data/ForeverBossNpcs.lua), keyed by normalised
+-- name: { npc =, display = }.
+local _builtIn
+local function BuiltIn()
+    if not _builtIn then
+        _builtIn = {}
         local fd = MS.ForeverData
-        for n, id in pairs(fd and fd.BOSS_NPCS or {}) do
-            local key = Norm(n)
-            if key then _shipped[key] = id end
+        for name, ids in pairs(fd and fd.BOSSES or {}) do
+            local key = Norm(name)
+            if key then _builtIn[key] = ids end
         end
     end
-    local db = MythicScoreboardPortraitsDB
-    local met = db and db.npc or {}
+    return _builtIn
+end
+
+-- A boss's name and aliases, normalised.
+local function KeysFor(name, aliases)
     local keys = { Norm(name) }
     for _, a in ipairs(aliases or {}) do keys[#keys + 1] = Norm(a) end
-    for _, k in ipairs(keys) do
-        if k and (met[k] or _shipped[k]) then return met[k] or _shipped[k] end
+    return keys
+end
+
+-- Which creature a boss is: met on this account, or in the built-in list.
+-- Or nil.
+function MS:BossNpcID(name, aliases)
+    local db = MythicScoreboardPortraitsDB
+    local met, list = db and db.npc or {}, BuiltIn()
+    for _, k in ipairs(KeysFor(name, aliases)) do
+        local id = met[k] or (list[k] and list[k].npc)
+        if id then return id end
+    end
+end
+
+-- What a boss looks like, from the built-in list: a display ID. Or nil.
+function MS:ShippedBossDisplay(name, aliases)
+    local list = BuiltIn()
+    for _, k in ipairs(KeysFor(name, aliases)) do
+        local id = list[k] and list[k].display
+        if id then return id end
     end
 end
 
@@ -401,7 +422,8 @@ function MS:BossPortrait(boss, run)
     local learned = MS:LearnedBossDisplay(boss, aliases)
     if learned then return "display", learned end
     -- Not seen yet, but which creature it is is known: ask the game, and the
-    -- medallion is drawn again when the answer comes.
+    -- medallion is drawn again when the answer comes. Asked even when the
+    -- built-in list has a model for it, so the game's own answer wins.
     local npc = boss.name and MS:BossNpcID(boss.name, aliases)
     if npc and not _askedFor[npc] then
         _askedFor[npc] = true
@@ -409,6 +431,9 @@ function MS:BossPortrait(boss, run)
         for _, a in ipairs(aliases or {}) do names[#names + 1] = a end
         AskCreature(npc, names, "known")
     end
+    -- Meanwhile, the built-in model (drawn straight away).
+    local shipped = boss.name and MS:ShippedBossDisplay(boss.name, aliases)
+    if shipped then return "display", shipped end
     return nil
 end
 
@@ -430,6 +455,78 @@ function MS:BossNpcReport()
     MS.Say(string.format("Bosses known: %d of %d.", known, total))
     for _, line in ipairs(missing) do MS.Say("  " .. line) end
     return known, total
+end
+
+-- ── /sb bosses check: the built-in IDs, checked against the game ─────────────
+-- The game names a creature from its ID (a creature link's tooltip), so
+-- every built-in ID can be checked against the boss it's listed for. Names
+-- not cached yet come back empty the first time: asked again after a moment.
+local scanTip
+local function CreatureName(id)
+    local link = "unit:Creature-0-0-0-0-" .. id .. "-0000000000"
+    local TI = rawget(_G, "C_TooltipInfo")
+    if TI and TI.GetHyperlink then
+        local ok, data = pcall(TI.GetHyperlink, link)
+        local line = ok and type(data) == "table" and data.lines and data.lines[1]
+        local text = line and MS.Readable(line.leftText)
+        if type(text) == "string" and text ~= "" then return text end
+    end
+    if not scanTip then
+        local ok, tip = pcall(CreateFrame, "GameTooltip", "MythicScoreboardScanTip", UIParent, "GameTooltipTemplate")
+        scanTip = ok and tip and tip.SetOwner and tip.SetHyperlink and tip or false
+    end
+    if not scanTip then return nil end
+    scanTip:SetOwner(UIParent, "ANCHOR_NONE")
+    pcall(scanTip.SetHyperlink, scanTip, link)
+    local fs = rawget(_G, "MythicScoreboardScanTipTextLeft1")
+    local text = fs and MS.Readable(fs:GetText())
+    scanTip:Hide()
+    if type(text) == "string" and text ~= "" then return text end
+end
+MS._CreatureName = CreatureName          -- for tests
+
+-- The names a boss goes by in the dungeon data (its name and aka).
+local function NamesFor(boss)
+    local set = { [Norm(boss)] = true }
+    for _, def in pairs(MS.FOREVER_DUNGEONS or {}) do
+        for _, b in ipairs(def.bosses or {}) do
+            if Norm(b.name) == Norm(boss) then
+                for _, a in ipairs(b.aka or {}) do set[Norm(a)] = true end
+            end
+        end
+    end
+    return set
+end
+
+function MS:CheckBossNpcs(onDone)
+    local list = {}
+    for name, ids in pairs(MS.ForeverData and MS.ForeverData.BOSSES or {}) do
+        if ids.npc then list[#list + 1] = { name, ids.npc } end
+    end
+    table.sort(list, function(a, b) return a[1] < b[1] end)
+    local function Pass(final)
+        local ok, wrong, unknown = 0, {}, {}
+        for _, e in ipairs(list) do
+            local got = CreatureName(e[2])
+            if not got then
+                unknown[#unknown + 1] = e[1] .. " (" .. e[2] .. ")"
+            elseif NamesFor(e[1])[Norm(got)] then
+                ok = ok + 1
+            else
+                wrong[#wrong + 1] = string.format("%s: %d is \"%s\"", e[1], e[2], got)
+            end
+        end
+        if not final and unknown[1] then return false end
+        MS.Say(string.format("Boss IDs checked: %d of %d match the game.", ok, #list))
+        for _, line in ipairs(wrong) do MS.Say("  |cffff6666" .. line .. "|r") end
+        if unknown[1] then MS.Say("  No answer yet for: " .. table.concat(unknown, ", ")) end
+        if onDone then onDone(ok, wrong, unknown) end
+        return true
+    end
+    if not Pass(false) then
+        MS.Say("Checking boss IDs...")
+        C_Timer.After(2, function() Pass(true) end)
+    end
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────

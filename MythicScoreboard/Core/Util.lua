@@ -105,7 +105,7 @@ local subs = {}   -- event -> list of fn (replaced, never changed, so a dispatch
 function MS:On(event, fn)
     local list = subs[event] or {}
     for _, f in ipairs(list) do if f == fn then return end end
-    local copy = { unpack(list) }
+    local copy = { _unpack(list) }
     copy[#copy + 1] = fn
     if #list == 0 then pcall(hub.RegisterEvent, hub, event) end
     subs[event] = copy
