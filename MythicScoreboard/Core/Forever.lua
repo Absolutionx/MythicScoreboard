@@ -2,9 +2,8 @@
 --
 -- Forever has classic-era dungeons (plus new ones), Normal/Heroic only and no
 -- Mythic+. Everything the scoreboard needs to know about those dungeons lives
--- in Data/ForeverDungeons.lua, so the addon works on its own. When the
--- ForeverDungeonJournal addon is installed its boss portraits are preferred;
--- otherwise the bundled copy in Data/BossPortraits.lua is used.
+-- in Data/ForeverDungeons.lua, so the addon works on its own. Boss portraits
+-- are learned from the game as the bosses are met (Portraits.lua).
 
 local MS = _G["MythicScoreboard"]
 -- (How Forever differs from retail is in Flavor_Forever.lua.)
@@ -51,7 +50,6 @@ for _, def in pairs(DUNGEONS) do
 end
 
 -- Each boss's names (name and aliases), normalised, worked out on first use.
--- (Kept beside the entry, not on it: entries may be ForeverDungeonJournal's.)
 local _names = setmetatable({}, { __mode = "k" })
 local function Names(entry)
     local set = _names[entry]
@@ -71,8 +69,7 @@ local function EntryMatches(entry, name)
 end
 
 local function IsRequired(entry)
-    -- (entry.trash / summonItem: ForeverDungeonJournal's flags, for portraits lookups)
-    return not entry.rare and not entry.summon and not entry.trash and not entry.summonItem
+    return not entry.rare and not entry.summon
 end
 
 
@@ -253,6 +250,10 @@ local sampler
 local function DoorZones()
     local zones = {}
     for _, d in ipairs(MS.ForeverData.WING_DOORS or {}) do zones[d.map] = true end
+    -- Where a dungeon with wings has its entrance, so its doors can be learned.
+    for _, e in ipairs(MS.ForeverData.ENTRANCES or {}) do
+        if e.map and MS:DungeonHasWings(InstanceOf(e[1])) then zones[e.map] = true end
+    end
     local acc = MS.AccountDB()
     for _, d in ipairs(acc and acc.wingDoors or {}) do zones[d.map] = true end
     return zones
@@ -412,8 +413,8 @@ local function TrashWing(npc, name, base)
     local found
     for wing, list in pairs(MS.ForeverData.WING_TRASH or {}) do
         if DUNGEONS[wing] and IsWingOf(wing, base) then
-            for id, english in pairs(list) do
-                if id == npc or (lname and lname == english:lower()) then
+            for _, english in ipairs(list) do
+                if lname and lname == english:lower() then
                     if found and found ~= wing then return nil end   -- in two wings: no vote
                     found = wing
                     break
@@ -696,70 +697,3 @@ function MS:ForeverBossAliases(boss, run)
     return nil
 end
 
--- Portrait for a boss medallion: "display", displayID  or  "file", path.
--- ForeverDungeonJournal's live data wins when it's installed (it may be newer
--- and has custom art for a few bosses); otherwise the bundled table in
--- Data/BossPortraits.lua is used.
-local function ArtFromFDJ(self, boss, run)
-    local ns = _G.ForeverDungeonJournal_NS
-    local db = ns and type(ns.DB) == "table" and ns.DB
-    if not db then return nil end
-    local _, key = self:ForeverDungeon(run)
-    local jdef = key and db[key]
-    if type(jdef) ~= "table" or type(jdef.bosses) ~= "table" then return nil end
-    for _, e in ipairs(jdef.bosses) do
-        if EntryMatches(e, boss.name) then
-            local display = e.displayID
-                or (e.npcID and ns.STATIC_DISPLAY_IDS and ns.STATIC_DISPLAY_IDS[e.npcID])
-            if display then return "display", display end
-            if type(e.customIcon) == "string" then return "file", e.customIcon end
-            return nil
-        end
-    end
-    return nil
-end
-
--- Bundled tables, re-keyed by normalised name on first use.
-local _bundled
-local function Bundled()
-    if _bundled then return _bundled end
-    _bundled = { display = {}, icons = {} }
-    for src, dst in pairs({ [MS.FOREVER_BOSS_DISPLAY or {}] = _bundled.display,
-                            [MS.FOREVER_BOSS_ICONS or {}]   = _bundled.icons }) do
-        for dungeon, list in pairs(src) do
-            local t = {}
-            for name, v in pairs(list) do t[Norm(name)] = v end
-            dst[dungeon] = t
-        end
-    end
-    return _bundled
-end
-
-local function ArtFromBundle(self, boss, run)
-    local b = Bundled()
-    local names = { Norm(boss.name) }
-    for _, a in ipairs(self:ForeverBossAliases(boss, run) or {}) do names[#names + 1] = Norm(a) end
-    local _, key = self:ForeverDungeon(run)
-    local function find(tbl)
-        local list = key and tbl[key]
-        if list then
-            for _, n in ipairs(names) do if list[n] then return list[n] end end
-        end
-        -- Dungeon not recognised: boss names are unique enough across Forever.
-        for _, l in pairs(tbl) do
-            for _, n in ipairs(names) do if l[n] then return l[n] end end
-        end
-    end
-    local display = find(b.display)
-    if display then return "display", display end
-    local icon = find(b.icons)
-    if icon then return "file", icon end
-    return nil
-end
-
-function MS:ForeverBossArt(boss, run)
-    if not boss or not boss.name then return nil end
-    local kind, art = ArtFromFDJ(self, boss, run)
-    if kind then return kind, art end
-    return ArtFromBundle(self, boss, run)
-end

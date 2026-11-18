@@ -15,6 +15,14 @@
 - The warning about a blacklisted player in your group no longer repeats after a `/reload` or relog while they're still with you.
 - The blacklist is now opened from the skull button in the header; its warning toggle is under Blacklist in settings.
 - The hint at the bottom of the blacklist window now fits.
+- The invite warning wraps long names and notes instead of cutting them off.
+- **Flight masters straight from the game:** directions now know every flight master on your continent for your side, even ones you haven't visited, so routes are better on a new character. The built-in list and the inns were redone to match where you actually land.
+- **Dungeon data redone from public sources.** Entrance markers sit where the guides put them, and the boss lists of WoW Forever's own dungeons were rebuilt:
+  - Ruins of Lordaeron is cleared by Rath'mael; Viktor the Vile is an optional gauntlet.
+  - Shaper's Terrace is cleared by the four crystal bosses and Nanaya; the roaming dinosaurs, Izha'Rel and Tor'Rel, and Vitrix are optional.
+  - Primeval Elemental (The Drowned City) and Highland Horror (Excavation Site) are listed as optional bosses.
+- **Boss portraits** for WoW Forever's dungeons are paused for now; bosses show a crest in the meantime. `/sb bosses` lists which ones have a portrait.
+- Scarlet Monastery wings are learned per door the first time you kill a boss behind it.
 
 ## 2.13.0
 

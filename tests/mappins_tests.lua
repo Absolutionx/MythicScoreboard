@@ -37,30 +37,24 @@ C_Map.GetMapRectOnMap = function(zone, map)
 end
 pins = MS:EntrancePins(1415)
 check("Eastern Kingdoms: Tirisfal's markers", #pins == 2, #pins)
-check("Eastern Kingdoms: placed in Tirisfal", pins[1] and math.abs(pins[1].x - (0.4 + 0.826 * 0.2)) < 1e-6
-    or pins[2] and math.abs(pins[2].x - (0.4 + 0.826 * 0.2)) < 1e-6)
+check("Eastern Kingdoms: placed in Tirisfal", pins[1] and math.abs(pins[1].x - (0.4 + 0.835 * 0.2)) < 1e-6
+    or pins[2] and math.abs(pins[2].x - (0.4 + 0.835 * 0.2)) < 1e-6)
 C_Map.GetMapRectOnMap = nil
 
 for _, p in ipairs(M.printed) do if p:find("error") then check("no errors", false, p) end end
 -- Every dungeon has its bosses, a final boss that's one of them, and its
--- levels, so each can be cleared; all but a few bosses have a portrait.
+-- levels, so each can be cleared.
 do
-    local noPortrait, total = 0, 0
     for key, def in pairs(MS.FOREVER_DUNGEONS or {}) do
         check(key .. ": has bosses", #def.bosses > 0)
         check(key .. ": has levels", def.levels ~= nil)
         local final = false
         for _, b in ipairs(def.bosses) do
-            total = total + 1
             if b.name == def.final then final = true end
-            if MS.ForeverBossArt and not MS:ForeverBossArt({ name = b.name }, { dungeonName = key, bosses = {} }) then
-                noPortrait = noPortrait + 1
-            end
         end
         check(key .. ": its final boss is one of its bosses", final, def.final)
         check(key .. ": can be cleared", MS:ForeverCanDetectClear({ dungeonName = key, bosses = {} }))
     end
-    if MS.ForeverBossArt then check("portraits: all but a few", total > 0 and noPortrait <= 5, noPortrait .. " of " .. total) end
 end
 
 io.stdout:write(("mappins_tests: %d passed, %d failed\n"):format(passes, fails))

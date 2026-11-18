@@ -6,7 +6,6 @@
 ## IconTexture: Interface\AddOns\MythicScoreboard\Icons\Icon
 ## SavedVariablesPerCharacter: MythicScoreboardDB
 ## SavedVariables: MythicScoreboardPortraitsDB, MythicScoreboardAccountDB
-## OptionalDeps: ForeverDungeonJournal
 
 MythicScoreboard.lua
 Core\Util.lua
@@ -40,7 +39,7 @@ Core\Bootstrap.lua
 Core\RunStats.lua
 Data\ForeverDungeons.lua
 Data\ForeverTravel.lua
-Data\BossPortraits.lua
+Data\ForeverBossNpcs.lua
 Core\Forever.lua
 Core\Travel.lua
 Core\MobForces.lua

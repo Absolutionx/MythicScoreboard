@@ -766,6 +766,8 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         MS:WingDebug(true)
     elseif (cmd == "blacklist" or cmd == "bl") and MS.ShowBlacklist then
         MS:ShowBlacklist()
+    elseif cmd == "bosses" and MS.BossNpcReport and MS.FLAVOR == "forever" then
+        MS:BossNpcReport()
     elseif cmd == "dumptravel" and MS.DumpTravel then
         MS:DumpTravel()
     elseif cmd == "routedebug" and MS.RouteDebug then

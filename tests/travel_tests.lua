@@ -501,6 +501,35 @@ check("dump: the game's list", dump and dump.taxi[KALIMDOR] and dump.taxi[KALIMD
 check("dump: landings and spots", dump and dump.landings == acc.landings and dump.flightSpots == acc.flightSpots)
 check("dump: said so", M.printed[#M.printed]:find("dumptravel: 1 flight", 1, true), M.printed[#M.printed])
 
+-- ── The game's own flight list: used live ──────────────────────────────────
+MythicScoreboardDB.flights, MythicScoreboardAccountDB.flightSpots = nil, nil
+C_TaxiMap.GetTaxiNodesForMap = function(id)
+    if id ~= KALIMDOR then return {} end
+    return { { name = "Crossroads, The Barrens", position = V(0.53, 0.54), faction = 1 },
+             { name = "Astranaar, Ashenvale", position = V(0.47, 0.40), faction = 2 },
+             { name = "Ratchet, The Barrens", position = V(0.56, 0.55), faction = 0 },
+             { name = "zzOLDPowderfuse Port, Riverglades", position = V(0.56, 0.55), faction = 0 } }
+end
+local live = MS:FlightMasters(KALIMDOR)
+local names = {}
+for _, f in ipairs(live) do names[#names + 1] = f.name end
+table.sort(names)
+check("game's list: your side and both sides', no old ones", table.concat(names, ",") == "Crossroads,Ratchet", table.concat(names, ","))
+check("game's list: exact spots", math.abs(live[1].x - 0.53) < 1e-6 or math.abs(live[2].x - 0.53) < 1e-6)
+side = "Alliance"
+names = {}
+for _, f in ipairs(MS:FlightMasters(KALIMDOR)) do names[#names + 1] = f.name end
+table.sort(names)
+check("game's list: the Alliance's", table.concat(names, ",") == "Astranaar,Ratchet", table.concat(names, ","))
+side = "Horde"
+-- Your own flight map still comes first (it knows which ones you have).
+C_TaxiMap.GetAllTaxiNodes = function()
+    return { { name = "Crossroads", position = V(0.53, 0.54), state = 1 } }
+end
+M.Fire("TAXIMAP_OPENED")
+check("your flight map first", #MS:FlightMasters(KALIMDOR) == 1)
+C_TaxiMap.GetTaxiNodesForMap = nil
+
 for _, p in ipairs(M.printed) do if p:find("error") then check("no errors", false, p) end end
 io.stdout:write(("travel_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)
