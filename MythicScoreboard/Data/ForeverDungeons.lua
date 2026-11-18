@@ -53,7 +53,7 @@ D.DUNGEONS = {
     ["Blackfathom Deeps"] = { levels = {24, 32}, final = "Aku'mai", bosses = {
         "Ghamoo-ra", "Lady Sarevess", { "Gelihast", aka = { "Geilhast" } },
         { "Lorgus Jett", rare = true },                -- doesn't always spawn
-        "Old Serra'kis", "Twilight Lord Kelris", "Aku'mai",
+        { "Baron Aquanis", summon = true }, "Old Serra'kis", "Twilight Lord Kelris", "Aku'mai",
     }},
     ["The Stockade"] = { levels = {24, 32}, final = "Bazil Thredd", bosses = {
         "Targorr the Dread", "Kam Deepfury", "Hamhock", "Dextren Ward", "Bazil Thredd",
@@ -64,7 +64,8 @@ D.DUNGEONS = {
     }},
     ["City of Dalaran"] = { levels = {28, 33}, final = "Shade of the Archmage", bosses = {
         "Atrexis the Grave Knight", { "Lyn the Ignored", summon = true }, "Mana Devourer",
-        "Arcane Anomaly", "Fel Ancient", "Arcanic Enigma",
+        "Arcane Anomaly", "Fel Ancient", { "Arcanic Enigma", aka = { "Mana Elemental" } },
+        { "Mana Wraith", rare = true },
         { "Unstable Sentinel", aka = { "Unstable Sentry" } }, "Shade of the Archmage",
     }},
     ["Gnomeregan"] = { levels = {29, 38}, final = "Mekgineer Thermaplugg", bosses = {
@@ -98,10 +99,14 @@ D.DUNGEONS = {
     }},
     ["Uldaman"] = { levels = {38, 48}, final = "Archaedas", bosses = {
         "Revelosh", { "The Lost Dwarves", aka = { "Baelog", "Eric \"The Swift\"", "Olaf" } },
-        "Ironaya", "Ancient Stone Keeper", "Galgann Firehammer", "Grimlok", "Archaedas",
+        "Ironaya", { "Obsidian Sentinel", rare = true }, "Ancient Stone Keeper", "Galgann Firehammer",
+        "Grimlok", "Archaedas",
     }},
     ["Zul'Farrak"] = { levels = {43, 50}, final = "Chief Ukorz Sandscalp", bosses = {
-        "Antu'sul", "Witch Doctor Zum'rah", "Shadowpriest Sezz'ziz", { "Gahz'rilla", summon = true },
+        { "Theka the Martyr", rare = true }, "Antu'sul", "Witch Doctor Zum'rah",
+        { "Nekrum Gutchewer", rare = true }, "Shadowpriest Sezz'ziz",
+        { "Sergeant Bly", rare = true }, { "Hydromancer Velratha", rare = true },
+        { "Gahz'rilla", summon = true },
         { "Zerillis", rare = true }, { "Sandarr Dunereaver", rare = true }, { "Dustwraith", rare = true },
         "Ruuzlu", "Chief Ukorz Sandscalp",
     }},
@@ -110,6 +115,8 @@ D.DUNGEONS = {
         "Celebras the Cursed", "Landslide", "Tinkerer Gizlock", "Rotgrip", "Princess Theradras",
     }},
     ["Sunken Temple"] = { levels = {49, 56}, final = "Shade of Eranikus", bosses = {
+        { "Gasher", rare = true }, { "Loro", rare = true }, { "Zolo", rare = true },
+        { "Hukku", rare = true }, { "Mijan", rare = true }, { "Zul'Lor", rare = true },
         "Atal'alarion", "Dreamscythe", "Weaver", "Avatar of Hakkar", "Jammal'an the Prophet",
         "Ogom the Wretched", "Morphaz", "Hazzas", "Shade of Eranikus",
     }},
@@ -118,9 +125,10 @@ D.DUNGEONS = {
         "Grizzle", "Eviscerator", "Ok'thor the Breaker", "Anub'shiah", "Hedrum the Creeper",
         "Pyromancer Loregrain", "Fineous Darkvire", "Warder Stilgiss", "Lord Incendius", "Bael'Gar",
         "General Angerforge", "Golem Lord Argelmach", "Hurley Blackbreath", "Phalanx",
-        "Ribbly Screwspigot", "Plugger Spazzring", "Ambassador Flamelash",
+        "Ribbly Screwspigot", "Plugger Spazzring", { "Theldren", summon = true }, "Ambassador Flamelash",
         { "Panzor the Invincible", rare = true },
-        { "The Seven", aka = { "Doom'rel", "Hate'rel", "Anger'rel", "Vile'rel", "Gloom'rel", "Seeth'rel", "Dope'rel" } },
+        { "The Seven", aka = { "Doom'rel", "Hate'rel", "Anger'rel", "Vile'rel", "Gloom'rel", "Seeth'rel",
+                               "Dope'rel" } },
         "Magmus", "Princess Moira Bronzebeard", "Emperor Dagran Thaurissan",
     }},
     ["Lower Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "Overlord Wyrmthalak", bosses = {
@@ -136,7 +144,7 @@ D.DUNGEONS = {
         { "Lord Valthalak", summon = true }, "General Drakkisath",
     }},
     ["Dire Maul: East"] = { levels = {55, 60}, final = "Alzzin the Wildshaper", bosses = {
-        "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper",
+        { "Pusillin", rare = true }, "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper",
     }},
     ["Dire Maul: West"] = { levels = {57, 60}, final = "Prince Tortheldrin", bosses = {
         "Tendris Warpwood", "Illyanna Ravenoak", { "Tsu'zee", rare = true }, "Magister Kalendris",
@@ -150,11 +158,13 @@ D.DUNGEONS = {
         { "Kirtonos the Herald", summon = true }, "Jandice Barov", "Rattlegore", "Marduk Blackpool",
         "Vectus", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov",
         "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov",
+        { "Death Knight Darkreaver", summon = true }, { "Kormok", summon = true },
         "Darkmaster Gandling",
     }},
     ["Stratholme: Living"] = { levels = {58, 60}, final = "Balnazzar", bosses = {
         { "Skul", rare = true }, { "Hearthsinger Forresten", rare = true }, "The Unforgiven",
-        "Timmy the Cruel", "Postmaster Malown", "Cannon Master Willey", "Archivist Galford", "Balnazzar",
+        "Timmy the Cruel", { "Malor the Zealous", rare = true }, "Postmaster Malown",
+        { "Ezra Grimm", rare = true }, "Cannon Master Willey", "Archivist Galford", "Balnazzar",
     }},
     ["Stratholme: Undead"] = { levels = {58, 60}, final = "Baron Rivendare", bosses = {
         { "Stonespine", rare = true }, "Magistrate Barthilas", "Nerub'enkan", "Baroness Anastari",
@@ -164,11 +174,12 @@ D.DUNGEONS = {
     ["Krol'dok Stronghold"] = { levels = {40, 45}, final = "Overlord Mugg", bosses = {
         "Slavecrusher Grox", { "Twilight Commander Zarmok", aka = { "Zarmok" } },
         { "War Handler Ashka", aka = { "Handler Ashka" } }, "Nar'gurk", "Bossman Toof",
-        "Overlord Mugg",
+        { "Kroog", rare = true }, "Overlord Mugg",
     }},
     ["The Drowned City"] = { levels = {35, 40}, final = "Min'loth the Serpent", bosses = {
         "Zul'Alai", "Var'Taka", { "Primeval Elemental", summon = true }, "Captain Dreadrise",
-        "Deathless Marrow", { "Umbra", rare = true }, { "Gill", rare = true },
+        { "Deathless Marrow", aka = { "Deathless Guardians" } },
+        { "Umbra", rare = true }, { "Gill", rare = true },
         { "\"Pyromancer\" Braxton", rare = true, aka = { "Pyromancer Braxton" } },
         { "Min'loth the Serpent", aka = { "Min'loth" } },
     }},
@@ -206,9 +217,6 @@ D.INSTANCE_ALIASES = {
     ["The Temple of Atal'Hakkar"] = "Sunken Temple",
     ["Temple of Atal'Hakkar"]     = "Sunken Temple",
 }
--- The classic dungeons by instance ID (GetInstanceInfo), for clients in other
--- languages, where the dungeon's name isn't the English one in DUNGEONS.
--- Dungeons with wings map to the instance; the wing is found by its bosses.
 -- Wings by the map the game says you're on (C_Map.GetBestMapForUnit): the
 -- four Scarlet Monastery wings share one instance, but each is its own map.
 -- The game names all four just "Scarlet Monastery", so the name can't say.
@@ -312,6 +320,9 @@ D.ENTRANCES = {
     { "Shaper's Terrace",             map = 1449, x = 0.481, y = 0.061, levels = { 58, 60 } },
 }
 
+-- The classic dungeons by instance ID (GetInstanceInfo), for clients in other
+-- languages, where the dungeon's name isn't the English one in DUNGEONS.
+-- Dungeons with wings map to the instance; the wing is found by its bosses.
 D.INSTANCE_IDS = {
     [389] = "Ragefire Chasm",    [43]  = "Wailing Caverns",  [36]  = "The Deadmines",
     [33]  = "Shadowfang Keep",   [48]  = "Blackfathom Deeps", [34]  = "The Stockade",

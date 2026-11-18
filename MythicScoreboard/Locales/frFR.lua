@@ -333,7 +333,6 @@ T["No result"] = "Aucun résultat"
 -- The in-run frame
 T["In-run frame"] = "Cadre de course"
 T["A small frame with the clock, bosses and deaths while you're in a run. Right-click it to change its style; drag it to move it."] = "Un petit cadre avec le chrono, les boss et les morts pendant une course. Clic droit pour changer de style ; glisser pour le déplacer."
-T["Left-click: open the scoreboard"] = "Clic gauche : ouvrir le tableau"
 T["%s left"] = "%s restant"
 T["+%d in %s"] = "+%d dans %s"
 T["Behind the timer"] = "Hors délai"
@@ -412,3 +411,11 @@ T["Right-click the frame for another view. Drag it to move it, or its corner to 
 T["Reset size"] = "Taille par défaut"
 T["Done"] = "Terminé"
 T["Right-click to reset the size."] = "Clic droit pour rétablir la taille."
+
+-- Map search
+T["Search dungeons and zones"] = "Chercher un donjon ou une zone"
+T["Zone"] = "Zone"
+T["Nothing called that."] = "Rien de ce nom."
+T["Enter or click: show it on the map. The arrow, or Shift-Enter: directions."] = "Entrée ou clic : l'afficher sur la carte. La flèche ou Maj-Entrée : l'itinéraire."
+T["Alt-click anywhere on the map: directions to that spot. Alt-click the route to clear it."] = "Alt-clic n'importe où sur la carte : l'itinéraire jusqu'à cet endroit. Alt-clic sur l'itinéraire pour l'effacer."
+T["Talk to the flight master: %s"] = "Parlez au maître de vol : %s"

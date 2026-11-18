@@ -22,6 +22,7 @@ local REPLAN = 2                             -- seconds between working out the 
 local REFRESH = 0.1                          -- seconds between looking where you are (the turn: every frame)
 
 local frame, target, plan, planAt, inAir, airFor
+local taxiOpen                               -- a flight master's map is open
 local P = UI and UI.P
 
 -- ── The steps ──────────────────────────────────────────────────────────────
@@ -38,6 +39,7 @@ local function StepText(leg)
     if leg.how == "hearth" then return _fmt(L["Use your Hearthstone (%s)"], to.name) end
     if leg.how == "recall" then return _fmt(L["Cast Astral Recall (%s)"], to.name) end
     if leg.how == "teleport" then return _fmt(L["Teleport to %s"], to.name) end
+    if to.kind == "flight" and leg.talk then return _fmt(L["Talk to the flight master: %s"], to.name), to end
     if to.kind == "flight" then return _fmt(L["Run to the flight master: %s"], to.name), to end
     if to.kind == "dock" then
         local text = to.transport == "zeppelin" and L["Run to the zeppelin to %s"]
@@ -49,13 +51,17 @@ local function StepText(leg)
 end
 
 -- The steps from here: the route's legs, less a run already done (you're at
--- the flight master or dock).
+-- the dock). At the flight master: talk to it, until its flight map's open.
 local function Steps(legs, here)
     local out = {}
     for i, leg in ipairs(legs or {}) do
-        local skip = i == 1 and leg.how == "run" and here and leg.to.kind ~= "end"
+        local at = i == 1 and leg.how == "run" and here and leg.to.kind ~= "end"
             and (MS:Yards(here.c, here.x, here.y, leg.to.x, leg.to.y) or 99) <= AT_YARDS
-        if not skip then out[#out + 1] = leg end
+        if at and leg.to.kind == "flight" and not taxiOpen then
+            out[#out + 1] = { how = leg.how, to = leg.to, talk = true }
+        elseif not at then
+            out[#out + 1] = leg
+        end
     end
     return out
 end
@@ -260,6 +266,7 @@ function MS:UpdateArrow()
         local dest = Flying()
         if not dest then
             local leg = plan and plan[1]
+            if leg and leg.talk then leg = plan[2] end           -- (taken before the steps caught up)
             dest = leg and leg.how == "fly" and leg.to or nil
             if dest then Flying(dest) end
         end
@@ -364,6 +371,11 @@ end
 
 function MS:NavigationTarget() return target end
 function MS:NavigationSteps() return plan end
+-- What a step says ("Fly to Crossroads"), or nil.
+function MS:NavigationStepText(i)
+    local leg = plan and plan[i]
+    return leg and (StepText(leg)) or nil
+end
 
 -- Clicking a marker: the way there (again: stop).
 function MS:ToggleNavigation(pin)
@@ -428,12 +440,14 @@ local function TakeFlight()
     end
 end
 MS:On("TAXIMAP_OPENED", function()
+    taxiOpen = true
+    planAt = nil
     Flying(false)                            -- a new flight: kept once it's in the route
     local ok, err = pcall(TakeFlight)
     if not ok then MS:ReportError("Flight", err) end
     if MS.RefreshRouteMap then MS:RefreshRouteMap() end
 end)
-MS:On("TAXIMAP_CLOSED", function() planAt = nil end)
+MS:On("TAXIMAP_CLOSED", function() taxiOpen = false; planAt = nil end)
 
 -- Landed (with the directions shown or not): that flight's over.
 MS:On("PLAYER_CONTROL_GAINED", function()

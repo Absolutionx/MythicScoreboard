@@ -391,7 +391,8 @@ local ARCHIVE_STEPS = {
                             local b = kills[i]
                             if xb.n == b.name then
                                 xb.t = Int(b.killTime)
-                                local d = b.pullTime and b.killTime > b.pullTime and _floor(b.killTime - b.pullTime) or nil
+                                local d = b.pullTime and b.killTime > b.pullTime
+                                    and _floor(b.killTime - b.pullTime) or nil
                                 if d and d > 0 then
                                     if xb.m and xb.d and xb.d > 0 then xb.m = Int(xb.m * xb.d / d) end
                                     xb.d = d

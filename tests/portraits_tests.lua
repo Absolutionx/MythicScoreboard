@@ -45,8 +45,10 @@ M.instance = { "Ragefire Chasm", "party", 1 }
 M.Fire("PLAYER_ENTERING_WORLD", false, false); M.Fire("ZONE_CHANGED_NEW_AREA"); M.RunTimers(8)
 check("in a run", MS.currentRun ~= nil)
 
--- The built-in list: Jergosh's creature known before anyone's met him.
-MS.ForeverData.BOSS_NPCS["Jergosh the Invoker"] = 11518
+-- The built-in list, cut down to Jergosh's creature only (no model), known
+-- before anyone's met him. (The full list: portraits_builtin_tests.lua.)
+for name in pairs(MS.ForeverData.BOSSES) do MS.ForeverData.BOSSES[name] = nil end
+MS.ForeverData.BOSSES["Jergosh the Invoker"] = { npc = 11518 }
 MODELS[11518] = 11429
 local boss = { name = "Oggleflint" }
 check("not met yet: no portrait", MS:BossPortrait(boss, MS.currentRun) == nil)

@@ -81,6 +81,22 @@ function MS.SafePassThrough(frame, ...)
     if fn then pcall(fn, frame, ...) end
 end
 
+-- Zygor sets a waypoint of its own wherever the open map is left-clicked
+-- (with Shift, or without if it's set that way), whatever frame is under the
+-- mouse: a click on our markers or the map search too. It skips a click when
+-- told to (Pointer.IgnoreThisButtonDown, read as the button comes up), so a
+-- click that's ours tells it, only when it would have taken it.
+function MS.ZygorSkipClick()
+    local Z = rawget(_G, "ZygorGuidesViewer")
+    local pointer = type(Z) == "table" and Z.Pointer
+    if type(pointer) ~= "table" then return end
+    local profile = type(Z.db) == "table" and Z.db.profile
+    local Shift = rawget(_G, "IsShiftKeyDown")
+    if (Shift and Shift()) or (type(profile) == "table" and profile.no_shift_for_waypoints) then
+        pointer.IgnoreThisButtonDown = true
+    end
+end
+
 -- Global: the XML template (Core/MapPins.xml) names it.
 local PinMixin = CreateFromMixins and PinBase and CreateFromMixins(PinBase) or {}
 rawset(_G, "MythicScoreboardEntrancePinMixin", PinMixin)
@@ -123,6 +139,7 @@ end
 
 -- (The map calls it on a click: OnMouseUp is its own, for zooming out on right-click.)
 function PinMixin:OnClick(button)
+    if button == "LeftButton" then MS.ZygorSkipClick() end
     if button == "LeftButton" and self.pin and MS.ToggleNavigation then
         local ok, err = pcall(MS.ToggleNavigation, MS, self.pin)
         if not ok then MS:ReportError("Arrow", err) end

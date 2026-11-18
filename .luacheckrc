@@ -71,6 +71,7 @@ read_globals = {
     "ITEM_QUALITY_COLORS",
     "InCombatLockdown",
     "IsInGroup",
+    "IsAltKeyDown",
     "IsShiftKeyDown",
     "TakeTaxiNode",
     "IsInInstance",
