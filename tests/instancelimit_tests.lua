@@ -15,6 +15,11 @@ GetCVar = function(k) return cvars[k] end
 
 M.LoadTOC(arg[1], arg[2])
 local MS = rawget(_G, "MythicScoreboard")
+-- WoW Forever only: elsewhere the files aren't loaded at all.
+if not MS.InstanceLimit then
+    io.stdout:write("instancelimit_tests: not on this game (WoW Forever only)\n")
+    os.exit(0)
+end
 local fails, passes = 0, 0
 local function check(name, cond, detail)
     if cond then passes = passes + 1 else fails = fails + 1; io.stdout:write("FAIL ", name, "  ", tostring(detail or ""), "\n") end

@@ -78,23 +78,7 @@ function MS:InstanceLimit()
     return info
 end
 
--- ── Clock times ────────────────────────────────────────────────────────────
--- "2:32 PM", or "14:32" with the game's clock set to 24-hour.
-local function TwentyFour()
-    local C = rawget(_G, "C_CVar")
-    local get = (C and C.GetCVar) or rawget(_G, "GetCVar")
-    local ok, v = pcall(get or function() end, "timeMgrUseMilitaryTime")
-    return ok and v == "1"
-end
-
-function MS.ClockTime(t)
-    if TwentyFour() then return date("%H:%M", t) end
-    local h = tonumber(date("%H", t))
-    local ampm = h < 12 and (rawget(_G, "TIMEMANAGER_AM") or "AM") or (rawget(_G, "TIMEMANAGER_PM") or "PM")
-    h = h % 12
-    if h == 0 then h = 12 end
-    return h .. date(":%M", t) .. " " .. ampm
-end
+-- (Clock times: MS.ClockTime, RunModel.lua.)
 
 -- "12 min", rounded up (a slot "in 0 min" is never said).
 function MS.MinutesFrom(seconds)

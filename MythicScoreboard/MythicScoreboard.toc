@@ -31,7 +31,6 @@ Core\Archive.lua
 Core\Trends.lua
 Core\Migrations.lua
 Core\Lifecycle.lua
-Core\InstanceLimit.lua
 Core\Encounters.lua
 Core\History.lua
 Core\Completion.lua
@@ -58,4 +57,3 @@ Core\UI_StatsKeys.lua
 Core\UI.lua
 Core\UI_Compact.lua
 Core\UI_Minimap.lua
-Core\UI_InstanceLimit.lua
