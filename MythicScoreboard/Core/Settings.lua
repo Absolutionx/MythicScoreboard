@@ -30,6 +30,7 @@ local DEFAULTS = {
     -- compactPos: no default (the frame starts near the top right)
     -- windowPos:  no default (the scoreboard window starts in the middle)
     -- navPos:     no default (the arrow starts just above your character)
+    -- limitPanelPos: no default (the instance limit's countdown starts near the top)
     -- minimapAngle: no default (the button's resting place is its own)
     -- trackedDifficulties: { [group key] = bool }, defaults from MS.DIFF_GROUPS
 }

@@ -551,6 +551,36 @@ local function RunCells(run, bosses, y)
     return y - 34
 end
 
+-- The instance limit (InstanceLimit.lua), once any are used this hour:
+-- "Instances this hour  7 of 10", a pip for each, when the next frees. The
+-- preview shows yours, or a sample (7 of 10) when you've used none.
+local function LimitRow(y, run)
+    local info = MS.InstanceLimit and MS:InstanceLimit()
+    if run._demoElapsed and info and info.used == 0 then
+        info = { used = 7, limit = info.limit, nextFree = time() + 12 * 60, entries = {} }
+    end
+    if not (info and info.used > 0 and info.nextFree) then return y end
+    local full = info.locked or info.used >= info.limit
+    Rule("rule9", y); y = y - 8
+    local inner = W - 2 * PAD
+    local lbl = FS("illbl", "regular", 11, P.ash, "LEFT")
+    OneLine(lbl, inner - 70, 10); lbl:SetText(L["Instances this hour"]); Place(lbl, PAD, y)
+    local val = FS("ilval", "semibold", 14, full and P.bloodHi or P.ivory, "RIGHT")
+    OneLine(val, 70, 13); val:SetText(_fmt(L["%d of %d"], info.used, info.limit)); PlaceRight(val, W - PAD, y + 2)
+    y = y - 18
+    local n = _min(info.limit, 30)
+    local gap = 3
+    local pw = (inner - gap * (n - 1)) / n
+    for i = 1, n do
+        local pip = Bar("ilpip" .. i, i <= info.used and (full and P.blood or FILL) or TRACK, 1, i <= info.used and "fill" or "back")
+        Place(pip, PAD + (i - 1) * (pw + gap), y); pip:SetSize(_max(1, pw), 5)
+    end
+    y = y - 11
+    local nxt = FS("ilnext", "regular", 11, P.ash, "LEFT")
+    OneLine(nxt, inner, 10); nxt:SetText(MS.InstanceNextFreeText(info)); Place(nxt, PAD, y)
+    return y - 16
+end
+
 -- One line: the essentials.
 local function DrawMinimal(run)
     local parts = {}
@@ -620,6 +650,7 @@ local function Draw(run, style)
                 y = Deaths(run, y)
             end
         end
+        y = LimitRow(y, run)
         f:SetSize(W, -y + PAD - 6)
     end
     for k, x in pairs(el) do
@@ -1050,6 +1081,8 @@ end
 function MS:ToggleCompactPreview()
     if demo then
         demo, previewStyle = nil, nil
+        -- (the instance limit's preview goes with it: UI_InstanceLimit.lua)
+        if MS.PreviewInstanceLimitPanel then MS:PreviewInstanceLimitPanel(false) end
     else
         local ok, r = pcall(DemoRun)
         if not ok then MS:ReportError("In-run frame", r); return false end

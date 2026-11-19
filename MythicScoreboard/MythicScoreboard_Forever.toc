@@ -1,7 +1,7 @@
 ## Interface: 16001
 ## Title: Mythic Scoreboard
 ## Author: Continually
-## Version: 2.15.0
+## Version: 2.16.0
 ## Notes: Dungeon run scoreboard for WoW Forever. Tracks DPS, HPS, deaths, interrupts, dispels, loot and a boss timeline.
 ## IconTexture: Interface\AddOns\MythicScoreboard\Icons\Icon
 ## SavedVariablesPerCharacter: MythicScoreboardDB
@@ -29,8 +29,10 @@ Core\Persist.lua
 Core\Inspect.lua
 Core\Meter.lua
 Core\Archive.lua
+Core\Trends.lua
 Core\Migrations.lua
 Core\Lifecycle.lua
+Core\InstanceLimit.lua
 Core\Encounters.lua
 Core\History.lua
 Core\Completion.lua
@@ -60,9 +62,11 @@ Core\UI_Scoreboard.lua
 Core\UI_Stats.lua
 Core\UI_StatsDungeon.lua
 Core\UI_StatsLoot.lua
+Core\UI_StatsTrends.lua
 Core\UI.lua
 Core\UI_Compact.lua
 Core\UI_Minimap.lua
+Core\UI_InstanceLimit.lua
 Core\MapPins.lua
 Core\MapSearch.lua
 Core\UI_Navigate.lua

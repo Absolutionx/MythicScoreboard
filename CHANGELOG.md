@@ -1,5 +1,21 @@
 # Changelog
 
+## 2.16.0
+
+### Everyone
+- **Instance limit tracker:** counts the dungeons you've entered in the last hour (re-entering the same one within 30 minutes isn't a new one) and learns your realm's limit from the game's own message. A warning when one is left and when you've used the last, and a chime with a chat line when one frees up. A small countdown window shows while you're locked out; drag it anywhere, click it to close. Times follow the game clock (12- or 24-hour). The in-run frame and the minimap button's tooltip show how many you've used. Turn the warnings off in settings; **Preview the instance limit** there (or `/sb limit test`) shows it all without entering a dungeon. `/sb limit` says where you stand.
+- **New Trends tab** on the Stats page:
+  - **Activity calendar:** a square a day for the last six months, darker on busier days; this week against last, and your streak. Click a day for that day's runs, time, XP and gold; click a run there to open it.
+  - **A chart run by run** with its trend: DPS, HPS, XP an hour, gold an hour, run time, damage taken or deaths. Pick one dungeon or all of them, and the last 7 days, 30 days or all time. Your best run is in bronze; click a point to open that run.
+  - **XP and gold an hour by dungeon** (WoW Forever; your DPS by dungeon elsewhere), near your level first. Click a column's name to sort by it, and a dungeon to open it.
+- **One page per dungeon**, from the Dungeons tab or Trends:
+  - Its numbers at the top: XP and gold an hour and a run, best and typical time, how often cleared, deaths a run (your DPS elsewhere).
+  - A chart of your run times, XP an hour, DPS, HPS, damage taken or deaths. With only one run, it shows how the dungeon compares with your others until there's a second.
+  - Every run, now with the gold it gave you, and the bosses with their best and typical fights.
+  - By level (by difficulty elsewhere): runs, typical time, XP and gold an hour at each level you've run it.
+  - Where its XP and gold came from: the dungeon or quests, mobs killed, quests, levels gained and reputation.
+  - **Click a run** (its bar, its point or its row) to see just that run: its own numbers, when each boss died and how long each fight took, your damage, healing, damage taken and interrupts. Click again, or the x by its date, to go back to all of them.
+
 ## 2.15.0
 
 ### WoW Forever

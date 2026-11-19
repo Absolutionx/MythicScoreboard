@@ -752,7 +752,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         end
     elseif cmd == "help" then
         MS.Say("v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, " .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, /sb limit, " .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)
@@ -764,6 +764,10 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         MS:KillDebug()
     elseif cmd == "wingdebug" and MS.WingDebug then
         MS:WingDebug(true)
+    elseif cmd == "limit" then
+        MS:SayInstanceLimit()
+    elseif cmd == "limit test" or cmd == "limit preview" then
+        MS:ToggleInstanceLimitPreview()
     elseif (cmd == "blacklist" or cmd == "bl") and MS.ShowBlacklist then
         MS:ShowBlacklist()
     elseif cmd == "bosses" and MS.BossNpcReport and MS.FLAVOR == "forever" then
