@@ -82,7 +82,8 @@ local GROUPS = {
         T(LK("Start the clock on the first pull"), "StartOnPull",
           LK("A dungeon's clock waits until you or your group get into combat, so waiting for the group doesn't count. Keystones keep the game's timer.")),
         T(LK("Warn about the instance limit"), "InstanceLimitWarn",
-          LK("A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again.")),
+          LK("A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."),
+          MS.InstanceLimit ~= nil),           -- WoW Forever only (InstanceLimit.lua)
         { kind = "limitPreview" },
         T(LK("Reset meter on zone-in"), "AutoResetMeter",
           LK("Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers.")),
@@ -299,7 +300,7 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
                     yOff = yOff - SROW
                 elseif r.kind == "preview" then
                     _ins(refreshers, PreviewRow(settPop, yOff)); yOff = yOff - SROW - 4
-                elseif r.kind == "limitPreview" then
+                elseif r.kind == "limitPreview" and MS.ToggleInstanceLimitPreview then
                     _ins(refreshers, LimitPreviewRow(settPop, yOff)); yOff = yOff - SROW - 4
                 elseif r.kind == "resetScale" then
                     _ins(refreshers, ResetScaleRow(settPop, yOff)); yOff = yOff - SROW - 4
