@@ -81,6 +81,9 @@ local GROUPS = {
         { kind = "preview" },
         T(LK("Start the clock on the first pull"), "StartOnPull",
           LK("A dungeon's clock waits until you or your group get into combat, so waiting for the group doesn't count. Keystones keep the game's timer.")),
+        T(LK("Warn about the instance limit"), "InstanceLimitWarn",
+          LK("A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again.")),
+        { kind = "limitPreview" },
         T(LK("Reset meter on zone-in"), "AutoResetMeter",
           LK("Resets the Blizzard damage meter when you enter a tracked dungeon. Needed for accurate numbers.")),
         -- Enemy forces only exist in Mythic+.
@@ -164,7 +167,7 @@ local function PreviewRow(settPop, yOff)
     local function Refresh()
         t:SetText(MS:IsCompactPreviewOn() and L["Hide the preview"] or L["Preview the in-run frame"])
     end
-    b:SetScript("OnClick", function() MS:ToggleCompactPreview(); Refresh() end)
+    b:SetScript("OnClick", function() MS:ToggleCompactPreview(); settPop.Refresh() end)
     b:HookScript("OnEnter", function()
         GameTooltip:SetOwner(b, "ANCHOR_LEFT")
         GameTooltip:SetText(L["Preview the in-run frame"])
@@ -172,6 +175,22 @@ local function PreviewRow(settPop, yOff)
         GameTooltip:Show()
     end)
     b:HookScript("OnLeave", GameTooltip_Hide)
+    return Refresh
+end
+
+-- Shows the instance limit (the in-run frame's row and the countdown) with
+-- sample numbers, and hides it again. Returns its refresh.
+local function LimitPreviewRow(settPop, yOff)
+    local b = Btn(settPop)
+    b:SetSize(COL_W - 24, 22)
+    b:SetPoint("TOPLEFT", settPop, "TOPLEFT", (settPop.colX or 0) + 12, yOff - 2)
+    Box(b, true)
+    local t = Text(b, "medium", 13, P.ivory, "CENTER")
+    t:SetAllPoints()
+    local function Refresh()
+        t:SetText(MS:IsInstanceLimitPreviewOn() and L["Hide the preview"] or L["Preview the instance limit"])
+    end
+    b:SetScript("OnClick", function() MS:ToggleInstanceLimitPreview(); settPop.Refresh() end)
     return Refresh
 end
 
@@ -280,6 +299,8 @@ function UI.BuildSettingsPopup(sbFrame, settBtn)
                     yOff = yOff - SROW
                 elseif r.kind == "preview" then
                     _ins(refreshers, PreviewRow(settPop, yOff)); yOff = yOff - SROW - 4
+                elseif r.kind == "limitPreview" then
+                    _ins(refreshers, LimitPreviewRow(settPop, yOff)); yOff = yOff - SROW - 4
                 elseif r.kind == "resetScale" then
                     _ins(refreshers, ResetScaleRow(settPop, yOff)); yOff = yOff - SROW - 4
                 elseif r.kind == "scale" then

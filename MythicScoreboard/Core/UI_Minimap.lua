@@ -1,5 +1,6 @@
 local _rad, _deg, _cos, _sin = math.rad, math.deg, math.cos, math.sin
 local _atan2 = math.atan2 or math.atan
+local _fmt = string.format
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
@@ -40,6 +41,21 @@ local function ShowTooltip(self)
     local board, stats = ScoreboardShown() and not UI.statsOpen, ScoreboardShown() and UI.statsOpen
     GameTooltip:AddLine(board and L["Left-click: close the scoreboard"] or L["Left-click: open the scoreboard"], 0.8, 0.8, 0.8)
     GameTooltip:AddLine(stats and L["Right-click: close your stats"] or L["Right-click: open your stats"], 0.8, 0.8, 0.8)
+    -- The instance limit (InstanceLimit.lua): this hour's, if any.
+    local info = MS.InstanceLimit and MS:InstanceLimit()
+    if info and info.used > 0 then
+        GameTooltip:AddLine(" ")
+        local full = info.locked or info.used >= info.limit
+        local r, g, b = 1, 1, 1
+        if full then r, g, b = 0.90, 0.44, 0.41 end
+        GameTooltip:AddDoubleLine(L["Instances this hour"], _fmt(L["%d of %d"], info.used, info.limit), 1, 0.82, 0.3, r, g, b)
+        for _, e in ipairs(info.entries) do
+            GameTooltip:AddDoubleLine(MS.ClockTime(e.t) .. "  " .. tostring(e.name or "?"), tostring(e.char or ""),
+                0.8, 0.8, 0.8, 0.55, 0.51, 0.45)
+        end
+        GameTooltip:AddLine(MS.InstanceNextFreeText(info), 0.6, 0.68, 0.42)
+        GameTooltip:AddLine(" ")
+    end
     GameTooltip:AddLine(L["Drag to move. Hide it in settings."], 0.55, 0.55, 0.55)
     GameTooltip:Show()
 end

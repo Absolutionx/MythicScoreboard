@@ -70,9 +70,15 @@ local RCOLS = {   -- detail: one row per run
     { key = "bosses", label = LK("Bosses"),   w = 242, left = true },
 }
 if MS.Flavor.progressStats then
-    for i, c in ipairs(RCOLS) do
-        if c.key == "dps" then RCOLS[i] = { key = "xp", label = LK("XP"), w = c.w } end
+    -- Forever: what each run gave you, in place of your DPS and the bosses
+    -- (those are in the run's tooltip); room left for Compare and remove.
+    for i = #RCOLS, 1, -1 do
+        local c = RCOLS[i]
+        if c.key == "dps" then RCOLS[i] = { key = "xp", label = LK("XP"), w = c.w }
+        elseif c.key == "bosses" then table.remove(RCOLS, i) end
     end
+    RCOLS[#RCOLS + 1] = { key = "gold", label = LK("Gold"), w = 100 }
+    RCOLS[#RCOLS + 1] = { key = "pad",  label = "",         w = 142 }
 end
 
 -- ── Formatting ─────────────────────────────────────────────────────────────
@@ -93,13 +99,21 @@ end
 local function Pct(a, b) return b > 0 and _floor(a / b * 100 + 0.5) .. "%" or "-" end
 
 -- ── State ──────────────────────────────────────────────────────────────────
-local view, overview, detail, lootView, controls, compareView, keysView
+local view, overview, detail, lootView, controls, compareView, keysView, trendsView
 -- (In one table, shared with UI_StatsDungeon.lua and UI_StatsLoot.lua.)
 local S = {
     selected  = nil,         -- dungeon name shown in detail, or nil for the overview
     compareA  = nil,         -- runs picked for comparison (archive entries)
     compareB  = nil,
-    tab       = "dungeons",  -- or "keys", "loot"
+    tab       = "dungeons",  -- or "trends", "keys", "loot"
+    from      = nil,         -- "trends": the dungeon was opened from the Trends tab (back goes there)
+    detailChart = "time",    -- the dungeon's chart: "time" (run times) or "rate" (XP an hour / your DPS)
+    detailRun = nil,         -- one run picked on the dungeon's page (its numbers shown), or nil
+    -- The Trends tab: its chart (a key of MS.TREND_METRICS; nil: DPS, or HPS
+    -- if you mostly heal), for one dungeon (nil: all) over the last days
+    -- (nil: all time); the list's order ({key, desc}; nil: the usual); the
+    -- calendar day whose runs are open (a time that day; nil: none).
+    trendMetric = nil, trendDungeon = nil, trendRange = nil, trendSort = nil, trendDay = nil,
     multiChar = false,       -- more than one character has runs
 }
 
@@ -214,7 +228,11 @@ local function FillRecent(bars, d, x0)
     end
 end
 
-local function OpenDungeon(name) S.selected = name; S.compareA, S.compareB = nil, nil; UI.RefreshStats() end
+local function OpenDungeon(name)
+    S.selected, S.from, S.detailRun = name, nil, nil
+    S.compareA, S.compareB = nil, nil
+    UI.RefreshStats()
+end
 
 local function MakeDungeonRow(parent)
     local row = Btn(parent)
@@ -492,7 +510,7 @@ local function TabButton(parent, label, key)
     b:SetScript("OnLeave", function() b.Refresh() end)
     b:SetScript("OnClick", function()
         if S.tab == key then return end
-        S.tab = key; S.selected = nil; S.compareA, S.compareB = nil, nil
+        S.tab = key; S.selected = nil; S.compareA, S.compareB = nil, nil; S.from = nil; S.detailRun = nil
         CloseCharMenu()
         UI.RefreshStats(true)
     end)
@@ -528,13 +546,15 @@ local function BuildControls(sbFrame)
 
     c.lootTab = TabButton(c, L["Loot"], "loot")
     c.dunTab = TabButton(c, L["Dungeons"], "dungeons")
+    c.trendTab = TabButton(c, L["Trends"], "trends")
     if MS.Flavor.mythicPlus then
         c.keysTab = TabButton(c, L["Keys"], "keys")
         c.keysTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
-        c.dunTab:SetPoint("RIGHT", c.keysTab, "LEFT", -6, 0)
+        c.trendTab:SetPoint("RIGHT", c.keysTab, "LEFT", -6, 0)
     else
-        c.dunTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
+        c.trendTab:SetPoint("RIGHT", c.lootTab, "LEFT", -6, 0)
     end
+    c.dunTab:SetPoint("RIGHT", c.trendTab, "LEFT", -6, 0)
     c.Layout = function()
         c.lootTab:ClearAllPoints()
         if cb:IsShown() then c.lootTab:SetPoint("RIGHT", cb, "LEFT", -18, 0)
@@ -551,7 +571,7 @@ local K = {
     BOSS_COL = BOSS_COL, CHART_H = CHART_H, LIST_ROW = LIST_ROW, MATE_ROW = MATE_ROW,
     RCOLS = RCOLS, LCOLS = LCOLS, LOOT_ROW = LOOT_ROW, MAX_LOOT = MAX_LOOT,
     Band = Band, Cells = Cells, HoverRow = HoverRow, TwoClick = TwoClick, Pool = Pool,
-    CharName = CharName, Day = Day, Dur = Dur, Pct = Pct, Result = Result, MakeBossRow = MakeBossRow,
+    CharName = CharName, Day = Day, Dur = Dur, Hours = Hours, Pct = Pct, Result = Result, MakeBossRow = MakeBossRow,
 }
 UI.StatsKit = K
 
@@ -567,6 +587,7 @@ function UI.BuildStatsView(sbFrame)
     lootView = K.BuildLoot(view)
     compareView = K.BuildCompare(view)
     if K.BuildKeys and MS.Flavor.mythicPlus then keysView = K.BuildKeys(view) end
+    if K.BuildTrends then trendsView = K.BuildTrends(view) end
     controls = BuildControls(sbFrame)
     view:Hide()
     return view
@@ -583,7 +604,7 @@ function UI.RefreshStats(force)
     local chars = MS:StatsCharacters()
     local who = MS:GetStatsChar()
     local sig = #runs .. "|" .. MS:StatsRevision() .. "|" .. tostring(S.selected) .. "|" .. S.tab .. "|" .. who .. "|" .. #chars
-        .. "|" .. tostring(S.compareA) .. "|" .. tostring(S.compareB)
+        .. "|" .. tostring(S.compareA) .. "|" .. tostring(S.compareB) .. "|" .. tostring(S.from) .. "|" .. S.detailChart .. "|" .. tostring(S.detailRun)
     if sig == drawnSig and not force then return end
     if overview and overview.reset then overview.reset.Disarm() end
     drawnSig = sig
@@ -596,7 +617,7 @@ function UI.RefreshStats(force)
     UI.SetNameText(controls.charBtn.text, who == "all" and L["All characters"] or CharName(who))
     local items = MS:LootHistory()
     controls.lootTab.SetLabel(#items > 0 and (L["Loot"] .. "  " .. CT(P.ash2, #items)) or L["Loot"])
-    controls.dunTab.Refresh(); controls.lootTab.Refresh()
+    controls.dunTab.Refresh(); controls.lootTab.Refresh(); controls.trendTab.Refresh()
     if controls.keysTab then controls.keysTab.Refresh() end
     controls.Layout()
     -- Only the character you're on can reset its own stats.
@@ -654,14 +675,17 @@ function UI.RefreshStats(force)
     if S.compareA and not Listed(S.compareA) then S.compareA, S.compareB = nil, nil end
     if S.compareB and not Listed(S.compareB) then S.compareB = nil end
     local onLoot = S.tab == "loot"
-    local onTable = not onLoot and not onKeys
+    local onTrends = S.tab == "trends" and trendsView ~= nil
+    local onTable = not onLoot and not onKeys and not onTrends
     local comparing = onTable and S.selected ~= nil and S.compareA ~= nil and S.compareB ~= nil
     overview:SetShown(onTable and not S.selected)
     detail:SetShown(onTable and S.selected ~= nil and not comparing)
     compareView:SetShown(comparing)
     lootView:SetShown(onLoot)
     if keysView then keysView:SetShown(onKeys) end
+    if trendsView then trendsView:SetShown(onTrends) end
     if onLoot then K.FillLoot(lootView, items)
+    elseif onTrends then K.FillTrends(trendsView, MS:TrendStats())
     elseif onKeys then K.FillKeys(keysView, keyStats)
     elseif comparing then K.FillCompare(compareView, MS:CompareRuns(S.compareA, S.compareB))
     elseif S.selected then K.FillDetail(detail, MS:StatsForDungeon(S.selected), stats)
@@ -679,6 +703,9 @@ function UI.OpenStats()
     if not UI.frame then MS:BuildUI() end
     UI.statsOpen = true
     S.selected = nil
+    S.from = nil
+    S.detailRun = nil
+    S.trendDay = nil
     drawnSig = nil
     if UI.frame.SettingsPopup then UI.frame.SettingsPopup:Hide() end
     SetRunViewShown(false)
