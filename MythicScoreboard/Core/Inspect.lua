@@ -20,9 +20,9 @@ local function Later(fn) C_Timer.After(INSPECT_DELAY, fn) end
 
 -- A player whose inspect brought nothing isn't asked again at once: after
 -- each try the wait grows, and after the last it stops for the run (a new
--- run starts afresh). (The
--- game gives up on inspects out of range or sent too often; asking every
--- couple of seconds only gets in the way of other inspects.)
+-- run starts afresh). (The game gives up on inspects out of range or sent
+-- too often; asking every couple of seconds only gets in the way of other
+-- inspects.)
 local RETRY_WAITS = { 5, 15, 60, 300 }
 local tries = {}               -- name -> { n = tries so far, at = no sooner than this }
 local triesFor                 -- the run's item level cache they belong to (a new run has a new one)

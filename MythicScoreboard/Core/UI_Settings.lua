@@ -95,7 +95,8 @@ local GROUPS = {
     } },
     { col = 2, title = LK("Run history"), rows = { { kind = "limit" } } },
     -- Difficulty choices (Forever has one difficulty, so none to choose).
-    { col = 2, title = LK("Track these difficulties"), rows = { { kind = "difficulties" } }, shown = MS.Flavor.difficulties },
+    { col = 2, title = LK("Track these difficulties"), rows = { { kind = "difficulties" } },
+      shown = MS.Flavor.difficulties },
     -- When a run counts as cleared (Forever: no Mythic+ completion event).
     { col = 2, title = LK("Mark a run cleared when"), rows = { { kind = "clear" } }, shown = MS.CLEAR_RULES ~= nil },
     -- WoW Forever: the dungeon directions (UI_Navigate.lua) and the blacklist.
@@ -204,8 +205,8 @@ local function ResetScaleRow(settPop, yOff)
     local t = Text(b, "medium", 13, P.ivory, "CENTER")
     t:SetAllPoints(); t:SetText(L["Reset size"])
     b:SetScript("OnClick", function() MS:SetWindowScale(1); settPop.Refresh() end)
-    settPop.ResetScaleBtn = b
-    return function() end
+    settPop.ResetScaleBtn = b                   -- (for tests)
+    return function() end      -- (nothing on it changes)
 end
 
 -- A group's heading, in its column; returns where its first row goes.

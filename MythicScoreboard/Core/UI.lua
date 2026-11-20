@@ -7,9 +7,12 @@ local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Art, Box, Btn, BuildTimelineChrome, COLS, COL_HDR_H = UI.Art, UI.Box, UI.Btn, UI.BuildTimelineChrome, UI.COLS, UI.COL_HDR_H
-local CloseHistDropdown, ComputeColumnAnchors, DiffShort, DoClearHistory, FRAME_H, FRAME_W = UI.CloseHistDropdown, UI.ComputeColumnAnchors, UI.DiffShort, UI.DoClearHistory, UI.FRAME_H, UI.FRAME_W
-local HDR_H, HGrad, MEDIA, MakeScrollFrame, OpenHistDropdown, Outline = UI.HDR_H, UI.HGrad, UI.MEDIA, UI.MakeScrollFrame, UI.OpenHistDropdown, UI.Outline
+local Art, Box, Btn, BuildTimelineChrome = UI.Art, UI.Box, UI.Btn, UI.BuildTimelineChrome
+local COLS, COL_HDR_H = UI.COLS, UI.COL_HDR_H
+local CloseHistDropdown, ComputeColumnAnchors, DiffShort = UI.CloseHistDropdown, UI.ComputeColumnAnchors, UI.DiffShort
+local DoClearHistory, FRAME_H, FRAME_W = UI.DoClearHistory, UI.FRAME_H, UI.FRAME_W
+local HDR_H, HGrad, MEDIA, MakeScrollFrame = UI.HDR_H, UI.HGrad, UI.MEDIA, UI.MakeScrollFrame
+local OpenHistDropdown, Outline = UI.OpenHistDropdown, UI.Outline
 local P, PAD_X, RunResult, SetFont, Solid, TL_H = UI.P, UI.PAD_X, UI.RunResult, UI.SetFont, UI.Solid, UI.TL_H
 local Text, Tint, VGrad, colHdrLabels, sortState = UI.Text, UI.Tint, UI.VGrad, UI.colHdrLabels, UI.sortState
 
@@ -66,7 +69,6 @@ local function BuildChrome(f, washH)
 end
 UI.BuildChrome = BuildChrome
 
--- ── The window ─────────────────────────────────────────────────────────────
 -- ── Size and lock ──────────────────────────────────────────────────────────
 -- A window grows and shrinks as a whole (everything keeps its place), from
 -- its top-left corner, which stays where it is. posKey: the setting its
@@ -84,10 +86,6 @@ function UI.ScaleFrame(f, s, posKey)
     end
 end
 
-function UI.ApplyWindowScale(s)
-    UI.ScaleFrame(UI.frame, s or MS:GetWindowScale(), "windowPos")
-end
-
 -- The corner to drag to resize a window. o: { get, set (the saved size),
 -- min, max, posKey, setting (the size's setting key), shown (when the
 -- corner shows), shownBy (settings that change that) }.
@@ -103,6 +101,15 @@ function UI.MakeResizeGrip(f, o)
     lit:SetAllPoints()
     lit:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
     local dragging
+    -- Done dragging: on letting go, or if the corner hides first (the window
+    -- closed mid-drag), so it doesn't follow the cursor when it's next shown.
+    local function StopDrag(self)
+        if not dragging then return end
+        dragging = false
+        art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+        self:SetScript("OnUpdate", nil)
+        o.set(f:GetScale())
+    end
     grip:SetScript("OnMouseDown", function(self, button)
         if button == "RightButton" and o.shown() then o.set(1); return end      -- back to its usual size
         if button ~= "LeftButton" or not o.shown() then return end
@@ -119,13 +126,8 @@ function UI.MakeResizeGrip(f, o)
             if math.abs(sc - f:GetScale()) > 0.004 then UI.ScaleFrame(f, sc, o.posKey) end
         end)
     end)
-    grip:SetScript("OnMouseUp", function(self)
-        if not dragging then return end
-        dragging = false
-        art:SetTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-        self:SetScript("OnUpdate", nil)
-        o.set(f:GetScale())
-    end)
+    grip:SetScript("OnMouseUp", StopDrag)
+    grip:SetScript("OnHide", StopDrag)
     grip:SetScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L["Drag to resize"])
@@ -332,7 +334,7 @@ local function BuildCloseAndSettings(hdr)
     closeBtn:SetScript("OnClick", function() CloseHistDropdown(); sbFrame:Hide() end)
     -- HookScript, not SetScript: IconButton's hover glow lives in these handlers.
     closeBtn:HookScript("OnEnter", function(b)
-        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText("Close"); GameTooltip:Show()
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(L["Close"]); GameTooltip:Show()
     end)
     closeBtn:HookScript("OnLeave", GameTooltip_Hide)
     sbFrame.CloseButton = closeBtn
@@ -443,7 +445,8 @@ local function BuildHistoryButton(hdr, settBtn)
         if n > 0 and not menuOpen then
             GameTooltip:SetOwner(histBtn, "ANCHOR_BOTTOM")
             GameTooltip:SetText(L["Run history"])
-            GameTooltip:AddLine(MS.Plural(n, "Pick one of %d saved run to view.", "Pick one of %d saved runs to view."), 0.8, 0.8, 0.8)
+            GameTooltip:AddLine(MS.Plural(n, "Pick one of %d saved run to view.", "Pick one of %d saved runs to view."),
+                0.8, 0.8, 0.8)
             GameTooltip:Show()
         end
     end)
@@ -594,8 +597,6 @@ local function BuildBody()
     sbFrame.timelineContainer = tlc
 
     UI.BuildStatsView(sbFrame)
-
-    MS:SetSBFrameVisibleCallback(function() return sbFrame and sbFrame:IsShown() end)
 end
 
 function MS:BuildUI()
@@ -861,7 +862,10 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
         end
     elseif cmd == "help" then
         MS.Say("v" .. MS.version
-            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang, /sb demo, /sb compact, /sb removeloot, " .. (MS.SayInstanceLimit and "/sb limit, " or "") .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
+            .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang,"
+            .. " /sb demo, /sb compact, /sb removeloot, "
+            .. (MS.SayInstanceLimit and "/sb limit, " or "")
+            .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()
         MS:SetAutoResetMeter(newVal)

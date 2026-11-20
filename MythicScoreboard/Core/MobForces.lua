@@ -21,7 +21,7 @@ local function IsNameplateEnabled() return MS:GetMobForcesNameplate() end
 
 -- ── Tooltip ───────────────────────────────────────────────────────────────────
 
-local function AddForcesToTooltip(tooltip, tooltipData)
+local function AddForcesToTooltip(tooltip)
     if not IsTooltipEnabled() then return end
     if not IsInMythicPlus() then return end
     if not (C_ScenarioInfo and C_ScenarioInfo.GetUnitCriteriaProgressValues) then return end

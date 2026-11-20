@@ -29,8 +29,6 @@ local function EndUnfinishedKey()
     if MS.inDungeon then MS:FinishRun(false, false) else MS:CommitRun({ completed = false }) end
 end
 
-local function ResetPetCaches() MS:ForgetPets() end
-
 -- ── Handlers ───────────────────────────────────────────────────────────────
 local H = {}
 
@@ -65,7 +63,7 @@ function H.CHALLENGE_MODE_START()
     end
 
     MS:AutoResetMeter(); MS:BeginRun()
-    ResetPetCaches()
+    MS:ForgetPets()
     MS:WarmPetCache(1.0, 3.0)
 end
 
@@ -141,7 +139,7 @@ function H.GROUP_ROSTER_UPDATE()
     MS:InvalidateGroupUnits()
     local run = MS.currentRun
     if not run then return end               -- no run: nobody to keep track of
-    if run and run._suspended and GetNumGroupMembers() == 0 then
+    if run._suspended and GetNumGroupMembers() == 0 then
         MS:ClosePausedRun()
         return
     end

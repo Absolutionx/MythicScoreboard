@@ -29,7 +29,8 @@ local KCOLS = {   -- one row per dungeon (widths add up to LEFT_W)
     { key = "name",    label = LK("Dungeon"),      w = 230, left = true },
     { key = "keys",    label = LK("Keys"),         w = 64,  tip = LK("Keys you've run in this dungeon.") },
     { key = "timed",   label = LK("Timed"),        w = 86,  tip = LK("How many of them you finished in time.") },
-    { key = "avg",     label = LK("Avg. upgrade"), w = 110, tip = LK("Levels a key went up on average: 0 over time, up to +3 in time.") },
+    { key = "avg",     label = LK("Avg. upgrade"), w = 110,
+      tip = LK("Levels a key went up on average: 0 over time, up to +3 in time.") },
     { key = "best",    label = LK("Best timed"),   w = 110, tip = LK("The highest key you've finished in time.") },
     { key = "highest", label = LK("Highest"),      w = 100, tip = LK("The highest key you've run, timed or not.") },
 }
@@ -117,6 +118,7 @@ local function FillChart(k, ks)
     c:SetShown(n > 0)
     if n == 0 then
         k.pointsHideFrom(1); k.linesHideFrom(1); k.gridHideFrom(1)
+        k.xFirst:SetText(""); k.xLast:SetText("")      -- (no dates left from another filter)
         return
     end
     local lo, hi = all[1].v, all[1].v

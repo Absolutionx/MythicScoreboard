@@ -39,7 +39,7 @@ local function Progress(run)
     return p
 end
 
-local function Changed(run)
+local function Changed()
     MS:SaveCurrentRun()
     MS:Changed("run")
 end
@@ -91,7 +91,7 @@ local function OnXP()
         if gained and gained > 0 then Progress(run).xp = Progress(run).xp + gained end
     end
     last.xp, last.max, last.level = xp, max, lvl
-    Changed(run)
+    Changed()
 end
 
 -- Looted coin. Your money going up (PLAYER_MONEY) and the game's loot line
@@ -101,7 +101,7 @@ end
 local LOOT_WINDOW = 1.5
 local lootLineAt                 -- when the game last said you looted coin
 local waiting                    -- { amount, at }: a rise not yet known to be loot
-local lootCounted                    -- { amount, at }: the last rise lootCounted as loot
+local lootCounted                -- { amount, at }: the last rise counted as loot
 local questGain                  -- { amount, at }: a quest's reward just given
 
 local function Near(at) return at ~= nil and math.abs(GetTime() - at) <= LOOT_WINDOW end
@@ -109,7 +109,7 @@ local function Near(at) return at ~= nil and math.abs(GetTime() - at) <= LOOT_WI
 local function CountLoot(run, amount)
     Progress(run).gold = (Progress(run).gold or 0) + amount
     lootCounted = { amount = amount, at = GetTime() }
-    Changed(run)
+    Changed()
 end
 
 local function OnMoney()
@@ -136,11 +136,7 @@ local function OnLootLine()
     local run = MS.currentRun
     if not (run and MS.inDungeon and worldIn) then return end
     lootLineAt = GetTime()
-    if waiting and Near(waiting.at) then
-        local amount = waiting.amount
-        waiting = nil
-        CountLoot(run, amount)
-    end
+    if waiting and Near(waiting.at) then CountLoot(run, waiting.amount) end
     waiting = nil
 end
 
@@ -225,7 +221,7 @@ end
 local function CountKill(run, name)
     if name then MS:NoteMobDied(name) end
     Progress(run).kills = Progress(run).kills + 1
-    Changed(run)
+    Changed()
 end
 
 local function OnXPLine(text)
@@ -308,7 +304,8 @@ local function CheckUnit(unit)
             alive[key] = true
             Debug(nil, "%s alive (%s)", tostring(name), unit)
         else
-            Debug("skip" .. key, "%s skipped: hostile %s, player's %s", tostring(name), tostring(hostile), tostring(theirs))
+            Debug("skip" .. key, "%s skipped: hostile %s, player's %s",
+                tostring(name), tostring(hostile), tostring(theirs))
         end
         return
     end
@@ -352,7 +349,7 @@ local function OnRepLine(text)
             if amount and amount > 0 then
                 local rep = Progress(run).rep
                 rep[faction] = (rep[faction] or 0) + amount
-                Changed(run)
+                Changed()
             end
             return
         end
@@ -483,7 +480,7 @@ local function OnQuestLog()
         end
         seen[id] = q.done
     end
-    if any then Changed(run) end
+    if any then Changed() end
 end
 
 -- A quest handed in inside the dungeon (some have their giver there). Its
@@ -516,7 +513,7 @@ local function OnQuestTurnedIn(questID, xpReward, moneyReward)
         end
         QuestTotals(p)
     end
-    Changed(run)
+    Changed()
 end
 
 -- ── Events ─────────────────────────────────────────────────────────────────

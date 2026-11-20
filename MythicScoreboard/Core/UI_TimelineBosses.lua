@@ -1,3 +1,4 @@
+local _abs    = math.abs
 local _floor  = math.floor
 local _max    = math.max
 local _min    = math.min
@@ -28,7 +29,7 @@ local function ShowBossTooltip(owner, boss, run)
     local isWipe = MS.FightLost(boss)
     GameTooltip:SetOwner(owner, "ANCHOR_TOP")
     local tc = isWipe and P.bloodHi or P.bronzeHi
-    GameTooltip:SetText((boss.name or L["Boss"]) .. (MS.FightLost(boss) and " " or "") .. MS.FightTag(boss), tc[1], tc[2], tc[3])
+    GameTooltip:SetText((boss.name or L["Boss"]) .. (isWipe and " " or "") .. MS.FightTag(boss), tc[1], tc[2], tc[3])
 
     local pullT = boss.pullTime or 0
     local endT  = MS.FightEnd(boss)
@@ -36,7 +37,8 @@ local function ShowBossTooltip(owner, boss, run)
     if endT then
         GameTooltip:AddDoubleLine(L["Pulled"], MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
         local r = MS.FightResult(boss)
-        GameTooltip:AddDoubleLine(r == "reset" and L["Reset"] or r == "wipe" and L["Wiped"] or L["Killed"], MS:FormatTime(endT), 0.8, 0.8, 0.8, 1, 1, 1)
+        GameTooltip:AddDoubleLine(r == "reset" and L["Reset"] or r == "wipe" and L["Wiped"] or L["Killed"],
+            MS:FormatTime(endT), 0.8, 0.8, 0.8, 1, 1, 1)
         GameTooltip:AddDoubleLine(L["Fight length"], MS:FormatTime(endT - pullT), 0.8, 0.8, 0.8, 1, 1, 1)
     else
         GameTooltip:AddDoubleLine(L["Pulled"], MS:FormatTime(pullT), 0.8, 0.8, 0.8, 1, 1, 1)
@@ -95,14 +97,13 @@ local function ShowBossTooltip(owner, boss, run)
     if MS.FightEnd(boss) then
         local shown = UI.focus and UI.focus.boss == boss
         GameTooltip:AddLine(" ")
-        GameTooltip:AddLine(shown and L["Click to see the whole run again"] or L["Click to see this fight in the table"],
+        GameTooltip:AddLine(shown and L["Click to see the whole run again"]
+            or L["Click to see this fight in the table"],
             P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
     end
     GameTooltip:Show()
 end
 
--- ── Segments + medallions ─────────────────────────────────────────────────
--- Returns where the drawn track ends and what is still going on there.
 -- ── Medallions: labels measured, then placed ──────────────────────────────
 -- Returns which bosses get no medallion of their own (wipes before a later
 -- kill) and, for the rest, their labels and placement.
@@ -140,10 +141,12 @@ local function PlaceMedallions(c)
             local name = Text(cv, "game", 13, isWipe and P.bloodHi or P.ivory)
             name:SetText(boss.name or L["Boss"])
             local sub = Text(cv, "regular", 12, P.ash)
-            if isWipe then sub:SetText(_fmt(result == "reset" and L["Reset at %s"] or L["Wipe at %s"], MS:FormatTime(endT)))
+            if isWipe then
+                sub:SetText(_fmt(result == "reset" and L["Reset at %s"] or L["Wipe at %s"], MS:FormatTime(endT)))
             elseif result == "kill" then
                 local w = wipesBefore[bi]
-                sub:SetText(w and _fmt(L["Killed at %s after %s"], MS:FormatTime(endT), MS.Plural(w, "%d wipe", "%d wipes"))
+                sub:SetText(w
+                    and _fmt(L["Killed at %s after %s"], MS:FormatTime(endT), MS.Plural(w, "%d wipe", "%d wipes"))
                     or _fmt(L["Killed at %s"], MS:FormatTime(endT)))
             elseif c.live then sub:SetText(L["In combat"])
             else sub:SetText(L["No result"]) end                   -- saved before fights were closed
@@ -199,13 +202,13 @@ local function DrawMedallion(c, boss, info, pullT, endT, isWipe)
         local t = Solid(cv, "ARTWORK", 0, stemC[1], stemC[2], stemC[3], 0.55)
         t:SetSize(w, h); At(t, "BOTTOMLEFT", x, y)
     end
-    if math.abs(cx - mx) < 1 then
+    if _abs(cx - mx) < 1 then
         StemPiece(1, cy - MED_R - top, _floor(mx), top)
     else
         -- Moved aside: up from the fight, across, then up to the medallion.
         local elbow = info.elbow or (top + 7)
         StemPiece(1, elbow - top, _floor(mx), top)
-        StemPiece(math.abs(_floor(cx) - _floor(mx)) + 1, 1, _min(_floor(mx), _floor(cx)), elbow)
+        StemPiece(_abs(_floor(cx) - _floor(mx)) + 1, 1, _min(_floor(mx), _floor(cx)), elbow)
         StemPiece(1, cy - MED_R - elbow, _floor(cx), elbow)
     end
 
@@ -291,7 +294,8 @@ end
 -- Returns where the drawn track ends and what is still going on there.
 local function DrawBosses(c)
     local cv, run, live, X, At, Solid = c.cv, c.run, c.live, c.X, c.At, c.Solid
-    local Art, Seg, SegButton, InBarText, CountDeaths, clampT = c.Art, c.Seg, c.SegButton, c.InBarText, c.CountDeaths, c.clampT
+    local Art, Seg, SegButton, InBarText, clampT = c.Art, c.Seg, c.SegButton, c.InBarText, c.clampT
+    local CountDeaths = c.CountDeaths
     local prevT = 0
     local liveKind = "trash"
     local superseded, medInfo = PlaceMedallions(c)
@@ -316,9 +320,13 @@ local function DrawBosses(c)
                 GameTooltip:SetOwner(self2, "ANCHOR_TOP")
                 GameTooltip:SetText(L["Trash"], P.ivory[1], P.ivory[2], P.ivory[3])
                 GameTooltip:AddDoubleLine(L["Duration"], MS:FormatTime(pullT - tStart), 0.8, 0.8, 0.8, 1, 1, 1)
-                if pct then GameTooltip:AddDoubleLine(L["Enemy forces at pull"], _fmt("%d%%", pct), 0.8, 0.8, 0.8, 1, 1, 1) end
+                if pct then
+                    GameTooltip:AddDoubleLine(L["Enemy forces at pull"], _fmt("%d%%", pct), 0.8, 0.8, 0.8, 1, 1, 1)
+                end
                 local d = CountDeaths(tStart, pullT)
-                if d > 0 then GameTooltip:AddDoubleLine(L["Deaths"], d, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
+                if d > 0 then
+                    GameTooltip:AddDoubleLine(L["Deaths"], d, 0.8, 0.8, 0.8, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                end
                 GameTooltip:Show()
             end)
             local trashTxt = MS:FormatTime(pullT - tStart)

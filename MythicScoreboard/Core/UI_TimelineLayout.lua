@@ -58,7 +58,9 @@ local _slice = 0          -- when the current slice of thorough search began
 local CIRCLE = MED_R * 2 + 6
 local SHIFTS = { 0, CIRCLE, -CIRCLE, 2 * CIRCLE, -2 * CIRCLE }
 local MODES = {
-    { left = false }, { left = true }, { left = false, compact = true }, { left = true, compact = true }, { bare = true },
+    { left = false }, { left = true },
+    { left = false, compact = true }, { left = true, compact = true },
+    { bare = true },
 }
 local CLASH = 1e6
 -- An upper-row line may not pass behind a lower-row medallion (it would
@@ -180,8 +182,12 @@ local function CrowdedFallback(states, info, bi)
                             far = _max(cx + MED_R, info.mx), cost = 300 + math.abs(k) * 20 }
                 local clashes = 0
                 for _, o in ipairs(st.near) do
-                    if o.row == row and _min(c.x2, o.x2 + 6) - _max(c.x1, o.x1 - 6) > 0 then clashes = clashes + 1 end
-                    if row == 1 and o.row == 2 and o.l1 and cx > o.l1 - 2 and cx < o.l2 + 2 then clashes = clashes + 1 end
+                    if o.row == row and _min(c.x2, o.x2 + 6) - _max(c.x1, o.x1 - 6) > 0 then
+                        clashes = clashes + 1
+                    end
+                    if row == 1 and o.row == 2 and o.l1 and cx > o.l1 - 2 and cx < o.l2 + 2 then
+                        clashes = clashes + 1
+                    end
                 end
                 nextStates[#nextStates + 1] = { parent = st, bi = bi, c = c, score = st.score + c.cost + clashes * CLASH,
                                                 ord = #nextStates + 1 }

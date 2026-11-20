@@ -5,7 +5,7 @@ local Art, Box, Btn, P, Solid, Text, Tint = UI.Art, UI.Box, UI.Btn, UI.P, UI.Sol
 
 -- The blacklist window: everyone on it, with their note and when they were
 -- added. Click one to change the note; the cross removes them (click twice).
--- Opened from the settings, or /sb blacklist. The list itself: Blacklist.lua.
+-- Opened from the skull button on the scoreboard, or /sb blacklist. The list itself: Blacklist.lua.
 
 local W, H, ROW_H, PAD = 400, 440, 46, 14
 local frame, rows = nil, {}

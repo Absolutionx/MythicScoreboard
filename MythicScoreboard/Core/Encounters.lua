@@ -34,10 +34,11 @@ local function GetEnemyForcesPercent()
             local curValue = MS.ReadableNumber(info.quantity) or 0
             local maxValue = MS.ReadableNumber(info.totalQuantity) or 0
             if maxValue <= 0 then return nil end
-            -- quantityString may be "42%": strip the suffix for the raw count.
+            -- quantityString may be "42%": strip the suffix for the raw count
+            -- (only a "%": a plain number is read as it is).
             local qs = MS.Readable(info.quantityString)
             if qs then
-                local stripped = tonumber(qs:sub(1, -2))
+                local stripped = tonumber((qs:gsub("%%$", "")))
                 if stripped then curValue = stripped end
             end
             local pct = (curValue / maxValue) * 100

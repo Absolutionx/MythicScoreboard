@@ -7,11 +7,13 @@ local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
-local Art, Box, Btn, ClassColor, DiffShort, P, RunResult = UI.Art, UI.Box, UI.Btn, UI.ClassColor, UI.DiffShort, UI.P, UI.RunResult
+local Art, Box, Btn, ClassColor = UI.Art, UI.Box, UI.Btn, UI.ClassColor
+local DiffShort, P, RunResult = UI.DiffShort, UI.P, UI.RunResult
 local Solid, Text, Tint = UI.Solid, UI.Text, UI.Tint
 
 -- Run history dropdown under the header's history button.
 
+-- ===========================================================================
 -- History dropdown
 -- ===========================================================================
 
@@ -82,7 +84,8 @@ local function MakeRow()
     local armed, timer = false, nil
     local function Tip()
         GameTooltip:SetOwner(delBtn, "ANCHOR_RIGHT")
-        GameTooltip:SetText(armed and L["Click again to delete"] or L["Delete run"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:SetText(armed and L["Click again to delete"] or L["Delete run"],
+            P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
         GameTooltip:AddLine(L["Removes this run from history and from your stats."], 0.8, 0.8, 0.8)
         GameTooltip:Show()
     end
@@ -183,9 +186,6 @@ end
 
 local function Colour(fs, c) fs:SetTextColor(c[1], c[2], c[3]) end
 
--- The live run (if any) sits on top as "Now", so you can get back to it
--- after looking at a saved run. It can't be deleted from here, and nor can
--- another character's run (only that character can).
 local scopeRow
 
 -- "All characters" / "This character", over the list when other characters
@@ -226,6 +226,9 @@ local function MakeScopeRow()
     return sr
 end
 
+-- The live run (if any) sits on top as "Now", so you can get back to it
+-- after looking at a saved run. It can't be deleted from here, and nor can
+-- another character's run (only that character can).
 function Fill()
     local others = #MS:OtherHistoryChars() > 0
     local showChars = others and MS:GetHistoryScope() == "all"
@@ -255,7 +258,8 @@ function Fill()
         nameW = math.max(nameW, probe:GetStringWidth())
     end
     local around = 8 + 42 + lvlW + (showChars and 268 or 162) + 6
-    local dropW = math.max(drop.anchor:GetWidth() + 60, _min(MAX_W, around + _ceil(nameW * 1.08)))   -- (the game draws a little wider than it measures)
+    -- (The game draws a little wider than it measures.)
+    local dropW = math.max(drop.anchor:GetWidth() + 60, _min(MAX_W, around + _ceil(nameW * 1.08)))
     local topH    = others and 28 or 0
     drop:SetSize(dropW, topH + visRows * DROP_ROW_H + DROP_ROW_H + 10)
 
@@ -269,7 +273,6 @@ function Fill()
     elseif scopeRow then
         scopeRow:Hide()
     end
-
 
     local yOff = -4 - topH
     for n = 1, visRows do

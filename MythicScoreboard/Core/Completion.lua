@@ -183,8 +183,6 @@ function MS:KeyDeathPenalty()
     return type(timeLost) == "number" and timeLost >= 0 and timeLost or nil
 end
 
--- The key is done. Its time and result are known now; the meter's numbers
--- are hidden for a moment, so the save waits (FinalizeKey).
 -- How many levels a key goes up for its time: 3 with 40% of the timer left,
 -- 2 with 20%, 1 in time, 0 over.
 function MS.KeyUpgrades(duration, limit, inTime)
@@ -221,6 +219,8 @@ local function NoteKeyInfo(self, run, info)
     end
 end
 
+-- The key is done. Its time and result are known now; the meter's numbers
+-- are hidden for a moment, so the save waits (FinalizeKey).
 function MS:OnKeyCompleted(totalTimeMs, onTime)
     local run = self.currentRun
     if not (self.inDungeon and run) then return end
@@ -279,13 +279,6 @@ function MS:FinalizeKey(run)
 end
 
 -- ── Saving ─────────────────────────────────────────────────────────────────
--- Ends the current run and saves it to history.
---   outcome.completed   mark it cleared (a run already cleared stays so)
---   outcome.inTime      the key's result (left as it is when nil)
---   outcome.snapshot    read the meter first; by default yes, except for
---                       keys (the meter is hidden as a key ends) and paused
---                       runs (the meter may hold another place's numbers)
---   outcome.show        open the scoreboard afterwards
 -- A run nothing happened in: never pulled (its clock still waiting), or no
 -- boss fought, nobody dead, nothing killed, looted or hit. Stepping into a
 -- dungeon and out again isn't a run.
@@ -314,6 +307,13 @@ local function Step(what, fn, ...)
     return a, b
 end
 
+-- Ends the current run and saves it to history.
+--   outcome.completed   mark it cleared (a run already cleared stays so)
+--   outcome.inTime      the key's result (left as it is when nil)
+--   outcome.snapshot    read the meter first; by default yes, except for
+--                       keys (the meter is hidden as a key ends) and paused
+--                       runs (the meter may hold another place's numbers)
+--   outcome.show        open the scoreboard afterwards
 function MS:CommitRun(outcome)
     local run = self.currentRun
     if not run then return end

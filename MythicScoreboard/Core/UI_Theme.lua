@@ -431,6 +431,7 @@ end
 
 local function Abbrev(n)
     n = n or 0
+    if n <= -1 then return "-" .. Abbrev(-n) end        -- (a hit taken: -812.0K)
     if     n >= 1e9 then return _fmt("%.1f", n / 1e9) .. L["B"]
     elseif n >= 1e6 then return _fmt("%.1f", n / 1e6) .. L["M"]
     elseif n >= 1e3 then return _fmt("%.1f", n / 1e3) .. L["K"]
@@ -563,8 +564,6 @@ end
 -- repeat it every poll).
 function UI.SayOnce(what, err) MS:ReportError(what, err) end
 
--- What a run did for your character (Forever), for a tooltip.
--- prog: a live run's run.progress, or an archive entry's e.prog.
 -- A chart line that stays smooth at any angle: a texture with soft edges,
 -- drawn where it falls rather than snapped to whole pixels (a flat colour
 -- snapped to pixels turns a slope into a staircase of dots).

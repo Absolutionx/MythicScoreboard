@@ -8,9 +8,11 @@ local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local Abbrev, Art, Btn, CELL_FONT_SIZE = UI.Abbrev, UI.Art, UI.Btn, UI.CELL_FONT_SIZE
-local CLASS_ICON_COORDS, COLS, CT, ClassColor, ComputeColumnAnchors = UI.CLASS_ICON_COORDS, UI.COLS, UI.CT, UI.ClassColor, UI.ComputeColumnAnchors
-local DN, FRAME_W, GetRole, HGrad = UI.DN, UI.FRAME_W, UI.GetRole, UI.HGrad
-local Outline, P, PAD_X, ROLE_ICON_COORDS, ROLE_ICON_TEX, ROW_H = UI.Outline, UI.P, UI.PAD_X, UI.ROLE_ICON_COORDS, UI.ROLE_ICON_TEX, UI.ROW_H
+local CLASS_ICON_COORDS, COLS, CT, ClassColor = UI.CLASS_ICON_COORDS, UI.COLS, UI.CT, UI.ClassColor
+local ComputeColumnAnchors, DN, FRAME_W = UI.ComputeColumnAnchors, UI.DN, UI.FRAME_W
+local GetRole, HGrad = UI.GetRole, UI.HGrad
+local Outline, P, PAD_X = UI.Outline, UI.P, UI.PAD_X
+local ROLE_ICON_COORDS, ROLE_ICON_TEX, ROW_H = UI.ROLE_ICON_COORDS, UI.ROLE_ICON_TEX, UI.ROW_H
 local ScoreColor, Solid, SplitAbbrev, Text, Tint = UI.ScoreColor, UI.Solid, UI.SplitAbbrev, UI.Text, UI.Tint
 
 -- Scoreboard, the player rows: each row's frames (made once, then reused),
@@ -55,7 +57,7 @@ end
 
 local QualityColor = UI.QualityColor
 
-local function MakeLootIcon(row, x, idx)
+local function MakeLootIcon(row, x)
     local b = Btn(row)
     b:SetSize(30, 30)
     b:SetPoint("LEFT", row, "LEFT", x, 0)
@@ -127,8 +129,8 @@ local function RowOnEnter(self2)
 
     if (pc.level or 0) > 0 and MS.Flavor.dungeonLevels then
         local lo, hi = MS:ForeverLevelRange(self2._run)
-        GameTooltip:AddDoubleLine(L["Level"], pc.level .. (lo and ("  (" .. _fmt(L["dungeon %d-%d"], lo, hi) .. ")") or ""),
-            0.8, 0.8, 0.8, 1, 1, 1)
+        local range = lo and ("  (" .. _fmt(L["dungeon %d-%d"], lo, hi) .. ")") or ""
+        GameTooltip:AddDoubleLine(L["Level"], pc.level .. range, 0.8, 0.8, 0.8, 1, 1, 1)
     end
     local sc = pc.mythicScore or 0
     if sc > 0 then
@@ -141,10 +143,12 @@ local function RowOnEnter(self2)
     end
     local avoid = pc.avoidableDamageTaken or 0
     if avoid > 0 then
-        GameTooltip:AddDoubleLine(L["Avoidable damage"], Abbrev(avoid), 0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
+        GameTooltip:AddDoubleLine(L["Avoidable damage"], Abbrev(avoid),
+            0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
     end
 
-    -- Highest / lowest interrupt badge (healers other than Shaman excluded from "lowest").
+    -- Highest / lowest interrupt badge (healers without an interrupt are left
+    -- out of "lowest").
     local intCount = pc.interrupts or 0
     local canKick = (pc.role ~= "HEALER") or KICK_HEALERS[pc.class]
     local badge = ""
@@ -161,8 +165,11 @@ local function RowOnEnter(self2)
             end
         end
         if n > 1 then
-            if intCount > 0 and intCount == hi then badge = "  |cffe7b877" .. L["most in group"] .. "|r"
-            elseif loN > 1 and canKick and intCount == lo then badge = "  |cffe57068" .. L["fewest in group"] .. "|r" end
+            if intCount > 0 and intCount == hi then
+                badge = "  |cffe7b877" .. L["most in group"] .. "|r"
+            elseif loN > 1 and canKick and intCount == lo then
+                badge = "  |cffe57068" .. L["fewest in group"] .. "|r"
+            end
         end
     end
     if intCount > 0 or badge ~= "" then
@@ -175,7 +182,8 @@ local function RowOnEnter(self2)
         for _, e in ipairs(pc.loot) do
             local link, _, _, ilvl = LootDetails(e)
             local shownLink = (type(link) == "string" and link:find("|H")) and link or L["Item not loaded yet"]
-            GameTooltip:AddDoubleLine("  " .. shownLink, ilvl and _fmt(L["ilvl %d"], ilvl) or "", 1, 1, 1, 0.8, 0.8, 0.8)
+            GameTooltip:AddDoubleLine("  " .. shownLink, ilvl and _fmt(L["ilvl %d"], ilvl) or "",
+                1, 1, 1, 0.8, 0.8, 0.8)
         end
         GameTooltip:AddLine(" ")
     end
@@ -205,7 +213,8 @@ local function RowOnEnter(self2)
                     if kill then
                         local line = "  |cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r"
                         if kill.caster and kill.caster ~= "" then
-                            line = "  " .. _fmt(L["%s |cff888888by|r %s"], "|cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r",
+                            line = "  " .. _fmt(L["%s |cff888888by|r %s"],
+                                "|cffff9944" .. (kill.spellName or L["Unknown"]) .. "|r",
                                 "|cffffd700" .. kill.caster .. "|r")
                         end
                         if (kill.amount or 0) > 0 then
@@ -362,7 +371,7 @@ local function MakeRow(parent)
     -- shows "+N" when there's more); LayoutRow places them.
     local most = math.max(3, math.floor(UI.LOOT_MAX_W / 33))
     row._loot = {}
-    for i = 1, most do row._loot[i] = MakeLootIcon(row, 0, i) end
+    for i = 1, most do row._loot[i] = MakeLootIcon(row, 0) end
     row._lootMore = Text(row, "semibold", 13, P.ash, "LEFT")
     row._lootNone = Text(row, "medium", 16, P.ash2, "LEFT")
     row._lootNone:SetText("-")

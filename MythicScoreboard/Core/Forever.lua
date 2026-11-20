@@ -49,14 +49,14 @@ for _, def in pairs(DUNGEONS) do
     if def.final then FINAL_NAMES[Norm(def.final)] = true end
 end
 
--- Each boss's names (name and aliases), normalised, worked out on first use.
+-- Each boss's names (name and aka), normalised, worked out on first use.
 local _names = setmetatable({}, { __mode = "k" })
 local function Names(entry)
     local set = _names[entry]
     if not set then
         set = {}
         if entry.name then set[Norm(entry.name)] = true end
-        for _, a in ipairs(entry.aka or entry.aliases or {}) do set[Norm(a)] = true end
+        for _, a in ipairs(entry.aka or {}) do set[Norm(a)] = true end
         _names[entry] = set
     end
     return set
@@ -194,9 +194,6 @@ function MS:ForeverDungeon(run)
     return nil
 end
 
--- For the run in progress: which wing it's in (shown as its name), and,
--- once its bosses say so, the wing its map is, for the next time. (A map
--- that turns out to hold two wings isn't used to tell them apart.)
 -- The part of the dungeon you're in, by its name (GetSubZoneText).
 local function SubZone()
     local fn = rawget(_G, "GetSubZoneText")
@@ -336,6 +333,10 @@ function MS:ForeverSameDoor(run)
     return Near(here, run.entryDoor, DOOR_RADIUS)
 end
 
+-- For the run in progress: which wing it's in (shown as its name), and,
+-- once its bosses say so, the wing its door, room and map are, for the next
+-- time. (A room or map that turns out to hold two wings isn't used to tell
+-- them apart.)
 function MS:NoteForeverWing(run)
     if not run then return end
     local key, how = Resolve(run)
@@ -400,7 +401,9 @@ end
 -- Most wings have trash found nowhere else (WING_TRASH). The first of those
 -- killed says which wing: surer than the door or the room, and kept unless a
 -- boss says otherwise. Kills are seen by name (the XP line, "<mob> dies.")
--- and by NPC ID (UNIT_DIED and PARTY_KILL carry the mob's GUID).
+-- and by NPC ID (UNIT_DIED and PARTY_KILL carry the mob's GUID). WING_TRASH
+-- lists names only, so a kill seen by its NPC ID alone shows in /sb
+-- wingdebug but doesn't say which wing.
 local lastKillSeen                                   -- for /sb wingdebug
 local function NpcOf(guid)
     guid = MS.Readable(guid)
@@ -408,7 +411,7 @@ local function NpcOf(guid)
     local kind, id = guid:match("^(%a+)%-%d+%-%d+%-%d+%-%d+%-(%d+)")
     if kind == "Creature" or kind == "Vehicle" then return tonumber(id) end
 end
-local function TrashWing(npc, name, base)
+local function TrashWing(name, base)
     local lname = type(name) == "string" and name:lower()
     local found
     for wing, list in pairs(MS.ForeverData.WING_TRASH or {}) do
@@ -429,9 +432,11 @@ function MS:NoteForeverKill(npc, name)
     if not (run and MS.inDungeon) then return end
     local base = RunName(run)
     if not MS:DungeonHasWings(base) then return end
-    local wing = TrashWing(npc, name, base)
+    local wing = TrashWing(name, base)
     lastKillSeen = { npc = npc, name = name, wing = wing }
-    if wingDebug then MS.Say(string.format("|cff9aa0a6wing:|r killed %s (%s): %s", tostring(name), tostring(npc), tostring(wing))) end
+    if wingDebug then
+        MS.Say(string.format("|cff9aa0a6wing:|r killed %s (%s): %s", tostring(name), tostring(npc), tostring(wing)))
+    end
     if not wing or #(run.bosses or {}) > 0 then return end
     if run._wingBy == "bosses" or run._wingBy == "map" or run._wingBy == "trash" then return end
     run.wingName, run._wingBy = wing, "trash"
@@ -496,7 +501,8 @@ function MS:WingDebug(toggle)
     local ForMap, Info = rawget(_G, "EJ_GetInstanceForMap"), rawget(_G, "EJ_GetInstanceInfo")
     if ForMap and type(map) == "number" then
         local ok, inst = pcall(ForMap, map)
-        say("journal: %s %s", Show(ok and inst), (ok and inst and inst ~= 0 and Info) and Show(select(2, pcall(Info, inst))) or "-")
+        say("journal: %s %s", Show(ok and inst),
+            (ok and inst and inst ~= 0 and Info) and Show(select(2, pcall(Info, inst))) or "-")
     else
         say("journal: no EJ_GetInstanceForMap")
     end
