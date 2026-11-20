@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.17.1
+
+### WoW Forever
+- The directions' Hearthstone, Astral Recall and teleport icon can now be clicked, and shows its tooltip (the arrow was in the way). It has a clean bronze edge, and it uses the item once per click, whichever way your "cast on key down" setting is.
+
 ## 2.17.0
 
 ### WoW Forever

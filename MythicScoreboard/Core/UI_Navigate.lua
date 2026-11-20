@@ -236,16 +236,26 @@ local function BuildJump()
     jump = CreateFrame("Button", "MythicScoreboardJump", UIParent, "SecureActionButtonTemplate")
     jump:SetSize(48, 48)
     jump:SetPoint("CENTER", frame, "TOP", 0, -28)          -- where the arrow is
+    -- Over the arrow's frame (which takes the mouse for dragging), or the
+    -- clicks and the tooltip would go to that instead.
     jump:SetFrameStrata(frame:GetFrameStrata() or "MEDIUM")
-    -- (Down and up: the game uses whichever its "cast on key down" setting says.)
-    jump:RegisterForClicks("AnyUp", "AnyDown")
+    jump:SetFrameLevel(frame:GetFrameLevel() + 10)
+    -- On the press or the release, as the game's "cast on key down" setting
+    -- says (the game ignores a click on the other one; and some versions
+    -- would act on both).
+    local GetCVarBool = rawget(_G, "GetCVarBool")
+    local onDown = GetCVarBool and GetCVarBool("ActionButtonUseKeyDown")
+    jump:RegisterForClicks(onDown and "AnyDown" or "AnyUp")
+    -- A thin bronze edge, then the icon inside it.
+    local edge = jump:CreateTexture(nil, "BACKGROUND")
+    edge:SetPoint("TOPLEFT", -2, 2); edge:SetPoint("BOTTOMRIGHT", 2, -2)
+    if P then edge:SetColorTexture(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3], 0.9) else edge:SetColorTexture(1, 0.8, 0.4, 0.9) end
+    local inner = jump:CreateTexture(nil, "BORDER")
+    inner:SetPoint("TOPLEFT", -1, 1); inner:SetPoint("BOTTOMRIGHT", 1, -1)
+    inner:SetColorTexture(0, 0, 0, 1)
     local icon = jump:CreateTexture(nil, "ARTWORK")
     icon:SetAllPoints(); icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
     jump.icon = icon
-    local edge = jump:CreateTexture(nil, "OVERLAY")
-    edge:SetPoint("TOPLEFT", -3, 3); edge:SetPoint("BOTTOMRIGHT", 3, -3)
-    edge:SetTexture("Interface\\Buttons\\UI-ActionButton-Border"); edge:SetBlendMode("ADD")
-    if P then edge:SetVertexColor(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3], 0.8) end
     jump:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
     jump:SetScript("OnEnter", function(self)
         local to = self.to
