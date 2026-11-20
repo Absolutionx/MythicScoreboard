@@ -31,8 +31,11 @@ local SAME_FOR = 30 * 60                -- left for less than this: still the sa
 --               last = { map, char, at, leftAt }, resets = { [dungeon name] = time },
 --               lockedUntil } }
 local function Realm()
-    local r = GetRealmName and GetRealmName()
-    return (type(r) == "string" and r ~= "" and not MS.IsSecret(r)) and r or "?"
+    local r = MS.PlayerRealm()
+    if r then return r end
+    -- (The game won't say: the realm your character's saved under.)
+    local key = MS.CharKey and MS:CharKey()
+    return key and key:match("@(.+)$") or "?"
 end
 
 local function Store()

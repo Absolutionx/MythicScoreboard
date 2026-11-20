@@ -469,6 +469,8 @@ local function OpenCharMenu(anchor)
         menuFrame:SetFrameStrata("FULLSCREEN_DIALOG"); menuFrame:EnableMouse(true)
         Box(menuFrame)
         menuFrame:SetScript("OnHide", function() charMenu = nil end)
+        -- (On the screen, not in the window: it goes when the window does.)
+        if UI.frame then UI.frame:HookScript("OnHide", CloseCharMenu) end
     end
     local m = menuFrame
     local entries = { { key = "all", label = L["All characters"] } }

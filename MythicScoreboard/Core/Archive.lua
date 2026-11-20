@@ -50,12 +50,49 @@ end
 
 local Plain = MS.ReadableValue
 
+-- name@realm, or nil until your name's known. When the game won't say the
+-- realm (WoW Forever, at times for a whole session): the key this character
+-- was saved under before, if there's just one; else "Name@". (An earlier
+-- version made "Name@" alongside the real one: SyncAccountStats folds it in.)
+-- A realm an earlier version saved by mistake: none, or (2.17.1, for a
+-- moment) your WoW Forever surname ("Jay-Breezy@Breezy").
+local function WrongRealm(name, realm)
+    return type(realm) ~= "string" or realm == "" or realm == (name or ""):match("%-(.+)$")
+end
+
 local function CharKey()
     local name = Plain(MS.UnitPlayerName and MS:UnitPlayerName("player") or UnitName("player"))
     if type(name) ~= "string" or name == "" then return nil end
-    local realm = Plain(GetRealmName and GetRealmName())   -- known from the start of the login
-    return name .. "@" .. (type(realm) == "string" and realm or ""), name, realm
+    local realm = MS.PlayerRealm()
+    if realm then return name .. "@" .. realm, name, realm end
+    local acc = MS.AccountDB and MS.AccountDB()
+    local _, cls = UnitClass("player")
+    cls = Plain(cls)
+    local found
+    for key, c in pairs(acc and type(acc.chars) == "table" and acc.chars or {}) do
+        if c.name == name and not WrongRealm(name, c.realm) and (not cls or not c.class or c.class == cls) then
+            if found then return name .. "@", name, "" end      -- (two: can't tell which)
+            found = key
+        end
+    end
+    if found then return found, name, acc.chars[found].realm end
+    return name .. "@", name, ""
 end
+
+-- One archive's runs added to another's (the same run, by its start and
+-- dungeon, once), oldest first.
+local function MergeArchive(into, from)
+    if type(from) ~= "table" or type(from.runs) ~= "table" then return end
+    local have = {}
+    for _, e in ipairs(into.runs) do have[tostring(e.at) .. "|" .. tostring(e.dungeon)] = true end
+    for _, e in ipairs(from.runs) do
+        local k = tostring(e.at) .. "|" .. tostring(e.dungeon)
+        if not have[k] then have[k] = true; into.runs[#into.runs + 1] = e end
+    end
+    table.sort(into.runs, function(a, b) return (a.at or 0) < (b.at or 0) end)
+end
+
+MS._CharKeyNow = function() return (CharKey()) end   -- for tests
 
 local function NewArchive() return { v = MS.ARCHIVE_VERSION, runs = {} } end
 local function Valid(a) return type(a) == "table" and type(a.runs) == "table" end
@@ -77,9 +114,15 @@ local function MoveAccountWide(key)
     local chars = Account().chars
     local c = chars[key]
     if not c then c = {}; chars[key] = c end
+    -- (Kept with the character while its name or realm wasn't known: added
+    -- to what's already saved for it, never in place of it.)
     local old = MythicScoreboardDB.archive
     if Valid(old) then
-        c.archive = old
+        if Valid(c.archive) and #c.archive.runs > 0 then
+            MergeArchive(Ready(c.archive), Ready(old))   -- (each brought up to date first)
+        else
+            c.archive = old
+        end
         Bump()
     end
     MythicScoreboardDB.archive = nil
@@ -351,11 +394,25 @@ function MS:SyncAccountStats()
     if not a then return end
     local key, name, realm = CharKey()
     if not key then return end
-    local c = Account().chars[key]
+    local chars = Account().chars
+    local c = chars[key]
     c.name, c.realm = name, realm
     local _, cls = UnitClass("player")
     c.class = Plain(cls) or c.class
     _charKey = key
+    -- Made by an earlier version under a wrong realm (none, or your
+    -- surname): this same character twice over. Its runs join this one's;
+    -- it goes. (Only once this one's realm is a real one.)
+    if WrongRealm(name, realm) then return end
+    for k, other in pairs(chars) do
+        if other ~= c and other.name == name and WrongRealm(name, other.realm)
+                and (other.class == nil or other.class == c.class) then
+            if Valid(other.archive) then MergeArchive(Ready(c.archive), Ready(other.archive)) end
+            chars[k] = nil
+            if Account().statsChar == k then Account().statsChar = nil end
+            Bump()
+        end
+    end
 end
 
 -- "all", or one character's key.
