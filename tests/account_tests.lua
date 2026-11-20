@@ -119,6 +119,20 @@ for _, w in ipairs(M.allFrames) do if w._shown and w._kind == "Button" and w._ch
 end end
 M.RunTimers(2)
 check("back to all", MS:GetStatsChar() == "all")
+-- The menu open, the window closed: the menu goes with it.
+charBtn:Fire("OnClick")
+local menu
+for _, w in ipairs(M.allFrames) do
+    if w._strata == "FULLSCREEN_DIALOG" and w._shown and w._parent == UIParent then
+        for _, c in ipairs(w._children) do
+            for _, g in ipairs(c._children or {}) do if g._text == "All characters" then menu = w end end
+        end
+    end
+end
+check("character menu open", menu ~= nil)
+f:Hide()
+check("window closed: the menu too", menu and not menu._shown)
+f:Show(); M.RunTimers(2)
 local controls
 for _, w in ipairs(M.allFrames) do if w.charBtn and w.lootTab then controls = w end end
 local lootTab = controls.lootTab

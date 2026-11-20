@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.17.2
+
+### WoW Forever
+- **You show up once in the Stats character list.** WoW Forever sometimes doesn't give the realm's name, and the addon could then save your runs under a second copy of you. Your runs now stay with you whatever the game says, and any extra copy is merged back in on login, each run kept once.
+- The instance limit tracker keeps counting under your realm when the game doesn't name it.
+
+### Everyone
+- The character menu on the Stats page closes along with the window.
+
 ## 2.17.1
 
 ### WoW Forever

@@ -130,6 +130,21 @@ function MS.ClockTime(t)
     return h .. date(":%M", t) .. " " .. ampm
 end
 
+-- ── Your realm ─────────────────────────────────────────────────────────────
+-- Its name, from whichever of the game's answers has one; nil when none do
+-- (WoW Forever gives an empty realm at times, for a whole session even).
+function MS.PlayerRealm()
+    local tries = {
+        function() return GetRealmName and GetRealmName() end,
+        function() local f = rawget(_G, "GetNormalizedRealmName"); return f and f() end,
+    }
+    -- (Not UnitFullName: on WoW Forever its second half is your surname.)
+    for _, try in ipairs(tries) do
+        local ok, r = pcall(try)
+        if ok and type(r) == "string" and r ~= "" and not MS.IsSecret(r) then return r end
+    end
+end
+
 -- Like FormatTime, with hours once a run passes an hour ("1:02:05").
 function MS:FormatLongTime(seconds)
     if not seconds then return "-" end
