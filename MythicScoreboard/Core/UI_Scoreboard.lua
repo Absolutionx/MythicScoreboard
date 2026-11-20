@@ -646,6 +646,18 @@ function MS:_DoRefreshOverview()
     for _, p in pairs(run.players) do _ins(_playersBuf, p) end
     local players = _playersBuf
 
+    -- WoW Forever: the first avoidable damage seen in any run brings the Avoidable
+    -- column back, now and from then on (UI_Theme.lua).
+    if not COLS._avoidable then
+        for _, p in ipairs(players) do
+            if (tonumber(p.avoidableDamageTaken) or 0) > 0 then
+                MS:SetSetting("avoidableSeen", true)
+                UI.SetAvoidableColumn(true)
+                break
+            end
+        end
+    end
+
     SortPlayers(players, dur)
     local hasSuffix = SuffixColumns(players, dur, run)
     local topDps, topHps = TopRates(players, dur)

@@ -52,6 +52,13 @@ function Widget:SetPassThroughButtons(...)
     if InCombatLockdown() then M.blocked = (M.blocked or 0) + 1; return end
     self._passThrough = { ... }
 end
+-- A secure button's attributes: blocked for addons in combat, like the game.
+function Widget:SetAttribute(k, v)
+    if InCombatLockdown() then M.blocked = (M.blocked or 0) + 1; return end
+    self._attr = self._attr or {}
+    self._attr[k] = v
+end
+function Widget:GetAttribute(k) return self._attr and self._attr[k] end
 function Widget:GetScript(n) return self._scripts[n] end
 function Widget:HookScript(n, f)
     local old = self._scripts[n]

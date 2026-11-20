@@ -241,6 +241,48 @@ end
 
 -- One player row (filled by FillRow). Made once per line; the scoreboard
 -- keeps them in a pool (UI.Pool) and reuses each line's row in place.
+-- Places a row's cells for the columns shown, and hides the rest: when it's
+-- made, and again (FillRow) once the columns have changed.
+local function LayoutRow(row)
+    ComputeColumnAnchors()
+    row._colsVersion = UI.ColumnsVersion()
+    local shown = {}
+    for _, col in ipairs(COLS) do shown[col.key] = col end
+    for key, cell in pairs(row._statFs) do
+        local col = shown[key]
+        cell.main:SetShown(col ~= nil)
+        if cell.tail then cell.tail:SetShown(col ~= nil) end
+        if col then
+            cell.main:ClearAllPoints()
+            cell.main:SetPoint("RIGHT", row, "LEFT", col.anchor, 0)
+            cell.main._msY = nil
+            if cell.tail then
+                cell.tail:ClearAllPoints()
+                cell.tail:SetPoint("LEFT", row, "LEFT", col.anchor, 0)
+            end
+            if key == "score" then row._scoreAnchor = col.anchor end
+        end
+        local bar = row._shareBar[key]
+        if bar then
+            bar:ClearAllPoints()
+            if col then bar:SetPoint("BOTTOMRIGHT", row, "BOTTOMLEFT", col.anchor + col.tailW, 9) else bar:Hide() end
+        end
+    end
+    if row._gainFs then row._gainFs:SetShown(shown.score ~= nil) end
+    local loot = shown.loot
+    row._lootX = loot.x
+    row._lootSlots = math.min(#row._loot, math.max(3, math.floor(loot.w / 33)))   -- as many icons as fit
+    for i, b in ipairs(row._loot) do
+        b:ClearAllPoints()
+        b:SetPoint("LEFT", row, "LEFT", loot.x + (i - 1) * 33, 0)
+        if i > row._lootSlots then b:SetEntry(nil) end
+    end
+    row._lootMore:ClearAllPoints()
+    row._lootMore:SetPoint("LEFT", row, "LEFT", loot.x + (row._lootSlots - 1) * 33 + 2, 0)
+    row._lootNone:ClearAllPoints()
+    row._lootNone:SetPoint("LEFT", row, "LEFT", loot.x, 0)
+end
+
 local function MakeRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(FRAME_W - 2, ROW_H)
@@ -291,24 +333,18 @@ local function MakeRow(parent)
     row._subFs = Text(row, "regular", 12, P.ash)
     row._subFs:SetPoint("LEFT", row, "LEFT", nameX, -9); row._subFs:SetWidth(nameW)
 
-    ComputeColumnAnchors()
+    -- A cell for every column there can be; LayoutRow places the ones shown
+    -- (and hides the rest), again whenever the columns change.
     row._statFs = {}
     row._shareBar = {}
-    for _, col in ipairs(COLS) do
-        if col.key == "loot" then
-            row._lootX = col.x
-        elseif col.num then
+    for _, col in ipairs(UI.ALL_COLS) do
+        if col.num then
             local font = col.strong and "semibold" or "medium"
             local main = Text(row, font, CELL_FONT_SIZE, P.ivory, "RIGHT")
-            main:SetPoint("RIGHT", row, "LEFT", col.anchor, 0)
             local tail
-            if col.num == "abbr" then
-                tail = Text(row, font, CELL_FONT_SIZE, P.ivory, "LEFT")
-                tail:SetPoint("LEFT", row, "LEFT", col.anchor, 0)
-            end
+            if col.num == "abbr" then tail = Text(row, font, CELL_FONT_SIZE, P.ivory, "LEFT") end
             row._statFs[col.key] = { main = main, tail = tail }
             if col.key == "score" then
-                row._scoreAnchor = col.anchor
                 -- Your rating gain from this key, centred under the rating.
                 local gain = Text(row, "medium", 11, P.verdHi, "CENTER")
                 gain:SetPoint("TOP", main, "BOTTOM", 0, 1)
@@ -317,20 +353,20 @@ local function MakeRow(parent)
             if col.strong then
                 local bar = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 0.7)
                 bar:SetHeight(2)
-                bar:SetPoint("BOTTOMRIGHT", row, "BOTTOMLEFT", col.anchor + col.tailW, 9)
                 row._shareBar[col.key] = bar
             end
         end
     end
 
-    -- Loot icons (up to three; a fourth slot shows "+N")
+    -- Loot icons: as many as the column holds at its widest (the last slot
+    -- shows "+N" when there's more); LayoutRow places them.
+    local most = math.max(3, math.floor(UI.LOOT_MAX_W / 33))
     row._loot = {}
-    for i = 1, 3 do row._loot[i] = MakeLootIcon(row, row._lootX + (i - 1) * 33, i) end
+    for i = 1, most do row._loot[i] = MakeLootIcon(row, 0, i) end
     row._lootMore = Text(row, "semibold", 13, P.ash, "LEFT")
-    row._lootMore:SetPoint("LEFT", row, "LEFT", row._lootX + 2 * 33 + 2, 0)
     row._lootNone = Text(row, "medium", 16, P.ash2, "LEFT")
-    row._lootNone:SetPoint("LEFT", row, "LEFT", row._lootX, 0)
     row._lootNone:SetText("-")
+    LayoutRow(row)
 
     local hov = Solid(row, "HIGHLIGHT", 0, 1, 0.94, 0.86, 0.035); hov:SetAllPoints()
 
@@ -435,6 +471,7 @@ UI.focus = nil      -- { run = run, boss = boss } while a fight is shown
 -- ctx: run, dur (the whole run's or the focused fight's), hasSuffix, topDps,
 -- topHps, dpsCellW, hpsCellW, count (rows in all).
 local function FillRow(row, idx, p, isSelf, ctx)
+    if row._colsVersion ~= UI.ColumnsVersion() then LayoutRow(row) end
     local run, dur = ctx.run, ctx.dur
     local hasSuffix, topDps, topHps = ctx.hasSuffix, ctx.topDps, ctx.topHps
     local dpsCellW, hpsCellW = ctx.dpsCellW, ctx.hpsCellW
@@ -512,10 +549,11 @@ local function FillRow(row, idx, p, isSelf, ctx)
 
     local loot = p.loot or {}
     local nLoot = #loot
-    local shown = (nLoot > 3) and 2 or nLoot
-    for i = 1, 3 do row._loot[i]:SetEntry(i <= shown and loot[i] or nil) end
-    row._lootMore:SetShown(nLoot > 3)
-    if nLoot > 3 then row._lootMore:SetText("+" .. (nLoot - 2)) end
+    local slots = row._lootSlots
+    local shown = (nLoot > slots) and (slots - 1) or nLoot
+    for i = 1, slots do row._loot[i]:SetEntry(i <= shown and loot[i] or nil) end
+    row._lootMore:SetShown(nLoot > slots)
+    if nLoot > slots then row._lootMore:SetText("+" .. (nLoot - shown)) end
     row._lootNone:SetShown(nLoot == 0)
 
     local dpsV = RateOf(p, "dps", "damageDone", dur)
