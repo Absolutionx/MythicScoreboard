@@ -154,7 +154,8 @@ local function Cells(row, cols, size)
     local out, x = {}, 0
     for _, c in ipairs(cols) do
         if c.key ~= "recent" then
-            local fs = Text(row, c.key == "name" and "semibold" or "medium", size or 15, P.ivory, c.left and "LEFT" or "CENTER")
+            local fs = Text(row, c.key == "name" and "semibold" or "medium", size or 15, P.ivory,
+                c.left and "LEFT" or "CENTER")
             fs:SetWidth(c.w - 8)
             if c.left then fs:SetPoint("LEFT", row, "LEFT", x, 0)
             else fs:SetPoint("CENTER", row, "LEFT", x + c.w / 2, 0) end
@@ -247,7 +248,8 @@ local function MakeDungeonRow(parent)
         local d = self.data
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(d.name, P.ivory[1], P.ivory[2], P.ivory[3])
-        GameTooltip:AddLine(MS.Plural(d.runs, "%d run", "%d runs") .. ", " .. _fmt(L["%d cleared"], d.cleared), P.ash[1], P.ash[2], P.ash[3])
+        GameTooltip:AddLine(MS.Plural(d.runs, "%d run", "%d runs") .. ", " .. _fmt(L["%d cleared"], d.cleared),
+            P.ash[1], P.ash[2], P.ash[3])
         GameTooltip:AddLine(L["Recent runs, oldest to newest. Shorter bars are faster; the brightest is your best clear."],
             P.ash[1], P.ash[2], P.ash[3], true)
         GameTooltip:AddLine(L["Click for every run in this dungeon."], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
@@ -270,7 +272,8 @@ local function MakeMateRow(parent)
         local m = self.data
         GameTooltip:SetOwner(self, "ANCHOR_LEFT")
         GameTooltip:SetText(DN(m.name), P.ivory[1], P.ivory[2], P.ivory[3])
-        GameTooltip:AddLine(MS.Plural(m.runs, "%d run together", "%d runs together") .. ", " .. _fmt(L["%d cleared"], m.cleared), P.ash[1], P.ash[2], P.ash[3])
+        GameTooltip:AddLine(MS.Plural(m.runs, "%d run together", "%d runs together") .. ", "
+            .. _fmt(L["%d cleared"], m.cleared), P.ash[1], P.ash[2], P.ash[3])
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -303,7 +306,8 @@ local function MakeBossRow(parent)
             GameTooltip:AddDoubleLine(L["Your best DPS"], Abbrev(b.bestDps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
         end
         if not b.best then
-            GameTooltip:AddLine(L["Fight lengths are recorded from version 2.5 on."], P.ash[1], P.ash[2], P.ash[3], true)
+            GameTooltip:AddLine(L["Fight lengths are recorded from version 2.5 on."],
+                P.ash[1], P.ash[2], P.ash[3], true)
         end
         GameTooltip:Show()
     end)
@@ -384,8 +388,8 @@ local function FillOverview(o, stats)
         UI.FitText(c.best, d.best and Dur(d.best) or CT(P.ash2, "-"), "medium", 15, 12)
         UI.FitText(c.typical, d.typical and Dur(d.typical) or CT(P.ash2, "-"), "medium", 15, 12)
         c.deaths:SetText(_fmt("%.1f", d.deathsPerRun))
-        c.deaths:SetTextColor((d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[1],
-            (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[2], (d.deathsPerRun >= 1 and P.bloodHi or P.ivory)[3])
+        local dc = d.deathsPerRun >= 1 and P.bloodHi or P.ivory
+        c.deaths:SetTextColor(dc[1], dc[2], dc[3])
         if c.xp then
             -- XP a run; under it, the split between the dungeon and quests.
             c.xp:SetText(d.xpPerRun and Abbrev(d.xpPerRun) or CT(P.ash2, "-"))
@@ -396,7 +400,8 @@ local function FillOverview(o, stats)
             end
             c.xpSplit:SetText((q > 0 and d.xp) and UI.XPSplit(d.xp - q, q, 44, 4) or "")
         else
-            c.dps:SetText(d.lastDps and (Abbrev(d.lastDps) .. (d.lastLvl and CT(P.ash, "  L" .. d.lastLvl) or "")) or CT(P.ash2, "-"))
+            c.dps:SetText(d.lastDps and (Abbrev(d.lastDps) .. (d.lastLvl and CT(P.ash, "  L" .. d.lastLvl) or ""))
+                or CT(P.ash2, "-"))
         end
         FillRecent(row.bars, d, row.recentX)
         y = y + ROW
@@ -603,8 +608,9 @@ function UI.RefreshStats(force)
     local runs = MS:StatsRuns()
     local chars = MS:StatsCharacters()
     local who = MS:GetStatsChar()
-    local sig = #runs .. "|" .. MS:StatsRevision() .. "|" .. tostring(S.selected) .. "|" .. S.tab .. "|" .. who .. "|" .. #chars
-        .. "|" .. tostring(S.compareA) .. "|" .. tostring(S.compareB) .. "|" .. tostring(S.from) .. "|" .. S.detailChart .. "|" .. tostring(S.detailRun)
+    local sig = #runs .. "|" .. MS:StatsRevision() .. "|" .. tostring(S.selected) .. "|" .. S.tab .. "|" .. who
+        .. "|" .. #chars .. "|" .. tostring(S.compareA) .. "|" .. tostring(S.compareB)
+        .. "|" .. tostring(S.from) .. "|" .. S.detailChart .. "|" .. tostring(S.detailRun)
     if sig == drawnSig and not force then return end
     if overview and overview.reset then overview.reset.Disarm() end
     drawnSig = sig
@@ -688,7 +694,7 @@ function UI.RefreshStats(force)
     elseif onTrends then K.FillTrends(trendsView, MS:TrendStats())
     elseif onKeys then K.FillKeys(keysView, keyStats)
     elseif comparing then K.FillCompare(compareView, MS:CompareRuns(S.compareA, S.compareB))
-    elseif S.selected then K.FillDetail(detail, MS:StatsForDungeon(S.selected), stats)
+    elseif S.selected then K.FillDetail(detail, MS:StatsForDungeon(S.selected))
     else FillOverview(overview, stats) end
 end
 

@@ -34,7 +34,8 @@ local SegmentLabelFor = TL.SegmentLabelFor
 -- Returns the growing segment of a live run, if there is one.
 local function DrawTail(c, prevT, liveKind)
     local cv, run, isMPlus, live, Solid, Art = c.cv, c.run, c.isMPlus, c.live, c.Solid, c.Art
-    local Tex, Seg, SegButton, InBarText, keyLimit, visualEnd = c.Tex, c.Seg, c.SegButton, c.InBarText, c.keyLimit, c.visualEnd
+    local Tex, Seg, SegButton, InBarText = c.Tex, c.Seg, c.SegButton, c.InBarText
+    local keyLimit, visualEnd = c.keyLimit, c.visualEnd
     local liveSeg
     if visualEnd then
         if visualEnd > prevT then
@@ -111,9 +112,11 @@ local function DrawKeyTimer(c)
             if runDur > 0 then
                 local diff = _abs(runDur - keyLimit)
                 if inTime then
-                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(diff)), P.verdHi[1], P.verdHi[2], P.verdHi[3])
+                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(diff)),
+                        P.verdHi[1], P.verdHi[2], P.verdHi[3])
                 else
-                    GameTooltip:AddLine(_fmt(L["Over by %s"], MS:FormatTime(diff)), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                    GameTooltip:AddLine(_fmt(L["Over by %s"], MS:FormatTime(diff)),
+                        P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
                 end
             end
             GameTooltip:Show()
@@ -159,11 +162,13 @@ local function DrawThresholds(c)
         b:SetFrameLevel(cv:GetFrameLevel() + 7)
         b:SetScript("OnEnter", function(self2)
             GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-            GameTooltip:SetText(n == 1 and L["Key timer"] or _fmt(L["+%d timer"], n), P.ivory[1], P.ivory[2], P.ivory[3])
+            GameTooltip:SetText(n == 1 and L["Key timer"] or _fmt(L["+%d timer"], n),
+                P.ivory[1], P.ivory[2], P.ivory[3])
             GameTooltip:AddLine(MS:FormatTime(t), 1, 1, 1)
             if run.completed and runDur > 0 then
                 if runDur <= t then
-                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(t - runDur)), P.verdHi[1], P.verdHi[2], P.verdHi[3])
+                    GameTooltip:AddLine(_fmt(L["In time by %s"], MS:FormatTime(t - runDur)),
+                        P.verdHi[1], P.verdHi[2], P.verdHi[3])
                 else
                     GameTooltip:AddLine(_fmt(L["Over by %s"], MS:FormatTime(runDur - t)), P.ash[1], P.ash[2], P.ash[3])
                 end
@@ -180,7 +185,8 @@ local function DrawCompletion(c)
     local cv, run, W, isMPlus, At = c.cv, c.run, c.W, c.isMPlus, c.At
     local Solid, Art, Text, Btn, keyLimit, compSec = c.Solid, c.Art, c.Text, c.Btn, c.keyLimit, c.compSec
     if compSec then
-        -- Finished on a boss kill: END_GAP past that boss's block (NewContext).
+        -- Finished on a boss kill: END_GAP past that boss's block (WhereRunEnds,
+        -- UI_Timeline.lua).
         local lineL = c.endLineL
         local fx = lineL + c.endLineW / 2               -- the line's middle
         local fc = (isMPlus and not run.inTime) and P.avoid or P.verd
@@ -323,7 +329,8 @@ local function DrawDeaths(c)
                 local r, gg, b = ClassColor(list[1].playerClass)
                 GameTooltip:SetText(_fmt(L["%s died"], list[1].playerName), r, gg, b)
             else
-                GameTooltip:SetText(MS.Plural(#list, "%d death", "%d deaths"), P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+                GameTooltip:SetText(MS.Plural(#list, "%d death", "%d deaths"),
+                    P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
             end
             local seg = SegmentLabelFor(run, list[1].rawTime)
             if seg then GameTooltip:AddLine(_fmt(L["During %s"], seg), P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
@@ -346,59 +353,59 @@ end
 local function DrawInterrupts(c)
     local cv, run, totalDur, W, X, At = c.cv, c.run, c.totalDur, c.W, c.X, c.At
     local Solid, Btn, clampT = c.Solid, c.Btn, c.clampT
-    do
-        local BUCKET_PX = 6
-        local nb = _ceil(W / BUCKET_PX)
-        local buckets = {}
-        local peak = 0
-        for _, p in pairs(run.players or {}) do
-            for _, ie in ipairs(p.interruptEvents or {}) do
-                local t = MS.EventTime(ie)
-                if clampT then t = _min(t, clampT) end
-                local bi = _min(nb, _floor((X(t) - TL_L) / BUCKET_PX) + 1)
-                local b = buckets[bi]
-                if not b then b = { n = 0, who = {} }; buckets[bi] = b end
-                b.n = b.n + 1
-                local who = DN(p.name)
-                b.who[who] = b.who[who] or { n = 0, class = p.class }
-                b.who[who].n = b.who[who].n + 1
-                if b.n > peak then peak = b.n end
-            end
+    local BUCKET_PX = 6
+    local nb = _ceil(W / BUCKET_PX)
+    local buckets = {}
+    local peak = 0
+    for _, p in pairs(run.players or {}) do
+        for _, ie in ipairs(p.interruptEvents or {}) do
+            local t = MS.EventTime(ie)
+            if clampT then t = _min(t, clampT) end
+            local bi = _min(nb, _floor((X(t) - TL_L) / BUCKET_PX) + 1)
+            local b = buckets[bi]
+            if not b then b = { n = 0, who = {} }; buckets[bi] = b end
+            b.n = b.n + 1
+            local who = DN(p.name)
+            b.who[who] = b.who[who] or { n = 0, class = p.class }
+            b.who[who].n = b.who[who].n + 1
+            if b.n > peak then peak = b.n end
         end
-        if peak > 0 then
-            local base = Solid(cv, "ARTWORK", 0, P.line[1], P.line[2], P.line[3], 1)
-            base:SetSize(W, 1); At(base, "BOTTOMLEFT", TL_L, INT_BASE - 1)
-            for bi, b in pairs(buckets) do
-                local x = TL_L + (bi - 1) * BUCKET_PX
-                local f = b.n / peak
-                local bar = Solid(cv, "ARTWORK", 1, P.kick[1], P.kick[2], P.kick[3], 0.35 + 0.55 * f)
-                bar:SetSize(BUCKET_PX - 2, _max(2, _floor(INT_MAXH * f + 0.5)))
-                At(bar, "BOTTOMLEFT", x + 1, INT_BASE)
+    end
+    if peak > 0 then
+        local base = Solid(cv, "ARTWORK", 0, P.line[1], P.line[2], P.line[3], 1)
+        base:SetSize(W, 1); At(base, "BOTTOMLEFT", TL_L, INT_BASE - 1)
+        for bi, b in pairs(buckets) do
+            local x = TL_L + (bi - 1) * BUCKET_PX
+            local f = b.n / peak
+            local bar = Solid(cv, "ARTWORK", 1, P.kick[1], P.kick[2], P.kick[3], 0.35 + 0.55 * f)
+            bar:SetSize(BUCKET_PX - 2, _max(2, _floor(INT_MAXH * f + 0.5)))
+            At(bar, "BOTTOMLEFT", x + 1, INT_BASE)
 
-                local hb = Btn(cv)
-                hb:SetSize(BUCKET_PX, INT_MAXH + 6)
-                At(hb, "BOTTOMLEFT", x, INT_BASE - 3)
-                hb:SetFrameLevel(cv:GetFrameLevel() + 4)
-                local hl = Solid(hb, "HIGHLIGHT", 0, 1, 1, 1, 0.12); hl:SetAllPoints()
-                local t1 = (x - TL_L) / W * totalDur
-                local t2 = (x + BUCKET_PX - TL_L) / W * totalDur
-                hb:SetScript("OnEnter", function(self2)
-                    GameTooltip:SetOwner(self2, "ANCHOR_TOP")
-                    GameTooltip:SetText(_fmt(L["Interrupts: %d"], b.n), P.kick[1], P.kick[2], P.kick[3])
-                    GameTooltip:AddLine(_fmt(L["%s to %s"], MS:FormatTime(t1), MS:FormatTime(t2)), 0.8, 0.8, 0.8)
-                    local seg = SegmentLabelFor(run, (t1 + t2) / 2)
-                    if seg then GameTooltip:AddLine(_fmt(L["During %s"], seg), P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]) end
-                    GameTooltip:AddLine(" ")
-                    local rows = {}
-                    for name, w in pairs(b.who) do _ins(rows, { name = name, n = w.n, class = w.class }) end
-                    _sort(rows, function(p, q) return p.n > q.n end)
-                    for _, r in ipairs(rows) do
-                        GameTooltip:AddDoubleLine("|cff" .. ClassHex(r.class) .. r.name .. "|r", r.n, 1, 1, 1, 1, 1, 1)
-                    end
-                    GameTooltip:Show()
-                end)
-                hb:SetScript("OnLeave", GameTooltip_Hide)
-            end
+            local hb = Btn(cv)
+            hb:SetSize(BUCKET_PX, INT_MAXH + 6)
+            At(hb, "BOTTOMLEFT", x, INT_BASE - 3)
+            hb:SetFrameLevel(cv:GetFrameLevel() + 4)
+            local hl = Solid(hb, "HIGHLIGHT", 0, 1, 1, 1, 0.12); hl:SetAllPoints()
+            local t1 = (x - TL_L) / W * totalDur
+            local t2 = (x + BUCKET_PX - TL_L) / W * totalDur
+            hb:SetScript("OnEnter", function(self2)
+                GameTooltip:SetOwner(self2, "ANCHOR_TOP")
+                GameTooltip:SetText(_fmt(L["Interrupts: %d"], b.n), P.kick[1], P.kick[2], P.kick[3])
+                GameTooltip:AddLine(_fmt(L["%s to %s"], MS:FormatTime(t1), MS:FormatTime(t2)), 0.8, 0.8, 0.8)
+                local seg = SegmentLabelFor(run, (t1 + t2) / 2)
+                if seg then
+                    GameTooltip:AddLine(_fmt(L["During %s"], seg), P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+                end
+                GameTooltip:AddLine(" ")
+                local rows = {}
+                for name, w in pairs(b.who) do _ins(rows, { name = name, n = w.n, class = w.class }) end
+                _sort(rows, function(p, q) return p.n > q.n end)
+                for _, r in ipairs(rows) do
+                    GameTooltip:AddDoubleLine("|cff" .. ClassHex(r.class) .. r.name .. "|r", r.n, 1, 1, 1, 1, 1, 1)
+                end
+                GameTooltip:Show()
+            end)
+            hb:SetScript("OnLeave", GameTooltip_Hide)
         end
     end
 end

@@ -56,7 +56,7 @@ TL.END_LINE_PX = END_LINE_PX
 -- that boss's block instead of on its edge).
 local function EndsOnKill(r, t)
     for _, b in ipairs(r.bosses or {}) do
-        if b.killTime and math.abs(b.killTime - t) < 2 then return true end
+        if b.killTime and _abs(b.killTime - t) < 2 then return true end
     end
     return false
 end
@@ -69,7 +69,7 @@ local function ClearedEnd(r)
     for _, b in ipairs(r.bosses or {}) do lastKill = _max(lastKill, b.killTime or 0) end
     local at = tonumber(r.clearedAt)
     if at and at > 0 then
-        if lastKill > 0 and math.abs(at - lastKill) < 2 then return lastKill end
+        if lastKill > 0 and _abs(at - lastKill) < 2 then return lastKill end
         return at
     end
     if lastKill > 0 then return lastKill end
@@ -188,12 +188,17 @@ local function BuildTimelineChrome(strip)
             local d = Art(f, "Diamond", "ARTWORK", 1); d:SetSize(8, 8); d:SetPoint("CENTER", r)
             Tint(d, { 0.62, 0.15, 0.13 })
             return r end },
-        { L["Wipe"], function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, WIPE_BOT, WIPE_TOP); return t end },
+        { L["Wipe"], function(f)
+            local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, WIPE_BOT, WIPE_TOP)
+            return t end },
         { L["Trash"], function(f)
             local b = Solid(f, "ARTWORK", 0, 0.16, 0.14, 0.12, 1); b:SetSize(16, 8)
-            local h = Art(f, "Hatch", "ARTWORK", 1, true); h:SetAllPoints(b); h:SetVertexColor(0.225, 0.195, 0.165, 1)
+            local h = Art(f, "Hatch", "ARTWORK", 1, true); h:SetAllPoints(b)
+            h:SetVertexColor(0.225, 0.195, 0.165, 1)
             return b end },
-        { L["Boss"], function(f) local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, FIGHT_BOT, FIGHT_TOP); return t end },
+        { L["Boss"], function(f)
+            local t = f:CreateTexture(nil, "ARTWORK"); t:SetSize(16, 8); VGrad(t, FIGHT_BOT, FIGHT_TOP)
+            return t end },
     }
     local anchor, gap = strip, -20
     for _, it in ipairs(items) do
@@ -292,7 +297,7 @@ local function Take(pools, key, parent)
     return obj, list
 end
 
-local function Keep(list, obj, parent)
+local function Keep(list, obj)
     list.n = list.n + 1
     list[list.n] = obj
     if obj.SetTexCoord and obj.SetVertexColor then Track(obj) end   -- textures
@@ -320,7 +325,7 @@ local function PooledMakers(pools)
     local function Solid(parent, layer, sub, r, g, b, a)
         local key = "S" .. (layer or "") .. (sub or 0)
         local t, list = Take(pools, key, parent)
-        if not t then return Snap(Keep(list, Solid0(parent, layer, sub, r, g, b, a), parent)) end
+        if not t then return Snap(Keep(list, Solid0(parent, layer, sub, r, g, b, a))) end
         ResetTexture(t)
         t:SetColorTexture(r, g, b, a or 1)
         return Snap(t)
@@ -328,27 +333,27 @@ local function PooledMakers(pools)
     local function Art(parent, file, layer, sub, tile)
         local key = "A" .. file .. (layer or "") .. (sub or 0) .. (tile and "t" or "")
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, Art0(parent, file, layer, sub, tile), parent) end
+        if not t then return Keep(list, Art0(parent, file, layer, sub, tile)) end
         ResetTexture(t)
         return t
     end
     local function Tex(parent, layer, sub)
         local key = "T" .. (layer or "") .. (sub or 0)
         local t, list = Take(pools, key, parent)
-        if not t then return Keep(list, parent:CreateTexture(nil, layer, nil, sub), parent) end
+        if not t then return Keep(list, parent:CreateTexture(nil, layer, nil, sub)) end
         ResetTexture(t, true)
         return t
     end
     local function Mask(parent)
         local m, list = Take(pools, "M", parent)
-        if not m then return Keep(list, parent:CreateMaskTexture(), parent) end
+        if not m then return Keep(list, parent:CreateMaskTexture()) end
         m:ClearAllPoints()
         return m
     end
     local function Text(parent, kind, size, col, justify)
         local key = "F" .. kind .. size
         local fs, list = Take(pools, key, parent)
-        if not fs then return Keep(list, Text0(parent, kind, size, col, justify), parent) end
+        if not fs then return Keep(list, Text0(parent, kind, size, col, justify)) end
         fs:ClearAllPoints()
         col = col or P.ivory
         fs:SetTextColor(col[1], col[2], col[3], col[4] or 1)
@@ -361,7 +366,7 @@ local function PooledMakers(pools)
     end
     local function Btn(parent)
         local b, list = Take(pools, "B", parent)
-        if not b then return Keep(list, Btn0(parent), parent) end
+        if not b then return Keep(list, Btn0(parent)) end
         b:ClearAllPoints()
         b:SetAlpha(1)
         b:SetScript("OnEnter", nil); b:SetScript("OnLeave", nil); b:SetScript("OnClick", nil)
@@ -544,7 +549,8 @@ local function NewContext(strip, run, totalDur)
         keyLimit = keyLimit, compSec = compSec, visualEnd = visualEnd, clampT = clampT, endLineL = endLineL,
         px = px, endLineW = END_LINE_W,
         -- Mythic+: the times for +3, +2 and +1 (marked on the axis).
-        thresholds = (isMPlus and keyLimit) and { { 3, keyLimit * 0.6 }, { 2, keyLimit * 0.8 }, { 1, keyLimit } } or nil,
+        thresholds = (isMPlus and keyLimit)
+            and { { 3, keyLimit * 0.6 }, { 2, keyLimit * 0.8 }, { 1, keyLimit } } or nil,
     }
     AddDrawHelpers(c)
     return c
@@ -562,6 +568,7 @@ local function DrawTrack(c)
 
     -- Weathering (multiplied, so it only darkens) and a carved-groove shadow
     -- along the top edge. Applied to the empty track bed here and to each
+    -- segment (Weather, in AddDrawHelpers).
     local bedGrit = Art(cv, "Grit", "BACKGROUND", 5, true)
     bedGrit:SetBlendMode("MOD")
     bedGrit:SetSize(W, TRACK_H); At(bedGrit, "BOTTOMLEFT", TL_L, TRACK_Y)

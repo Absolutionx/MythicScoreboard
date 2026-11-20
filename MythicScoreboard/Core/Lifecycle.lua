@@ -206,7 +206,6 @@ function MS:WarmPetCache(...)
     end
 end
 
--- ── Transitions ────────────────────────────────────────────────────────────
 -- ── Starting a run ─────────────────────────────────────────────────────────
 -- The key's affixes: the keystone's own list, else the week's.
 local function CurrentAffixes()

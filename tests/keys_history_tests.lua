@@ -131,7 +131,7 @@ check("all: three runs", #e == 3, #e)
 check("all: newest first, interleaved", e[1].run.dungeonName == "Mine B" and e[2].run.dungeonName == "Alt run"
     and e[3].run.dungeonName == "Mine A", e[2] and e[2].run.dungeonName)
 check("all: owner known", e[2].owner and e[2].owner.name == "Alt" and e[1].own)
-check("other character's run isn't ours", MS:HistoryOwner(e[2].run) ~= nil and not MS:IsOwnHistoryRun(e[2].run))
+check("other character's run isn't ours", MS:HistoryOwner(e[2].run) ~= nil)
 check("index in the list", MS:HistoryIndexOf(e[2].run) == 2)
 MS:SetHistoryScope("me")
 check("this character only", #MS:HistoryEntries() == 2)

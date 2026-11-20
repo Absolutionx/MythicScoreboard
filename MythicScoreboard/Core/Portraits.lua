@@ -4,6 +4,7 @@
 -- medallion shows. In order:
 --   1. the journal's creature icon (retail: saved per encounter)
 --   2. a model ID learned from the journal or in play (below)
+--   3. the model ID in the built-in boss list (Data/ForeverBossNpcs.lua)
 -- and nil when there's nothing: the medallion shows a crest.
 --
 -- Retail: the game's Encounter Journal, read on entering an instance.
@@ -17,9 +18,7 @@
 -- from its own model. No artwork ships with the addon.
 
 local MS = _G["MythicScoreboard"]
-local IsSecret = _G["MythicScoreboard"].IsSecret
-
-local Secret = IsSecret
+local Secret = MS.IsSecret
 
 local Norm = MS.BossKey      -- (the key portraits are saved under)
 
@@ -364,8 +363,6 @@ local function BuildJournalIndex()
 end
 
 -- ── The answer ─────────────────────────────────────────────────────────────
--- What a boss's medallion shows: "icon", texture | "display", model ID |
--- "file", path | nil.
 -- The built-in boss list (Data/ForeverBossNpcs.lua), keyed by normalised
 -- name: { npc =, display = }.
 local _builtIn
@@ -410,6 +407,7 @@ end
 
 local _askedFor = {}       -- npc -> true: asked this session (once is enough)
 
+-- What a boss's medallion shows: "icon", texture | "display", model ID | nil.
 function MS:BossPortrait(boss, run)
     if not boss then return nil end
     local icon = CachedIcon(boss)
@@ -546,7 +544,7 @@ MS:WatchRunState(function(state)
     end
 end)
 
-local function ScanSoon() pcall(ScanHere) end
+local function ScanSafely() pcall(ScanHere) end
 
 local function OnRunEvent(event, ...)
     if event == "ENCOUNTER_START" then
@@ -574,7 +572,7 @@ local function OnRunEvent(event, ...)
     elseif event == "PLAYER_REGEN_ENABLED" then
         -- Retry a journal read skipped while its window was open, and give
         -- anything hidden during the fight another look.
-        pcall(ScanHere)
+        ScanSafely()
         wipe(_tried)
         Consider("target", "after-combat")
         SweepNameplates("after-combat")
@@ -583,7 +581,7 @@ end
 
 function OnEvent(event, ...)
     if event == "PLAYER_ENTERING_WORLD" or event == "ZONE_CHANGED_NEW_AREA" then
-        C_Timer.After(2, ScanSoon)
+        C_Timer.After(2, ScanSafely)
         return
     end
     if not MS.inDungeon then return end

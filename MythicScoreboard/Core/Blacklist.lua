@@ -234,7 +234,9 @@ end
 
 -- ── Looking For Group: a red border round their listings ──────────────────
 local BRIGHT_RED = { 1, 0.1, 0.1 }
-local function Red(fs) if fs and fs.SetTextColor then fs:SetTextColor(BRIGHT_RED[1], BRIGHT_RED[2], BRIGHT_RED[3]) end end
+local function Red(fs)
+    if fs and fs.SetTextColor then fs:SetTextColor(BRIGHT_RED[1], BRIGHT_RED[2], BRIGHT_RED[3]) end
+end
 
 local function LFG() return rawget(_G, "C_LFGList") end
 
@@ -312,7 +314,6 @@ local function AnyListed(resultID)
 end
 
 local lastEntry, lastEntryAt  -- the listing last right-clicked: its menu comes next
-local BrowseEntryForMenu
 local function HookBrowse()
     Hook("LFGBrowseSearchEntry_Update", function(entry)
         if entry then SetBorder(entry, AnyListed(entry.resultID)) end
@@ -343,10 +344,12 @@ end
 -- The listing a menu being built is for, or nil: the Looking For Group
 -- window is open, and the listing is under the mouse (or was right-clicked
 -- a moment ago).
-BrowseEntryForMenu = function(owner)
+local function BrowseEntryForMenu(owner)
     local browse = rawget(_G, "LFGBrowseFrame")
     if not (browse and browse.IsVisible and browse:IsVisible()) then return nil end
-    if owner and browse.SearchEntryDropDown and owner == browse.SearchEntryDropDown and lastEntry then return lastEntry end
+    if owner and browse.SearchEntryDropDown and owner == browse.SearchEntryDropDown and lastEntry then
+        return lastEntry
+    end
     local Foci = rawget(_G, "GetMouseFoci")
     if Foci then
         local ok, list = pcall(Foci)
@@ -432,9 +435,11 @@ function MS:AddBlacklistMenuItems(root, name, realm, class)
     root:CreateDivider()
     if e then
         root:CreateButton(L["Change blacklist note"], function() MS:AskBlacklistNote(name, realm, class) end)
-        root:CreateButton("|cffff4040" .. L["Remove from blacklist"] .. "|r", function() MS:RemoveFromBlacklist(name, realm) end)
+        root:CreateButton("|cffff4040" .. L["Remove from blacklist"] .. "|r",
+            function() MS:RemoveFromBlacklist(name, realm) end)
     else
-        root:CreateButton("|cffff4040" .. L["Add to blacklist"] .. "|r", function() MS:AskBlacklistNote(name, realm, class) end)
+        root:CreateButton("|cffff4040" .. L["Add to blacklist"] .. "|r",
+            function() MS:AskBlacklistNote(name, realm, class) end)
     end
 end
 

@@ -13,15 +13,13 @@
 -- Great Vault, a quest reward in town) isn't the run's.
 
 local MS = _G["MythicScoreboard"]
-local IsSecret = _G["MythicScoreboard"].IsSecret
+local Secret = MS.IsSecret
 local _ins = table.insert
 
 local PREFIX         = "MSBLoot"
 local LATE_WINDOW    = 300     -- seconds after a run ends that loot still counts
 local DEDUPE_WINDOW  = 15
 local MAX_PER_PLAYER = 40      -- a full Blackrock Depths can drop a lot of greens
-
-local Secret = IsSecret
 
 local function ItemString(link)
     if type(link) ~= "string" then return nil end
@@ -124,7 +122,8 @@ function MS:RecordLoot(playerName, link, source)
 
     p.loot = p.loot or {}
     for _, l in ipairs(p.loot) do
-        if (ItemID(MS.LootItemString(l)) or MS.LootItemString(l)) == id and (now - (l.at or 0)) < DEDUPE_WINDOW then return end
+        local s = MS.LootItemString(l)
+        if (ItemID(s) or s) == id and (now - (l.at or 0)) < DEDUPE_WINDOW then return end
     end
     if #p.loot >= MAX_PER_PLAYER then return end
 

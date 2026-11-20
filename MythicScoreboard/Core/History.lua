@@ -47,7 +47,7 @@ function MS:_CommitRunToHistory(run)
 end
 
 -- Fewer runs to keep: the oldest go now.
-MS:OnSettingChanged("historyLimit", function(cap)
+MS:OnSettingChanged("historyLimit", function()
     local runs = Runs()
     if runs then Trim(runs, MS:GetHistoryLimit()) end
 end)
@@ -93,7 +93,6 @@ end
 -- account-wide lists. Nil for this character's own.
 local _owner = setmetatable({}, { __mode = "k" })
 function MS:HistoryOwner(run) return _owner[run] end
-function MS:IsOwnHistoryRun(run) return run ~= nil and _owner[run] == nil end
 
 -- Other characters with saved runs.
 function MS:OtherHistoryChars()
@@ -155,7 +154,7 @@ function MS:BestKeyTime(dungeon, level)
     if hit ~= nil then return hit or nil end
     local best
     local legacy = MythicScoreboardDB and MythicScoreboardDB.personalBests
-    local old = legacy and legacy[(dungeon or "") .. ":" .. (level or 0)]
+    local old = legacy and legacy[slot]
     if type(old) == "number" and old > 0 then best = old end
     if self.ArchiveRuns then
         for _, e in ipairs(self:ArchiveRuns()) do
@@ -189,7 +188,8 @@ end
 -- Whether a run (live or saved) is your best time for its key.
 function MS:IsPersonalBest(run)
     if not IsTimedKey(run) then return false end
-    if run._demo or self:HistoryOwner(run) then return false end   -- another character's run: its bests aren't this one's
+    -- (another character's run: its bests aren't this one's)
+    if run._demo or self:HistoryOwner(run) then return false end
     local dur = run.duration or 0
     if dur <= 0 then return false end
     local best = self:BestKeyTime(run.dungeonName, run.keystoneLevel)

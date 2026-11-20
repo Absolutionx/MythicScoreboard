@@ -39,8 +39,10 @@ local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText(L["Mythic Scoreboard"])
     local board, stats = ScoreboardShown() and not UI.statsOpen, ScoreboardShown() and UI.statsOpen
-    GameTooltip:AddLine(board and L["Left-click: close the scoreboard"] or L["Left-click: open the scoreboard"], 0.8, 0.8, 0.8)
-    GameTooltip:AddLine(stats and L["Right-click: close your stats"] or L["Right-click: open your stats"], 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(board and L["Left-click: close the scoreboard"] or L["Left-click: open the scoreboard"],
+        0.8, 0.8, 0.8)
+    GameTooltip:AddLine(stats and L["Right-click: close your stats"] or L["Right-click: open your stats"],
+        0.8, 0.8, 0.8)
     -- The instance limit (InstanceLimit.lua): this hour's, if any.
     local info = MS.InstanceLimit and MS:InstanceLimit()
     if info and info.used > 0 then

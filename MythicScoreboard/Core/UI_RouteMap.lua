@@ -256,7 +256,8 @@ local function HoverStep()
         local x, y = scroll:GetNormalizedCursorPosition()
         local scale = canvas:GetEffectiveScale()
         if x and y then
-            step, kind = MS:RouteStepAt(map:GetMapID(), x, y, canvas:GetWidth() * scale, canvas:GetHeight() * scale, NEAR)
+            step, kind = MS:RouteStepAt(map:GetMapID(), x, y,
+                canvas:GetWidth() * scale, canvas:GetHeight() * scale, NEAR)
         end
     end
     if not step then

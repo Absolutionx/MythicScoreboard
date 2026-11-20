@@ -88,6 +88,8 @@ function MS:RebuildPetGUIDCache()
 end
 
 local PET_TITLES   -- "%s's Pet" and friends, built on first use
+local PET_TITLE_GLOBALS = { "UNITNAME_TITLE_PET", "UNITNAME_TITLE_COMPANION", "UNITNAME_TITLE_GUARDIAN",
+                            "UNITNAME_TITLE_MINION", "UNITNAME_TITLE_CHARM", "UNITNAME_TITLE_CREATION" }
 
 -- The tooltip of a pet names its owner on line 2, as a GUID or as text.
 local function OwnerFromTooltip(self, petGUID, run)
@@ -106,9 +108,10 @@ local function OwnerFromTooltip(self, petGUID, run)
     if not text then return nil end
     if not PET_TITLES then
         PET_TITLES = {}
-        for _, fmt in ipairs({ UNITNAME_TITLE_PET, UNITNAME_TITLE_COMPANION, UNITNAME_TITLE_GUARDIAN,
-                               UNITNAME_TITLE_MINION, UNITNAME_TITLE_CHARM, UNITNAME_TITLE_CREATION }) do
-            PET_TITLES[#PET_TITLES + 1] = fmt
+        -- (by name: one the client lacks is skipped, not the end of the list)
+        for _, g in ipairs(PET_TITLE_GLOBALS) do
+            local fmt = rawget(_G, g)
+            if type(fmt) == "string" then PET_TITLES[#PET_TITLES + 1] = fmt end
         end
         if UNITNAME_TITLE_PET and PET_TYPE_DEMON then
             PET_TITLES[#PET_TITLES + 1] = UNITNAME_TITLE_PET:gsub(PET_TYPE_PET or "Pet", PET_TYPE_DEMON)
@@ -286,7 +289,6 @@ local function TakeBaseline(self, run, damage, duration)
     run._baselinePending = nil
 end
 
--- One read of each stat type. Returns true when the numbers were read.
 -- What the scoreboard shows of the run, in one string: a reading that
 -- changes none of it isn't counted as a change, so the rows aren't redrawn
 -- (and a tooltip over one stays put) while nothing happens.

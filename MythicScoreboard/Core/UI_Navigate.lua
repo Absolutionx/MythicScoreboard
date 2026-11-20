@@ -1,6 +1,7 @@
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
+-- luacheck: globals MythicScoreboardDB
 
 -- ── The way to a dungeon (WoW Forever) ────────────────────────────────────
 -- Click a dungeon's marker on the world map: the way there, step by step
@@ -68,6 +69,14 @@ local function Steps(legs, here)
 end
 MS._NavigationSteps = Steps                  -- for tests
 
+-- The arrow's turn for a bearing (clockwise from north) and the way you
+-- face now: all that changes from one frame to the next.
+local function TurnFor(bearing)
+    local Facing = rawget(_G, "GetPlayerFacing")
+    local facing = MS.ReadableNumber(Facing and Facing()) or 0
+    return (-(bearing + facing) + _pi) % (2 * _pi) - _pi
+end
+
 -- The turn from where you face to a spot (radians, left positive, as
 -- SetRotation), and the yards to it.
 function MS:TurnTo(here, spot)
@@ -76,19 +85,7 @@ function MS:TurnTo(here, spot)
     local east, south = (spot.x - here.x) * w, (spot.y - here.y) * h
     local yards = math.sqrt(east * east + south * south)
     local bearing = _atan2(east, -south)                 -- clockwise from north
-    local Facing = rawget(_G, "GetPlayerFacing")
-    local facing = MS.ReadableNumber(Facing and Facing()) or 0
-    local turn = -(bearing + facing)
-    turn = (turn + _pi) % (2 * _pi) - _pi
-    return turn, yards, bearing
-end
-
--- The arrow's turn for a bearing (clockwise from north) and the way you
--- face now: all that changes from one frame to the next.
-local function TurnFor(bearing)
-    local Facing = rawget(_G, "GetPlayerFacing")
-    local facing = MS.ReadableNumber(Facing and Facing()) or 0
-    return (-(bearing + facing) + _pi) % (2 * _pi) - _pi
+    return TurnFor(bearing), yards, bearing
 end
 
 -- ── The arrow ──────────────────────────────────────────────────────────────
@@ -108,7 +105,9 @@ local function Flying(place)
     if place then
         local f = MythicScoreboardDB.navFlying
         if not (f and f.name == place.name and f.x == place.x and f.y == place.y) then
-            MythicScoreboardDB.navFlying = { kind = "flight", name = place.name, c = place.c, x = place.x, y = place.y }
+            MythicScoreboardDB.navFlying = {
+                kind = "flight", name = place.name, c = place.c, x = place.x, y = place.y,
+            }
         end
     elseif place == false then
         MythicScoreboardDB.navFlying = nil
@@ -120,7 +119,8 @@ end
 
 local function SaveTarget()
     MythicScoreboardDB = MythicScoreboardDB or {}
-    MythicScoreboardDB.navTarget = target and { name = target.name, map = target.map, x = target.x, y = target.y } or nil
+    MythicScoreboardDB.navTarget = target
+        and { name = target.name, map = target.map, x = target.x, y = target.y } or nil
 end
 
 local function Build()
@@ -367,7 +367,9 @@ function MS:UpdateArrow()
                 plan = { { how = "fly", to = dest } }
                 for _, leg in ipairs(Steps(MS:PlanRoute(landing, target.spot), landing)) do plan[#plan + 1] = leg end
                 if #plan == 1 then
-                    plan[2] = { how = "run", to = { kind = "end", c = target.spot.c, x = target.spot.x, y = target.spot.y, name = target.name } }
+                    local spot = target.spot
+                    plan[2] = { how = "run",
+                                to = { kind = "end", c = spot.c, x = spot.x, y = spot.y, name = target.name } }
                 end
                 RouteChanged()
             end
@@ -590,9 +592,9 @@ local function SkipToFlightMap()
     -- A flight next, or after the run to this flight master (whose spot may
     -- be a little off until its flight map has been opened once).
     local next1, next2 = plan and plan[1], plan and plan[2]
-    if not ((next1 and next1.how == "fly") or (next1 and next1.to.kind == "flight" and next2 and next2.how == "fly")) then
-        return
-    end
+    local flyNext = next1 and next1.how == "fly"
+    local runThenFly = next1 and next1.to.kind == "flight" and next2 and next2.how == "fly"
+    if not (flyNext or runThenFly) then return end
     local o = TaxiOption(G)
     if not o then return end
     if o.gossipOptionID and G.SelectOption then G.SelectOption(o.gossipOptionID)

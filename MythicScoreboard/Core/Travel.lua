@@ -226,7 +226,6 @@ function MS:TaxiNodeSpot(slot)
     end
 end
 
--- Flight masters on a continent for your side: { name, x, y, known }.
 -- Every flight master on a continent as the game lists them, for your side
 -- (and both sides' shared ones): { name, x, y, known (assumed) }. Or nil
 -- when the game won't say.
@@ -251,6 +250,7 @@ function MS:GameFlightMasters(continent, side)
     return out[1] and out or nil
 end
 
+-- Flight masters on a continent for your side: { name, x, y, known }.
 function MS:FlightMasters(continent)
     local learned = Learned()[continent]
     if learned then
@@ -658,6 +658,6 @@ function MS:DumpTravel()
     for _, side in pairs(acc.flightSpots or {}) do
         for _, list in pairs(side) do learned = learned + #list end
     end
-    MS.Say(string.format("dumptravel: %d flight masters from the game's list, %d from flight maps, %d inns, %d teleports. /reload to save.",
-        n, learned, inns, spells))
+    MS.Say(string.format("dumptravel: %d flight masters from the game's list, %d from flight maps, "
+        .. "%d inns, %d teleports. /reload to save.", n, learned, inns, spells))
 end

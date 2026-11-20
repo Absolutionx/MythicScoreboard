@@ -72,6 +72,8 @@ function UI.RunXP(prog)
     return math.max(0, prog.xp or 0), math.max(0, prog.qx or 0)
 end
 
+-- What a run did for your character, as tooltip lines. prog: a live run's
+-- run.progress, or (fromArchive) an archive entry's e.prog.
 function UI.AddProgressLines(prog, fromArchive)
     if not prog then return end
     local mobXP, questXP = UI.RunXP(prog)
@@ -84,8 +86,10 @@ function UI.AddProgressLines(prog, fromArchive)
         .. (levels > 0 and ("  (" .. MS.Plural(levels, "+%d level", "+%d levels") .. ")") or ""), a, b, c, 1, 1, 1)
     if questXP > 0 then
         GameTooltip:AddLine(UI.XPSplit(mobXP, questXP, 200, 6))
-        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpMob, 8, 8) .. " " .. L["From the dungeon"], MS.FormatThousands(mobXP), a, b, c, 1, 1, 1)
-        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpQuest, 8, 8) .. " " .. L["From quests"], MS.FormatThousands(questXP), a, b, c, 1, 1, 1)
+        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpMob, 8, 8) .. " " .. L["From the dungeon"],
+            MS.FormatThousands(mobXP), a, b, c, 1, 1, 1)
+        GameTooltip:AddDoubleLine("   " .. Swatch(P.xpQuest, 8, 8) .. " " .. L["From quests"],
+            MS.FormatThousands(questXP), a, b, c, 1, 1, 1)
     end
     GameTooltip:AddDoubleLine(L["Mobs killed"], kills, a, b, c, 1, 1, 1)
     GameTooltip:AddDoubleLine(L["Quests completed"], quests, a, b, c, 1, 1, 1)
@@ -98,15 +102,17 @@ function UI.AddProgressLines(prog, fromArchive)
                 0.8, 0.8, 0.8, P.xpQuest[1], P.xpQuest[2], P.xpQuest[3])
         end
     end
-    GameTooltip:AddDoubleLine(L["Gold looted"], MS.FormatGold(gold), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
-    local qg = (fromArchive and prog.qg) or prog.qg
+    local br, bg, bb = P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3]
+    GameTooltip:AddDoubleLine(L["Gold looted"], MS.FormatGold(gold), a, b, c, br, bg, bb)
+    local qg = prog.qg                       -- (the same key in live runs and archive entries)
     if (qg or 0) > 0 then
-        GameTooltip:AddDoubleLine("   " .. L["From quests"], MS.FormatGold(qg), a, b, c, P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:AddDoubleLine("   " .. L["From quests"], MS.FormatGold(qg), a, b, c, br, bg, bb)
     end
     local reps = {}
     for f, n in pairs(prog.rep or {}) do reps[#reps + 1] = { f = f, n = n } end
     table.sort(reps, function(x, y) return x.n > y.n end)
     for _, r in ipairs(reps) do
-        GameTooltip:AddDoubleLine(r.f, _fmt(L["+%s reputation"], MS.FormatThousands(r.n)), a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
+        GameTooltip:AddDoubleLine(r.f, _fmt(L["+%s reputation"], MS.FormatThousands(r.n)),
+            a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
     end
 end

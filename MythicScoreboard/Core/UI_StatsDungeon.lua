@@ -1,4 +1,4 @@
-local _ceil, _floor, _max, _min = math.ceil, math.floor, math.max, math.min
+local _abs, _ceil, _floor, _max, _min = math.abs, math.ceil, math.floor, math.max, math.min
 local _fmt = string.format
 
 local MS = _G["MythicScoreboard"]
@@ -32,12 +32,15 @@ local function RunTooltip(owner, e)
     if S.multiChar and MS:RunOwner(e) then
         GameTooltip:AddDoubleLine(L["Character"], CharName(MS:RunOwner(e)), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
     end
-    if e.me and e.me.lvl then GameTooltip:AddDoubleLine(L["Your level"], e.me.lvl, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
+    if e.me and e.me.lvl then
+        GameTooltip:AddDoubleLine(L["Your level"], e.me.lvl, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
+    end
     if e.me then GameTooltip:AddDoubleLine(L["Your DPS"], Abbrev(e.me.dps), P.ash[1], P.ash[2], P.ash[3], 1, 1, 1) end
     GameTooltip:AddDoubleLine(L["Group deaths"], e.deaths or 0, P.ash[1], P.ash[2], P.ash[3], 1, 1, 1)
     if e.prog then UI.AddProgressLines(e.prog, true) end
     for _, b in ipairs(e.bosses or {}) do
-        GameTooltip:AddDoubleLine(b.n, Dur(b.t), P.ash[1], P.ash[2], P.ash[3], P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
+        GameTooltip:AddDoubleLine(b.n, Dur(b.t), P.ash[1], P.ash[2], P.ash[3],
+            P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
     end
     GameTooltip:AddLine(S.detailRun == e and L["Click again for all runs."] or L["Click to see just this run."],
         P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3])
@@ -83,7 +86,7 @@ local function MakeRunRow(parent)
     del:SetSize(22, LIST_ROW)
     del:SetPoint("RIGHT", row, "RIGHT", -2, 0)
     del:SetFrameLevel(row:GetFrameLevel() + 2)
-    local icon = Art(del, L["Close"], "OVERLAY")
+    local icon = Art(del, "Close", "OVERLAY")
     icon:SetSize(11, 11); icon:SetPoint("CENTER"); Tint(icon, P.ash2)
     TwoClick(del, function(armed) Tint(icon, armed and P.bloodHi or P.ash2) end, function()
         GameTooltip:Hide()
@@ -315,7 +318,9 @@ local function BuildDetail(parent)
     arrow:SetRotation(-math.pi / 2); Tint(arrow, P.ash)
     local backTxt = Text(back, "medium", 13, P.ash, "LEFT")
     backTxt:SetPoint("LEFT", arrow, "RIGHT", 4, 0)
-    back:SetScript("OnEnter", function() Tint(arrow, P.ivory); backTxt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3]) end)
+    back:SetScript("OnEnter", function()
+        Tint(arrow, P.ivory); backTxt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
+    end)
     back:SetScript("OnLeave", function() Tint(arrow, P.ash); backTxt:SetTextColor(P.ash[1], P.ash[2], P.ash[3]) end)
     back:SetScript("OnClick", function()
         if S.from == "trends" then S.tab = "trends" end
@@ -541,7 +546,7 @@ local function FillBars(d, s)
     local cw, ch = d.chart:GetWidth(), DCHART_H
     local slot = n > 0 and cw / _max(n, 12) or cw
     local bw = _max(4, _min(22, slot - 6))
-    local firstBar, lastBar
+    local firstBar, lastBar, bestBar
     for i = first, #runs do
         local e, k = runs[i], i - first + 1
         local b = d.barAt(k)
@@ -555,20 +560,23 @@ local function FillBars(d, s)
         lastBar = b
         if e.cleared and e.dur == s.best then
             VGrad(b.fill, P.bronze, P.bronzeHi)
+            bestBar = b
         elseif e.cleared then
             VGrad(b.fill, FIGHT_BOT, FIGHT_TOP, 0.85, 0.85)
         else
             b.fill:SetColorTexture(P.ash2[1], P.ash2[2], P.ash2[3], 0.6)
         end
         b.fill:SetHeight(h)
-        if e.cleared and e.dur == s.best then
-            d.bestLbl:ClearAllPoints()
-            d.bestLbl:SetPoint("BOTTOM", b, "TOP", 0, 3)
-            d.bestLbl:SetText(L["Best"])
-        end
     end
     d.barsHideFrom(n + 1)
-    d.bestLbl:SetShown(s.best ~= nil and n > 0)
+    -- "Best" over the best clear's bar (the latest, if tied). Not shown when
+    -- that run is older than the bars drawn.
+    if bestBar then
+        d.bestLbl:ClearAllPoints()
+        d.bestLbl:SetPoint("BOTTOM", bestBar, "TOP", 0, 3)
+        d.bestLbl:SetText(L["Best"])
+    end
+    d.bestLbl:SetShown(bestBar ~= nil)
     d.yTop:SetText(Dur(top))
     d.xFirst:SetText(n > 0 and Day(runs[first].at) or "")
     d.xLast:SetText(n > 1 and Day(runs[#runs].at) or "")
@@ -961,10 +969,10 @@ local CCOLS = {
     { key = "split", label = LK("Run 2 was"),      w = 112 },
     { key = "f1",    label = LK("Fight 1"),        w = 76 },
     { key = "f2",    label = LK("Fight 2"),        w = 76 },
-    { key = "fd",    label = "",               w = 64 },
+    { key = "fd",    label = "",                   w = 64 },
     { key = "t1",    label = LK("Trash 1"),        w = 76 },
     { key = "t2",    label = LK("Trash 2"),        w = 76 },
-    { key = "td",    label = "",               w = 64 },
+    { key = "td",    label = "",                   w = 64 },
     { key = "m1",    label = LK("Your DPS 1"),     w = 92 },
     { key = "m2",    label = LK("Your DPS 2"),     w = 92 },
 }
@@ -975,13 +983,13 @@ local RUN_COL = { P.ash, P.bronzeHi }          -- run 1 (earlier), run 2 (later)
 
 local function Signed(d)
     if not d then return CT(P.ash2, "-") end
-    if math.abs(d) < 1 then return CT(P.ash, "same") end
+    if _abs(d) < 1 then return CT(P.ash, "same") end
     return d < 0 and CT(P.verd, "-" .. Dur(-d)) or CT(P.bloodHi, "+" .. Dur(d))
 end
 
 local function Split(d)
     if not d then return CT(P.ash2, "-") end
-    if math.abs(d) < 1 then return CT(P.ash, L["level"]) end
+    if _abs(d) < 1 then return CT(P.ash, L["level"]) end
     return d < 0 and CT(P.verd, _fmt(L["%s ahead"], Dur(-d))) or CT(P.bloodHi, _fmt(L["%s behind"], Dur(d)))
 end
 
@@ -999,7 +1007,9 @@ local function BuildCompare(parent)
     arrow:SetRotation(-math.pi / 2); Tint(arrow, P.ash)
     c.backTxt = Text(back, "medium", 13, P.ash, "LEFT")
     c.backTxt:SetPoint("LEFT", arrow, "RIGHT", 4, 0)
-    back:SetScript("OnEnter", function() Tint(arrow, P.ivory); c.backTxt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3]) end)
+    back:SetScript("OnEnter", function()
+        Tint(arrow, P.ivory); c.backTxt:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3])
+    end)
     back:SetScript("OnLeave", function() Tint(arrow, P.ash); c.backTxt:SetTextColor(P.ash[1], P.ash[2], P.ash[3]) end)
     back:SetScript("OnClick", function() S.compareA, S.compareB = nil, nil; UI.RefreshStats(true) end)
     c.title = Text(band, "semibold", 15, P.ivory, "LEFT")
@@ -1029,9 +1039,7 @@ local function BuildCompare(parent)
         lane.zero:SetText("0:00")
         lane.endLbl = Text(c, "medium", 11, P.ash, "CENTER")
         lane.killAt, lane.killsHideFrom = Pool(function() return Text(c, "medium", 11, P.ash2, "CENTER") end)
-        lane.blockAt, lane.blocksHideFrom = Pool(function()
-            local t = c:CreateTexture(nil, "ARTWORK"); return t
-        end)
+        lane.blockAt, lane.blocksHideFrom = Pool(function() return c:CreateTexture(nil, "ARTWORK") end)
         c.lanes[i] = lane
     end
     c.linkAt, c.linksHideFrom = Pool(function()
@@ -1148,10 +1156,11 @@ local function FillCompare(c, cmp)
     -- Verdict
     local T = cmp.total
     local d = T.diff
-    local head = math.abs(d) < 1 and L["Both runs took the same time."]
-        or (d < 0 and CT(P.verd, _fmt(L["Run 2 was %s faster."], Dur(-d))) or CT(P.bloodHi, _fmt(L["Run 2 was %s slower."], Dur(d))))
+    local head = _abs(d) < 1 and L["Both runs took the same time."]
+        or (d < 0 and CT(P.verd, _fmt(L["Run 2 was %s faster."], Dur(-d)))
+            or CT(P.bloodHi, _fmt(L["Run 2 was %s slower."], Dur(d))))
     local extra = {}
-    if T.fightA and T.fightB and T.trashA and T.trashB and math.abs(d) >= 1 then
+    if T.fightA and T.fightB and T.trashA and T.trashB and _abs(d) >= 1 then
         local fd, td = T.fightB - T.fightA, T.trashB - T.trashA
         extra[#extra + 1] = _fmt(L["Boss fights %s, trash %s"], Signed(fd), Signed(td))
     end
@@ -1174,8 +1183,10 @@ local function FillCompare(c, cmp)
         cl.boss:SetText(r.name or "?")
         cl.k1:SetText(OrDash(ra.t, Dur)); cl.k2:SetText(OrDash(rb.t, Dur))
         cl.split:SetText(Split(r.split))
-        cl.f1:SetText(OrDash(ra.d, Dur)); cl.f2:SetText(OrDash(rb.d, Dur)); cl.fd:SetText(r.fight and Signed(r.fight) or "")
-        cl.t1:SetText(OrDash(ra.trash, Dur)); cl.t2:SetText(OrDash(rb.trash, Dur)); cl.td:SetText(r.trashDiff and Signed(r.trashDiff) or "")
+        cl.f1:SetText(OrDash(ra.d, Dur)); cl.f2:SetText(OrDash(rb.d, Dur))
+        cl.fd:SetText(r.fight and Signed(r.fight) or "")
+        cl.t1:SetText(OrDash(ra.trash, Dur)); cl.t2:SetText(OrDash(rb.trash, Dur))
+        cl.td:SetText(r.trashDiff and Signed(r.trashDiff) or "")
         cl.m1:SetText(OrDash(ra.m, Abbrev)); cl.m2:SetText(OrDash(rb.m, Abbrev))
     end
     -- After the last kill, then the whole run.

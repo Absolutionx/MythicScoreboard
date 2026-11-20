@@ -40,8 +40,12 @@ local COL_SORT_VALUES = {
     damage     = function(p) return p.damageDone or 0 end,
     healing    = function(p) return p.healingDone or 0 end,
     -- Per second, as shown: the meter's rate, else the total over the run.
-    dps        = function(p, dur) return (p.dps or 0) > 0 and p.dps or ((dur or 0) > 0 and (p.damageDone or 0) / dur or 0) end,
-    hps        = function(p, dur) return (p.hps or 0) > 0 and p.hps or ((dur or 0) > 0 and (p.healingDone or 0) / dur or 0) end,
+    dps        = function(p, dur)
+        return (p.dps or 0) > 0 and p.dps or ((dur or 0) > 0 and (p.damageDone or 0) / dur or 0)
+    end,
+    hps        = function(p, dur)
+        return (p.hps or 0) > 0 and p.hps or ((dur or 0) > 0 and (p.healingDone or 0) / dur or 0)
+    end,
     interrupts = function(p) return p.interrupts or 0 end,
     dispels    = function(p) return p.dispels or 0 end,
 }
@@ -299,7 +303,6 @@ local function HeaderEmpty()
     UI.frame.LayoutAffixIcons(0)
     if UI.frame.WholeRunBtn then UI.frame.WholeRunBtn:Hide() end
     if UI.frame.AbandonBtn then UI.frame.AbandonBtn:Hide() end
-    if UI.frame.FreshRunBtn then UI.frame.FreshRunBtn:Hide() end
     StartFreshButton():SetShown(MS:CanStartFresh())
 end
 
@@ -406,7 +409,8 @@ end
 local function HeaderAffixes(run, isMPlus)
     local affixIDs = {}
     for _, af in ipairs(run.affixes or {}) do _ins(affixIDs, af.id or af) end
-    if #affixIDs == 0 and isMPlus and run == MS.currentRun and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
+    if #affixIDs == 0 and isMPlus and run == MS.currentRun
+            and C_ChallengeMode and C_ChallengeMode.GetActiveKeystoneInfo then
         local _, keystoneAffixes = C_ChallengeMode.GetActiveKeystoneInfo()
         for _, id in ipairs(keystoneAffixes or {}) do _ins(affixIDs, id) end
     end

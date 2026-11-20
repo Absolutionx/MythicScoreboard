@@ -159,9 +159,3 @@ MS:On("PLAYER_LOGIN", function() pcall(AddProvider) end)
 MS:On("ADDON_LOADED", function(_, name)
     if name == "Blizzard_WorldMap" then pcall(AddProvider) end
 end)
-
--- Turning the markers on or off redraws an open map.
-function MS:RefreshEntrancePins()
-    local p = MS._entranceProvider
-    if p and p.GetMap and p:GetMap() then pcall(p.RefreshAllData, p) end
-end

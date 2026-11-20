@@ -88,12 +88,13 @@ local function MoveAccountWide(key)
     return c.archive
 end
 
--- This character's archive table: { v = data version, runs, seeded }.
--- Reading it changes nothing once it's in place.
--- This character's key (name@realm), once known. Archive.lua sets it.
+-- This character's key (name@realm), once known (set by Store and
+-- SyncAccountStats).
 local _charKey
 function MS:CharKey() return _charKey end
 
+-- This character's archive table: { v = data version, runs, seeded }.
+-- Reading it changes nothing once it's in place.
 local function Store()
     if not MythicScoreboardDB then return nil end
     local key = _charKey or CharKey()
@@ -142,7 +143,6 @@ local function LootBoss(run, t)
     return boss
 end
 
--- A compact summary of a finished run, or nil if there's nothing to keep.
 -- A key's upgrade, timer and your rating, from the saved run: the rating
 -- the game reported after it, or else your rating going in (from the group
 -- roster, read when the run started).
@@ -159,6 +159,7 @@ local function KeyInfo(self, e, run, me)
     if r1 and r1 > 0 then e.r1 = Int(r1) end
 end
 
+-- A compact summary of a finished run, or nil if there's nothing to keep.
 function MS:SummarizeRun(run)
     if type(run) ~= "table" or not run.dungeonName or run.dungeonName == "" then return nil end
     local dur = Int(self:GetRunDuration(run))

@@ -109,7 +109,9 @@ end
 local function KeyObjectives(run)
     if run._demoObjectives then return run._demoObjectives end
     local out = {}
-    if not (C_Scenario and C_Scenario.GetStepInfo and C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo) then return out end
+    if not (C_Scenario and C_Scenario.GetStepInfo and C_ScenarioInfo and C_ScenarioInfo.GetCriteriaInfo) then
+        return out
+    end
     local ok, _, _, n = pcall(C_Scenario.GetStepInfo)
     for i = 1, (ok and MS.ReadableNumber(n)) or 0 do
         local ok2, info = pcall(C_ScenarioInfo.GetCriteriaInfo, i)
@@ -284,7 +286,8 @@ local function UpgradeBar(run, y, style)
     local fill = Bar("fill", FILL); Place(fill, PAD, y); fill:SetSize(_max(1, w * frac), 8)
     local marks = { { 3, 0.6, P.gold }, { 2, 0.8, P.silver }, { 1, 1.0, P.bronze } }
     for _, m in ipairs(marks) do
-        local t = Bar("mark" .. m[1], m[3], 1, "mark"); Place(t, PAD + _min(w - 2, w * m[2] - 1), y + 3); t:SetSize(2, 14)
+        local t = Bar("mark" .. m[1], m[3], 1, "mark")
+        Place(t, PAD + _min(w - 2, w * m[2] - 1), y + 3); t:SetSize(2, 14)
     end
     y = y - 14
     if style == "detailed" then
@@ -317,8 +320,10 @@ local function KeyStats(run, bosses, y)
         { L["Deaths"], deaths > 0 and CT(P.bloodHi, deaths .. (cost > 0 and ("  -" .. T(cost)) or "")) or "0" },
     }
     for i, c in ipairs(cells) do
-        local lbl = FS("cellL" .. i, "regular", 11, P.ash, "LEFT"); Place(lbl, PAD + (i - 1) * col, y); lbl:SetText(c[1])
-        local val = FS("cellV" .. i, "semibold", 15, P.ivory, "LEFT"); Place(val, PAD + (i - 1) * col, y - 13); val:SetText(c[2])
+        local lbl = FS("cellL" .. i, "regular", 11, P.ash, "LEFT")
+        Place(lbl, PAD + (i - 1) * col, y); lbl:SetText(c[1])
+        local val = FS("cellV" .. i, "semibold", 15, P.ivory, "LEFT")
+        Place(val, PAD + (i - 1) * col, y - 13); val:SetText(c[2])
     end
     return y - 34
 end
@@ -328,9 +333,12 @@ local COLS = { kill = 92, best = 50, diff = 0 }    -- right edges, in from the r
 local function BossRows(run, bosses, y, withBest)
     local F = MS.ResultTimeFn(run) or function(t) return t end
     if withBest then
-        local h1 = FS("bh1", "regular", 11, P.ash, "RIGHT"); PlaceRight(h1, W - PAD - COLS.kill, y); h1:SetText(L["Killed"])
-        local h2 = FS("bh2", "regular", 11, P.ash, "RIGHT"); PlaceRight(h2, W - PAD - COLS.best, y); h2:SetText(L["Best"])
-        local h3 = FS("bh3", "regular", 11, P.ash, "RIGHT"); PlaceRight(h3, W - PAD, y); h3:SetText(L["vs best"])
+        local h1 = FS("bh1", "regular", 11, P.ash, "RIGHT")
+        PlaceRight(h1, W - PAD - COLS.kill, y); h1:SetText(L["Killed"])
+        local h2 = FS("bh2", "regular", 11, P.ash, "RIGHT")
+        PlaceRight(h2, W - PAD - COLS.best, y); h2:SetText(L["Best"])
+        local h3 = FS("bh3", "regular", 11, P.ash, "RIGHT")
+        PlaceRight(h3, W - PAD, y); h3:SetText(L["vs best"])
         y = y - 15
     end
     for i, b in ipairs(bosses) do
@@ -339,7 +347,8 @@ local function BossRows(run, bosses, y, withBest)
         Tint(dia, b.done and P.bronzeHi or P.ash2, b.done and 1 or 0.7)
         local name = FS("bn" .. i, "medium", 13, b.done and P.ivory or P.ash, "LEFT")
         Place(name, PAD + 16, y); OneLine(name, W - 2 * PAD - 16 - (withBest and 130 or 50), 13)
-        UI.FitText(name, b.name .. (b.fighting and ("  " .. CT(P.bronzeHi, L["fighting"])) or ""), "game", GameSize(13), 9)
+        local fighting = b.fighting and ("  " .. CT(P.bronzeHi, L["fighting"])) or ""
+        UI.FitText(name, b.name .. fighting, "game", GameSize(13), 9)
         local kill = FS("bk" .. i, "medium", 13, P.ivory, "RIGHT")
         PlaceRight(kill, W - PAD - (withBest and COLS.kill or 0), y)
         kill:SetText(b.kill and T(b.kill) or (b.done and "-" or ""))
@@ -350,7 +359,8 @@ local function BossRows(run, bosses, y, withBest)
             PlaceRight(diff, W - PAD, y)
             if b.kill and b.best then
                 local d = F(b.kill) - b.best
-                diff:SetText(_abs(d) < 1 and CT(P.ash, "0:00") or d < 0 and CT(P.verdHi, "-" .. T(-d)) or CT(P.bloodHi, "+" .. T(d)))
+                diff:SetText(_abs(d) < 1 and CT(P.ash, "0:00")
+                    or d < 0 and CT(P.verdHi, "-" .. T(-d)) or CT(P.bloodHi, "+" .. T(d)))
             else
                 diff:SetText("")
             end
@@ -374,7 +384,8 @@ local function Forces(run, y)
     local track = Bar("ftrack", TRACK, 1, "back"); Place(track, PAD, y); track:SetSize(w, 6)
     local before = Bar("fbefore", FILL); Place(before, PAD, y); before:SetSize(_max(1, w * _max(0, now - last)), 6)
     if last > 0 then
-        local pull = Bar("fpull", P.bronzeHi); Place(pull, PAD + w * _max(0, now - last), y); pull:SetSize(_max(1, w * last), 6)
+        local pull = Bar("fpull", P.bronzeHi)
+        Place(pull, PAD + w * _max(0, now - last), y); pull:SetSize(_max(1, w * last), 6)
     end
     y = y - 10
     local lp = FS("flp", "regular", 12, P.ash, "LEFT"); Place(lp, PAD, y)
@@ -493,8 +504,10 @@ local function Progress(run, y)
         { L["Gold looted"], CT(P.bronzeHi, MS.FormatGold(_max(0, pr.gold or 0) + (pr.qg or 0))) },
     }
     for i, c in ipairs(cells) do
-        local l = FS("pcl" .. i, "regular", 11, P.ash, "LEFT"); Place(l, PAD + (i - 1) * col, y); l:SetText(c[1])
-        local v = FS("pcv" .. i, "semibold", 14, P.ivory, "LEFT"); Place(v, PAD + (i - 1) * col, y - 13); v:SetText(c[2])
+        local l = FS("pcl" .. i, "regular", 11, P.ash, "LEFT")
+        Place(l, PAD + (i - 1) * col, y); l:SetText(c[1])
+        local v = FS("pcv" .. i, "semibold", 14, P.ivory, "LEFT")
+        Place(v, PAD + (i - 1) * col, y - 13); v:SetText(c[2])
     end
     return y - 34
 end
@@ -598,7 +611,8 @@ local function DrawMinimal(run)
     _ins(parts, (#bosses > 0 and (done .. "/" .. #bosses) or tostring(done)) .. " " .. CT(P.ash, L["Bosses"]))
     if IsKey(run) then _ins(parts, _floor(run.currentPct or 0) .. "%") end
     local deaths = DeathCount(run)
-    _ins(parts, deaths > 0 and CT(P.bloodHi, MS.Plural(deaths, "%d death", "%d deaths")) or MS.Plural(0, "%d death", "%d deaths"))
+    local deathText = MS.Plural(deaths, "%d death", "%d deaths")
+    _ins(parts, deaths > 0 and CT(P.bloodHi, deathText) or deathText)
     if IsKey(run) then
         local d = Pace(run, bosses)
         if d and _abs(d) >= 1 then _ins(parts, d < 0 and CT(P.verdHi, "-" .. T(-d)) or CT(P.bloodHi, "+" .. T(d))) end
@@ -659,7 +673,9 @@ local function Draw(run, style)
 end
 
 -- ── The frame ──────────────────────────────────────────────────────────────
-local STYLE_NAMES = { compact = MS.LK("Compact"), detailed = MS.LK("Detailed"), minimal = MS.LK("Minimal"), off = MS.LK("Off") }
+local STYLE_NAMES = {
+    compact = MS.LK("Compact"), detailed = MS.LK("Detailed"), minimal = MS.LK("Minimal"), off = MS.LK("Off"),
+}
 
 local function TimeLeftLine(run)
     local limit = tonumber(run.keystoneTimeLimit)
@@ -818,7 +834,9 @@ local _rand = math.random
 -- A dungeon's bosses from the Encounter Journal, by the dungeon's name.
 -- (It changes the journal's selected tier briefly, so not while it's open.)
 local function JournalBosses(dungeon)
-    if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex and EJ_GetEncounterInfoByIndex) then return nil end
+    if not (EJ_GetNumTiers and EJ_SelectTier and EJ_GetInstanceByIndex and EJ_GetEncounterInfoByIndex) then
+        return nil
+    end
     if EncounterJournal and EncounterJournal.IsShown and EncounterJournal:IsShown() then return nil end
     local prev = EJ_GetCurrentTier and EJ_GetCurrentTier()
     local out
@@ -1027,7 +1045,8 @@ local function DemoRun()
         r = MS.NewRunData()
         r.dungeonName, r.wingName, r.difficultyLabel = "Scarlet Monastery", "Scarlet Monastery: Library", "Normal"
         r.progress = { xp = 0, qx = 0, kills = 0, gold = 0, quests = {}, questRewards = {}, levels = 0, rep = {} }
-        local me = MS.NewPlayerStats(MS.ShortName(MS:UnitPlayerName("player") or "You"), select(2, UnitClass("player")) or "WARRIOR", "Demo-1")
+        local myName = MS.ShortName(MS:UnitPlayerName("player") or "You")
+        local me = MS.NewPlayerStats(myName, select(2, UnitClass("player")) or "WARRIOR", "Demo-1")
         r.players = { [me.name] = me }
     end
     r._demo, r._demoStart = true, GetTime()
@@ -1109,7 +1128,8 @@ function MS:CompactCommand(arg)
         self:SetCompactStyle(arg)
         MS.Say(_fmt(L["In-run frame: %s"], L[STYLE_NAMES[arg]]))
     else
-        MS.Say(_fmt(L["In-run frame: %s"], L[STYLE_NAMES[self:GetCompactStyle()]]) .. "  (/sb compact compact | detailed | minimal | off | demo)")
+        MS.Say(_fmt(L["In-run frame: %s"], L[STYLE_NAMES[self:GetCompactStyle()]])
+            .. "  (/sb compact compact | detailed | minimal | off | demo)")
     end
     self:RefreshCompact()
 end
