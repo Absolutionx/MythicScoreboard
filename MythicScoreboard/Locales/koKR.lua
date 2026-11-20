@@ -484,3 +484,8 @@ T["Back to all runs"] = "모든 기록으로"
 T["Fight"] = "전투"
 T["Compared with your other dungeons"] = "다른 던전과 비교"
 T["Your run-by-run chart and trend show here once you've done a second run."] = "두 번째 기록부터 기록별 차트와 추세가 여기에 표시됩니다."
+
+-- Directions: the hearthstone / teleport button
+T["Click the icon to go."] = "아이콘을 클릭하면 이동합니다."
+T["Click to go to %s."] = "클릭하면 %s(으)로 이동합니다."
+T["A sample run, not saved. Pick a run from history to go back."] = "저장되지 않는 예시 기록입니다. 돌아가려면 기록에서 하나를 고르세요."

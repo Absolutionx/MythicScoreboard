@@ -130,6 +130,43 @@ if MS.Flavor.dungeonLevels then
     end
 end
 
+-- Every column there can be (ALL_COLS); COLS: the ones shown, in order,
+-- the same table throughout (other files keep it), filled in place.
+--
+-- WoW Forever's damage meter hasn't counted avoidable damage so far (its
+-- dungeons have nothing marked avoidable), so there the Avoidable column is
+-- left out and its width goes to Loot, until the first avoidable damage is
+-- seen: then it's back (UI.SetAvoidableColumn), at once and from then on.
+local ALL_COLS = {}
+for i, c in ipairs(COLS) do ALL_COLS[i] = c end
+local LOOT_W, AVOID_W = 0, 0
+for _, c in ipairs(ALL_COLS) do
+    if c.key == "loot" then LOOT_W = c.w elseif c.key == "avoidable" then AVOID_W = c.w end
+end
+local _colsVersion, _colsListeners = 0, {}
+local LOOT_MAX_W = LOOT_W + (MS.Flavor.progressStats and AVOID_W or 0)   -- Loot at its widest
+local function SetAvoidableColumn(on)
+    on = on and true or false
+    if COLS._avoidable == on then return false end
+    for i = #COLS, 1, -1 do COLS[i] = nil end
+    for _, c in ipairs(ALL_COLS) do
+        if c.key == "loot" then c.w = on and LOOT_W or (LOOT_W + AVOID_W) end
+        if on or c.key ~= "avoidable" then COLS[#COLS + 1] = c end
+    end
+    COLS._avoidable = on
+    COLS._anchored = false
+    _colsVersion = _colsVersion + 1
+    for _, fn in ipairs(_colsListeners) do fn() end
+    return true
+end
+SetAvoidableColumn(not MS.Flavor.progressStats)
+-- (Settings are only there once the game has loaded them.)
+if MS.Flavor.progressStats then
+    MS:On("PLAYER_LOGIN", function()
+        if MS:GetSetting("avoidableSeen") == true then SetAvoidableColumn(true) end
+    end)
+end
+
 -- ===========================================================================
 -- Primitive helpers
 -- ===========================================================================
@@ -584,6 +621,12 @@ UI.Btn = Btn
 UI.CELL_FONT_SIZE = CELL_FONT_SIZE
 UI.CLASS_ICON_COORDS = CLASS_ICON_COORDS
 UI.COLS = COLS
+UI.ALL_COLS = ALL_COLS
+UI.LOOT_MAX_W = LOOT_MAX_W
+UI.SetAvoidableColumn = SetAvoidableColumn
+function UI.ColumnsVersion() return _colsVersion end
+-- fn() each time the columns shown change (laid out again at once).
+function UI.OnColumnsChanged(fn) _colsListeners[#_colsListeners + 1] = fn end
 UI.COL_HDR_H = COL_HDR_H
 UI.CT = CT
 UI.ClassColor = ClassColor

@@ -442,7 +442,8 @@ function MS:HearthPlace()
 end
 
 -- The places you can be at in a moment, from anywhere: { kind = "jump",
--- how = "hearth" | "recall" | "teleport", c, x, y, name }.
+-- how = "hearth" | "recall" | "teleport", c, x, y, name, and what takes you
+-- there: item (the hearthstone) or spell }.
 function MS:Jumps()
     local out = {}
     local hearth = MS:HearthPlace()
@@ -450,7 +451,8 @@ function MS:Jumps()
         -- Astral Recall first: it's on the shorter cooldown.
         local how = SpellReady(ASTRAL_RECALL) and "recall" or (ItemReady(HEARTHSTONE) and "hearth") or nil
         if how then
-            _ins(out, { kind = "jump", how = how, c = hearth.c, x = hearth.x, y = hearth.y, name = hearth.name })
+            _ins(out, { kind = "jump", how = how, c = hearth.c, x = hearth.x, y = hearth.y, name = hearth.name,
+                        item = how == "hearth" and HEARTHSTONE or nil, spell = how == "recall" and ASTRAL_RECALL or nil })
         end
     end
     local acc = MS.AccountDB()
@@ -458,7 +460,7 @@ function MS:Jumps()
     for _, t in ipairs(MS.ForeverData.TELEPORTS or {}) do
         local at = landed[t.spell]
         if at and SpellReady(t.spell) then
-            _ins(out, { kind = "jump", how = "teleport", c = at.c, x = at.x, y = at.y, name = t[1] })
+            _ins(out, { kind = "jump", how = "teleport", c = at.c, x = at.x, y = at.y, name = t[1], spell = t.spell })
         end
     end
     return out

@@ -484,3 +484,8 @@ T["Back to all runs"] = "Zurück zu allen Läufen"
 T["Fight"] = "Kampf"
 T["Compared with your other dungeons"] = "Im Vergleich mit deinen anderen Dungeons"
 T["Your run-by-run chart and trend show here once you've done a second run."] = "Dein Diagramm Lauf für Lauf mit Trend erscheint hier nach deinem zweiten Lauf."
+
+-- Directions: the hearthstone / teleport button
+T["Click the icon to go."] = "Klicke auf das Symbol, um zu reisen."
+T["Click to go to %s."] = "Klicken, um nach %s zu reisen."
+T["A sample run, not saved. Pick a run from history to go back."] = "Ein Beispiellauf, nicht gespeichert. Wähle einen Lauf aus dem Verlauf, um zurückzukehren."

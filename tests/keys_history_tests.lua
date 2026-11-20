@@ -161,13 +161,15 @@ local before = #MythicScoreboardDB.runs
 for _, up in ipairs({ 0, 1, 2, 3 }) do
     SlashCmdList["MYTHICSCOREBOARD"]("demo " .. up); M.RunTimers(2)
     local d = MS.displayRun
-    check("demo " .. up .. ": shown", d and d._demo and MS:RunUpgrades(d) == up, d and MS:RunUpgrades(d))
+    -- (WoW Forever has no keys: its demo is a run of its own dungeons, demo_tests.lua.)
+    local keys = MS.Flavor.mythicPlus
+    check("demo " .. up .. ": shown", d and d._demo and (not keys or MS:RunUpgrades(d) == up), d and MS:RunUpgrades(d))
     local n = 0
     for _ in pairs(d and d.players or {}) do n = n + 1 end
     check("demo " .. up .. ": five players", n == 5, n)
     local sub = MS.UI.frame.Subline:GetText() or ""
     local _, filled = sub:gsub("PipFull", "")
-    check("demo " .. up .. ": diamonds", filled == up, sub)
+    check("demo " .. up .. ": diamonds", filled == (keys and up or 0), sub)
 end
 check("demo: not saved", #MythicScoreboardDB.runs == before and #MS:ArchiveRuns() == 0)
 check("demo: not a personal best", not MS:IsPersonalBest(MS.displayRun))

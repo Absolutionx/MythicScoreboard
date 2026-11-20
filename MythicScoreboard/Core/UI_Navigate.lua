@@ -11,7 +11,8 @@ local UI = MS.UI
 --
 -- The arrow's turn: where the step goes from you (on the continent's map,
 -- in yards), against which way you face (GetPlayerFacing: 0 is north,
--- turning left).
+-- turning left). A step that's your hearthstone, Astral Recall or a
+-- teleport: in the arrow's place, its icon, to click and go.
 
 local _atan2 = math.atan2 or math.atan
 local _floor, _fmt, _pi = math.floor, string.format, math.pi
@@ -209,6 +210,93 @@ local function Build()
     return frame
 end
 
+-- ── Hearthstone, Astral Recall, a teleport: click to go ───────────────────
+-- A secure button (only those may use an item or cast a spell for you), on
+-- its own (so the arrow's frame stays free to hide in a fight) and over
+-- where the arrow is. The game won't let a secure button be changed, shown
+-- or hidden in combat: then it's left as it is, and set right as the fight
+-- ends (you can't hearth in combat anyway).
+local jump, jumpWant                         -- the button; the step it's for (nil: none)
+
+local function JumpIcon(to)
+    if to.item then
+        local CItem = rawget(_G, "C_Item")
+        local get = (CItem and CItem.GetItemIconByID) or rawget(_G, "GetItemIcon")
+        local ok, icon = pcall(get or error, to.item)
+        return ok and icon or 134400
+    end
+    local CSpell = rawget(_G, "C_Spell")
+    local get = (CSpell and CSpell.GetSpellTexture) or rawget(_G, "GetSpellTexture")
+    local ok, icon = pcall(get or error, to.spell)
+    return ok and icon or 134400
+end
+
+local function BuildJump()
+    if jump then return jump end
+    jump = CreateFrame("Button", "MythicScoreboardJump", UIParent, "SecureActionButtonTemplate")
+    jump:SetSize(48, 48)
+    jump:SetPoint("CENTER", frame, "TOP", 0, -28)          -- where the arrow is
+    jump:SetFrameStrata(frame:GetFrameStrata() or "MEDIUM")
+    -- (Down and up: the game uses whichever its "cast on key down" setting says.)
+    jump:RegisterForClicks("AnyUp", "AnyDown")
+    local icon = jump:CreateTexture(nil, "ARTWORK")
+    icon:SetAllPoints(); icon:SetTexCoord(0.07, 0.93, 0.07, 0.93)
+    jump.icon = icon
+    local edge = jump:CreateTexture(nil, "OVERLAY")
+    edge:SetPoint("TOPLEFT", -3, 3); edge:SetPoint("BOTTOMRIGHT", 3, -3)
+    edge:SetTexture("Interface\\Buttons\\UI-ActionButton-Border"); edge:SetBlendMode("ADD")
+    if P then edge:SetVertexColor(P.bronzeHi[1], P.bronzeHi[2], P.bronzeHi[3], 0.8) end
+    jump:SetHighlightTexture("Interface\\Buttons\\ButtonHilight-Square", "ADD")
+    jump:SetScript("OnEnter", function(self)
+        local to = self.to
+        if not to then return end
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        local ok = false
+        if to.item and GameTooltip.SetItemByID then ok = pcall(GameTooltip.SetItemByID, GameTooltip, to.item)
+        elseif to.spell and GameTooltip.SetSpellByID then ok = pcall(GameTooltip.SetSpellByID, GameTooltip, to.spell) end
+        if not ok then GameTooltip:SetText(to.name or "?", 1, 1, 1) end
+        GameTooltip:AddLine(_fmt(L["Click to go to %s."], to.name or "?"), 0.91, 0.72, 0.47)
+        GameTooltip:Show()
+    end)
+    jump:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    jump:Hide()
+    return jump
+end
+
+-- Shows the button for a step ({ item or spell, name }), or hides it (nil).
+-- In combat: nothing yet (PLAYER_REGEN_ENABLED, below, does it after).
+local function SetJump(to)
+    jumpWant = to
+    local InCombat = rawget(_G, "InCombatLockdown")
+    if InCombat and InCombat() then return end
+    if not to then
+        if jump and jump:IsShown() then jump:Hide() end
+        if jump then jump.to, jump.key = nil, nil end
+        return
+    end
+    BuildJump()
+    local key = (to.item and "item:" .. to.item) or ("spell:" .. tostring(to.spell))
+    if jump.key ~= key then
+        jump.key = key
+        if to.item then
+            jump:SetAttribute("type", "item")
+            jump:SetAttribute("item", "item:" .. to.item)
+            jump:SetAttribute("spell", nil)
+        else
+            jump:SetAttribute("type", "spell")
+            jump:SetAttribute("spell", to.spell)
+            jump:SetAttribute("item", nil)
+        end
+        jump.icon:SetTexture(JumpIcon(to))
+    end
+    jump.to = to
+    if not jump:IsShown() then jump:Show() end
+end
+MS:On("PLAYER_REGEN_ENABLED", function()
+    if jump or jumpWant then pcall(SetJump, target and jumpWant or nil) end
+end)
+function MS:NavigationJump() return jump and jump:IsShown() and jump.to or nil end   -- for tests
+
 -- ── Distance and time left ────────────────────────────────────────────────
 -- The time left is the yards to go over how fast they've been going down
 -- (on foot, mounted or in the air): measured, not guessed, and smoothed so
@@ -297,6 +385,7 @@ function MS:UpdateArrow()
             end
         end
         SetText(frame.step, "lastStep", text)
+        SetJump(nil)
         local turn, yards, bearing
         if here and spot and here.c == spot.c then turn, yards, bearing = MS:TurnTo(here, spot) end
         if turn then Point(turn, bearing) else NoPoint() end
@@ -327,6 +416,7 @@ function MS:UpdateArrow()
     local leg = plan and plan[1]
     if not (here and leg) then
         NoPoint()
+        SetJump(nil)
         local where = goal and MS:MapName(goal.c)
         SetText(frame.step, "lastStep", here and where and here.c ~= goal.c and _fmt(L["Travel to %s"], where) or "")
         SetText(frame.dist, "lastDist", "")
@@ -335,6 +425,14 @@ function MS:UpdateArrow()
     local text, spot = StepText(leg)
     if #plan > 1 then text = _fmt(L["Step %d of %d"], 1, #plan) .. ": " .. text end
     SetText(frame.step, "lastStep", text)
+    -- Hearthstone, Astral Recall, a teleport: its icon to click, in the arrow's place.
+    if (leg.how == "hearth" or leg.how == "recall" or leg.how == "teleport") and (leg.to.item or leg.to.spell) then
+        NoPoint()
+        SetJump(leg.to)
+        SetText(frame.dist, "lastDist", "|cffe8b878" .. L["Click the icon to go."] .. "|r")
+        return
+    end
+    SetJump(nil)
     if spot then
         local turn, yards, bearing = MS:TurnTo(here, spot)
         if turn then
@@ -365,6 +463,7 @@ end
 function MS:StopNavigation()
     target, plan, planAt, airFor = nil, nil, nil, nil
     SaveTarget()
+    SetJump(nil)
     if frame then frame:Hide() end
     RouteChanged()
 end

@@ -484,3 +484,8 @@ T["Back to all runs"] = "返回全部記錄"
 T["Fight"] = "戰鬥"
 T["Compared with your other dungeons"] = "與你的其他副本相比"
 T["Your run-by-run chart and trend show here once you've done a second run."] = "完成第二次後，這裡會顯示逐次圖表和趨勢。"
+
+-- Directions: the hearthstone / teleport button
+T["Click the icon to go."] = "點擊圖示前往。"
+T["Click to go to %s."] = "點擊前往%s。"
+T["A sample run, not saved. Pick a run from history to go back."] = "示例記錄，不會儲存。從歷史中選擇一條記錄即可返回。"

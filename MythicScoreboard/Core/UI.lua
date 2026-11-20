@@ -521,12 +521,26 @@ local function BuildColumnHeader()
         end
     end
 
-    ComputeColumnAnchors()
-    local x = PAD_X - 2
-    for _, col in ipairs(COLS) do
+    -- A header cell for every column there can be; placed (and the ones not
+    -- shown hidden) by LayoutHeader, again whenever the columns change.
+    local cells = {}
+    local function LayoutHeader()
+        ComputeColumnAnchors()
+        local shown = {}
+        for _, col in ipairs(COLS) do shown[col.key] = col end
+        for key, cell in pairs(cells) do
+            local col = shown[key]
+            cell:SetShown(col ~= nil)
+            if col then
+                cell:ClearAllPoints()
+                cell:SetPoint("LEFT", colHdr, "LEFT", col.x, 0)
+                cell:SetSize(col.w, COL_HDR_H)
+            end
+        end
+    end
+    for _, col in ipairs(UI.ALL_COLS) do
         local cell = Btn(colHdr)
-        cell:SetPoint("LEFT", colHdr, "LEFT", x, 0)
-        cell:SetSize(col.w, COL_HDR_H)
+        cells[col.key] = cell
         local hov = Solid(cell, "HIGHLIGHT", 0, 1, 0.94, 0.86, 0.04); hov:SetAllPoints()
 
         local lbl = Text(cell, "medium", 13, P.ash, col.left and "LEFT" or "CENTER")
@@ -553,8 +567,13 @@ local function BuildColumnHeader()
             RefreshHeaderLabels()
             MS:RefreshOverview()
         end)
-        x = x + col.w
     end
+    LayoutHeader()
+    UI.OnColumnsChanged(function()
+        if sortState.key and not COLS._avoidable and sortState.key == "avoidable" then sortState.key = nil end
+        LayoutHeader()
+        RefreshHeaderLabels()
+    end)
     RefreshHeaderLabels()
 end
 
@@ -629,7 +648,8 @@ end
 -- /sb demo [0-3]: a made-up finished key, to see how a key looks (the
 -- diamonds, your rating gain, the +3/+2/+1 marks, specializations) without
 -- running one. Shown only; never saved to history or stats. The number is
--- the upgrade it got (0 = over time; 2 if left out).
+-- the upgrade it got (0 = over time; 2 if left out). On WoW Forever: a
+-- made-up run of one of its own dungeons near your level instead (ForeverDemoRun).
 local DEMO_TIMES = { [0] = 1890, [1] = 1632, [2] = 1395, [3] = 1020 }   -- of a 30:00 timer
 local function DemoRun(up)
     local dur, limit = DEMO_TIMES[up] or DEMO_TIMES[2], 1800
@@ -705,14 +725,103 @@ end
 
 UI.DemoRun = DemoRun          -- (the in-run frame's sample, UI_Compact.lua)
 
+-- WoW Forever: a finished run of one of its dungeons, picked at random from
+-- the ones near your level (any, with none near), with its own bosses, a
+-- group of the classes it has, numbers to suit the level, and the XP, kills
+-- and gold a run gives.
+local function ForeverDemoRun()
+    local D = MS.ForeverData and MS.ForeverData.DUNGEONS or {}
+    local lvl = UnitLevel and UnitLevel("player")
+    if MS.IsSecret(lvl) or type(lvl) ~= "number" then lvl = 30 end
+    local near, all = {}, {}
+    for name, d in pairs(D) do
+        if d.levels and #(d.bosses or {}) > 0 then
+            all[#all + 1] = name
+            if lvl >= d.levels[1] - 3 and lvl <= d.levels[2] + 3 then near[#near + 1] = name end
+        end
+    end
+    local pool = #near > 0 and near or all
+    table.sort(pool)
+    local name = pool[math.random(math.max(1, #pool))] or "Zul'Farrak"
+    local d = D[name] or { levels = { lvl, lvl }, bosses = {} }
+
+    local run = MS.NewRunData()
+    local wing = name:match("^(.-):%s")
+    run.dungeonName = d.instance or wing or name
+    if d.instance or wing then run.wingName = name end
+    run.difficultyLabel = "Normal"
+    local dur = math.random(28, 46) * 60
+    run.completed, run.duration = true, dur
+    run._wallClockStart, run._demo = time() - dur, true
+    run.affixes = {}
+    -- The bosses that are always there, spread over the run.
+    local names = {}
+    for _, b in ipairs(d.bosses) do
+        -- (Forever.lua turns each into { name = ... } as it loads.)
+        local bn = type(b) == "string" and b or (type(b) == "table" and not (b.rare or b.summon) and (b.name or b[1]))
+        if bn then names[#names + 1] = bn end
+    end
+    run.bosses = {}
+    for i, b in ipairs(names) do
+        local kill = math.floor(dur * i / #names) - (i == #names and 0 or 40)
+        local fight = math.random(35, 110)
+        run.bosses[i] = { name = b, pullTime = kill - fight, killTime = kill, progressPct = math.floor(100 * i / #names) }
+    end
+    -- What it did for you.
+    local xp = lvl < 60 and lvl * math.random(700, 1100) or 0
+    run.progress = { xp = xp, qx = lvl < 60 and lvl * math.random(150, 400) or 0, levels = 0,
+                     kills = math.random(80, 140), quests = {}, questRewards = {}, gold = lvl * math.random(250, 700), rep = {} }
+
+    local myName = MS:UnitPlayerName("player") or UNKNOWN or "You"
+    local _, myClass = UnitClass("player")
+    local group = {
+        { MS.ShortName(myName), myClass or "WARRIOR", "DAMAGER" },
+        { "Ironhide",    "WARRIOR", "TANK" },
+        { "Mosswhisper", "DRUID",   "HEALER" },
+        { "Frostbyte",   "MAGE",    "DAMAGER" },
+        { "Shadestep",   "ROGUE",   "DAMAGER" },
+        { "Arrowyn",     "HUNTER",  "DAMAGER" },   -- if one above stayed home
+    }
+    -- Five: you and four others (a stand-in of your own class stays home,
+    -- or else the spare at the end).
+    local home = #group
+    for i = 2, #group do
+        if group[i][2] == myClass and group[i][3] == "DAMAGER" then home = i; break end
+    end
+    table.remove(group, home)
+    run.players = {}
+    for i, g in ipairs(group) do
+        local p = MS.NewPlayerStats(g[1], g[2], "Demo-" .. i)
+        p.role = g[3]
+        p.level = math.max(1, math.min(60, lvl + (i == 1 and 0 or math.random(-2, 2))))
+        p.itemLevel = math.max(1, p.level - math.random(2, 8))
+        local dps = g[3] == "HEALER" and p.level * 0.6 or (g[3] == "TANK" and p.level * 1.4 or p.level * (1.8 + i * 0.15))
+        p.dps, p.damageDone = math.floor(dps), math.floor(dps * dur)
+        local hps = g[3] == "HEALER" and p.level * 2.2 or p.level * 0.15
+        p.hps, p.healingDone = math.floor(hps), math.floor(hps * dur)
+        p.damageTaken = (g[3] == "TANK" and 900 or 280) * p.level
+        p.interrupts = g[3] == "HEALER" and 0 or math.random(1, 6)
+        for k = 1, p.interrupts do p.interruptEvents[k] = math.floor(dur * k / (p.interrupts + 1)) end
+        if i == 4 then
+            p.deaths = 1
+            local b = run.bosses[math.min(2, #run.bosses)]
+            p.deathEvents = { { time = b and b.killTime - 10 or math.floor(dur / 2), events = {} } }
+        end
+        run.players[g[1]] = p
+    end
+    return run
+end
+UI.ForeverDemoRun = ForeverDemoRun
+
 local function DemoCommand(arg)
     local up = tonumber(arg)
     if not (up and DEMO_TIMES[up]) then up = 2 end
     MS:ShowScoreboard()
     if UI.statsOpen then UI.CloseStats() end
-    MS.displayRun = DemoRun(up)
+    MS.displayRun = MS.Flavor.progressStats and ForeverDemoRun() or DemoRun(up)
     MS:RefreshOverview()
-    MS.Say(L["A sample key, not saved. Pick a run from history to go back."])
+    MS.Say(MS.Flavor.progressStats and L["A sample run, not saved. Pick a run from history to go back."]
+        or L["A sample key, not saved. Pick a run from history to go back."])
 end
 
 -- Slash commands work before the window is first opened (it is built then).

@@ -394,6 +394,35 @@ cooldown[556] = 900
 check("Astral Recall on cooldown: the hearthstone", hows(MS:PlanRoute(from(), goal)) == "hearth,run")
 cooldown[556] = 1.5
 check("only the global cooldown: still ready", hows(MS:PlanRoute(from(), goal)) == "recall,run")
+-- Shown: the step's icon to click in place of the arrow, set to cast it.
+bags[6948], spells[556], cooldown[556] = 1, nil, nil
+MS:NavigateTo({ name = "Far Dungeon", map = 1413, x = 0.88, y = 0.9 })
+local jb = rawget(_G, "MythicScoreboardJump")
+check("hearth step: the button", jb and jb:IsShown() and MS:NavigationJump() ~= nil)
+check("hearth step: uses the hearthstone", jb and jb:GetAttribute("type") == "item" and jb:GetAttribute("item") == "item:6948",
+    jb and tostring(jb:GetAttribute("type")))
+check("hearth step: no arrow", arrow.arrow and not arrow.arrow:IsShown())
+spells[556] = true; M.now = M.now + 5; MS:UpdateArrow()
+check("Astral Recall step: casts it", jb:GetAttribute("type") == "spell" and jb:GetAttribute("spell") == 556,
+    tostring(jb:GetAttribute("type")))
+-- In a fight: left as it is (the game won't allow a change), set right after.
+local fighting = true
+InCombatLockdown = function() return fighting end
+local blockedBefore = M.blocked or 0
+MS:StopNavigation()
+check("combat: nothing blocked", (M.blocked or 0) == blockedBefore, M.blocked)
+check("combat: the button stays for now", jb:IsShown())
+fighting = false
+M.Fire("PLAYER_REGEN_ENABLED")
+check("after the fight: hidden", not jb:IsShown())
+InCombatLockdown = function() return false end
+-- A step on foot: the arrow again, no button.
+MS:NavigateTo({ name = "Far Dungeon", map = 1413, x = 0.88, y = 0.9 })
+bags[6948], spells[556] = 0, nil
+M.now = M.now + 5; MS:UpdateArrow()
+check("on foot: no button", not jb:IsShown() and arrow.arrow:IsShown())
+MS:StopNavigation()
+bags[6948] = 1
 cooldown[556], spells[556] = nil, nil
 bind = "Their Inn"
 check("the other side's inn: not yours", hows(MS:PlanRoute(from(), goal)) == "run")

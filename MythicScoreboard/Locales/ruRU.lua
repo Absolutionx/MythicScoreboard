@@ -497,3 +497,8 @@ T["Back to all runs"] = "Назад ко всем забегам"
 T["Fight"] = "Бой"
 T["Compared with your other dungeons"] = "В сравнении с другими подземельями"
 T["Your run-by-run chart and trend show here once you've done a second run."] = "График по забегам и тренд появятся здесь после второго забега."
+
+-- Directions: the hearthstone / teleport button
+T["Click the icon to go."] = "Нажмите на значок, чтобы отправиться."
+T["Click to go to %s."] = "Нажмите, чтобы отправиться в %s."
+T["A sample run, not saved. Pick a run from history to go back."] = "Пример забега, не сохраняется. Выберите забег из истории, чтобы вернуться."
