@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.17.0
+
+### WoW Forever
+- **Click to hearth or teleport:** when the directions' next step is your Hearthstone, Astral Recall or a mage's teleport, its icon takes the arrow's place. Click it to use it, and hover it to see where it goes. In combat it waits until the fight's over to change, like any action button.
+- **Avoidable column:** WoW Forever doesn't count avoidable damage, so the scoreboard leaves that column out and gives its room to Loot, which now shows up to five items per player. If avoidable damage ever shows up in a run, the column comes back at once, mid-run, and stays from then on.
+- **`/sb demo`** shows a sample run of one of WoW Forever's own dungeons near your level, with its bosses, a group of its classes, and the XP, kills and gold a run gives. It no longer shows a retail Mythic+ key.
+
+### Everyone
+- Each pet's damage is credited to its owner again in every case. It could be missed when the game lacked one of its pet titles.
+- If the scoreboard closes while you're resizing it, it no longer follows your mouse the next time it opens.
+- The close button's tooltip is in your language. It was always in English.
+- A saved run's remove (x) icon shows in every language. It was missing outside English.
+- Negative numbers are shortened correctly (-812.0K).
+- Stats: the run time chart no longer keeps dates from another filter, and "Best" sits over the right bar (and isn't shown when that run is older than the bars on screen).
+- Timeline: a run that ended on a boss kill ends just past that boss.
+- Mythic+: the enemy forces count on a mob's tooltip no longer loses its last digit when the game gives a plain number.
+
 ## 2.16.0
 
 ### Everyone
