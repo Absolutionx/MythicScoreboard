@@ -445,7 +445,6 @@ T["Instances this hour: %d of %d."] = "Входов за этот час: %d и�
 T["Instances this hour"] = "Входов за этот час"
 T["%d of %d"] = "%d из %d"
 T["Warn about the instance limit"] = "Предупреждать о пределе входов"
-T["A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."] = "Предупреждение, когда за этот час остается последнее новое подземелье, и строка в чате, когда место снова освобождается."
 T["Preview the instance limit"] = "Предпросмотр предела входов"
 
 -- Stats: Trends
@@ -502,3 +501,15 @@ T["Your run-by-run chart and trend show here once you've done a second run."] = 
 T["Click the icon to go."] = "Нажмите на значок, чтобы отправиться."
 T["Click to go to %s."] = "Нажмите, чтобы отправиться в %s."
 T["A sample run, not saved. Pick a run from history to go back."] = "Пример забега, не сохраняется. Выберите забег из истории, чтобы вернуться."
+
+-- Instance limit: each dungeon on its own (WoW Forever, 20 Nov 2026)
+T["%s is open again (%d of %d this hour)."] = "%s снова открыто (%d из %d за этот час)."
+T["%s: %d of %d this hour."] = "%s: %d из %d за этот час."
+T["A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."] = "Предупреждение, когда у вас остался последний забег в подземелье за этот час, и строка в чате, когда оно снова откроется."
+T["Dungeons this hour"] = "Подземелья за этот час"
+T["Next frees at %s (in %s)"] = "Следующий освободится в %s (через %s)"
+T["One %s run left this hour. Another frees at %s."] = "Остался один забег в %s за этот час. Следующий освободится в %s."
+T["That was your last %s run this hour. It opens again at %s."] = "Это был ваш последний забег в %s за этот час. Снова откроется в %s."
+T["This dungeon this hour"] = "Это подземелье за этот час"
+T["Your next %s run frees at %s (in %s)"] = "Ваш следующий забег в %s освободится в %s (через %s)"
+T["until you can enter %s again (%s)"] = "пока вы не сможете снова войти в %s (%s)"

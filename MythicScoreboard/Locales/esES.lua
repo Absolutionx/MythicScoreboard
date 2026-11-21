@@ -433,7 +433,6 @@ T["Instances this hour: %d of %d."] = "Instancias esta hora: %d de %d."
 T["Instances this hour"] = "Instancias esta hora"
 T["%d of %d"] = "%d de %d"
 T["Warn about the instance limit"] = "Avisar del límite de instancias"
-T["A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."] = "Un aviso cuando solo te queda una mazmorra nueva esta hora, y una línea en el chat cuando vuelve a quedar un hueco libre."
 T["Preview the instance limit"] = "Vista previa del límite de instancias"
 
 -- Stats: Trends
@@ -489,3 +488,15 @@ T["Your run-by-run chart and trend show here once you've done a second run."] = 
 T["Click the icon to go."] = "Haz clic en el icono para ir."
 T["Click to go to %s."] = "Haz clic para ir a %s."
 T["A sample run, not saved. Pick a run from history to go back."] = "Una partida de ejemplo, sin guardar. Elige una partida del historial para volver."
+
+-- Instance limit: each dungeon on its own (WoW Forever, 20 Nov 2026)
+T["%s is open again (%d of %d this hour)."] = "%s vuelve a estar abierta (%d de %d esta hora)."
+T["%s: %d of %d this hour."] = "%s: %d de %d esta hora."
+T["A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."] = "Un aviso cuando te quede una sola partida de una mazmorra esta hora, y una línea de chat cuando vuelva a abrirse."
+T["Dungeons this hour"] = "Mazmorras esta hora"
+T["Next frees at %s (in %s)"] = "Siguiente libre a las %s (en %s)"
+T["One %s run left this hour. Another frees at %s."] = "Te queda una partida de %s esta hora. La siguiente se libera a las %s."
+T["That was your last %s run this hour. It opens again at %s."] = "Esa fue tu última partida de %s esta hora. Vuelve a abrirse a las %s."
+T["This dungeon this hour"] = "Esta mazmorra esta hora"
+T["Your next %s run frees at %s (in %s)"] = "Tu siguiente partida de %s se libera a las %s (en %s)"
+T["until you can enter %s again (%s)"] = "hasta que puedas volver a entrar en %s (%s)"

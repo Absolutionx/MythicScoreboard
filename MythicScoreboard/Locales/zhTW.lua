@@ -433,7 +433,6 @@ T["Instances this hour: %d of %d."] = "本小時副本：%d/%d。"
 T["Instances this hour"] = "本小時副本"
 T["%d of %d"] = "%d/%d"
 T["Warn about the instance limit"] = "副本上限提醒"
-T["A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."] = "本小時只剩最後一個新副本名額時發出警告，名額空出時在聊天框提示。"
 T["Preview the instance limit"] = "預覽副本上限"
 
 -- Stats: Trends
@@ -489,3 +488,15 @@ T["Your run-by-run chart and trend show here once you've done a second run."] = 
 T["Click the icon to go."] = "點擊圖示前往。"
 T["Click to go to %s."] = "點擊前往%s。"
 T["A sample run, not saved. Pick a run from history to go back."] = "示例記錄，不會儲存。從歷史中選擇一條記錄即可返回。"
+
+-- Instance limit: each dungeon on its own (WoW Forever, 20 Nov 2026)
+T["%s is open again (%d of %d this hour)."] = "%s 已再次開放（本小時 %d/%d）。"
+T["%s: %d of %d this hour."] = "%s：本小時 %d/%d。"
+T["A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."] = "本小時某副本只剩最後一次時提醒，重新開放時在聊天中提示。"
+T["Dungeons this hour"] = "本小時的副本"
+T["Next frees at %s (in %s)"] = "下次可用於 %s（%s後）"
+T["One %s run left this hour. Another frees at %s."] = "本小時 %s 只剩一次。下一次於 %s 可用。"
+T["That was your last %s run this hour. It opens again at %s."] = "這是你本小時最後一次進入 %s。將於 %s 重新開放。"
+T["This dungeon this hour"] = "本小時此副本"
+T["Your next %s run frees at %s (in %s)"] = "你下一次進入 %s 於 %s 可用（%s後）"
+T["until you can enter %s again (%s)"] = "直到你能再次進入 %s（%s）"

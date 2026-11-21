@@ -82,7 +82,7 @@ local GROUPS = {
         T(LK("Start the clock on the first pull"), "StartOnPull",
           LK("A dungeon's clock waits until you or your group get into combat, so waiting for the group doesn't count. Keystones keep the game's timer.")),
         T(LK("Warn about the instance limit"), "InstanceLimitWarn",
-          LK("A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."),
+          LK("A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."),
           MS.InstanceLimit ~= nil),           -- WoW Forever only (InstanceLimit.lua)
         { kind = "limitPreview" },
         T(LK("Reset meter on zone-in"), "AutoResetMeter",

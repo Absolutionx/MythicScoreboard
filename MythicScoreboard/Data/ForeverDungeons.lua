@@ -136,6 +136,7 @@ D.DUNGEONS = {
         { "Spirestone Lord Magus", rare = true }, "Highlord Omokk", "Shadow Hunter Vosh'gajin",
         "War Master Voone", "Mother Smolderweb", { "Crystal Fang", rare = true }, "Urok Doomhowl",
         { "Bannok Grimaxe", rare = true }, "Quartermaster Zigris", "Halycon", "Gizrul the Slavener",
+        { "Mor Grayhoof", summon = true }, { "Burning Felguard", rare = true },
         { "Ghok Bashguud", rare = true }, "Overlord Wyrmthalak",
     }},
     ["Upper Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "General Drakkisath", bosses = {
@@ -144,7 +145,7 @@ D.DUNGEONS = {
         { "Lord Valthalak", summon = true }, "General Drakkisath",
     }},
     ["Dire Maul: East"] = { levels = {55, 60}, final = "Alzzin the Wildshaper", bosses = {
-        { "Pusillin", rare = true }, "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", "Alzzin the Wildshaper",
+        { "Pusillin", rare = true }, "Zevrim Thornhoof", "Hydrospawn", "Lethtendris", { "Isalien", summon = true }, "Alzzin the Wildshaper",
     }},
     ["Dire Maul: West"] = { levels = {57, 60}, final = "Prince Tortheldrin", bosses = {
         "Tendris Warpwood", "Illyanna Ravenoak", { "Tsu'zee", rare = true }, "Magister Kalendris",
@@ -164,7 +165,8 @@ D.DUNGEONS = {
     ["Stratholme: Living"] = { levels = {58, 60}, final = "Balnazzar", bosses = {
         { "Skul", rare = true }, { "Hearthsinger Forresten", rare = true }, "The Unforgiven",
         "Timmy the Cruel", { "Malor the Zealous", rare = true }, "Postmaster Malown",
-        { "Ezra Grimm", rare = true }, "Cannon Master Willey", "Archivist Galford", "Balnazzar",
+        { "Ezra Grimm", rare = true }, "Cannon Master Willey", "Archivist Galford",
+        { "Jarien and Sothos", summon = true, aka = { "Jarien", "Sothos" } }, "Balnazzar",
     }},
     ["Stratholme: Undead"] = { levels = {58, 60}, final = "Baron Rivendare", bosses = {
         { "Stonespine", rare = true }, "Magistrate Barthilas", "Nerub'enkan", "Baroness Anastari",

@@ -182,6 +182,7 @@ MS.ForeverData.BOSSES = {
     ["Hydrospawn"]            = { npc = 13280, display = 5489 },
     ["Lethtendris"]           = { npc = 14327, display = 14378 },
     ["Alzzin the Wildshaper"] = { npc = 11492, display = 14416 },
+    ["Isalien"]               = { npc = 16097, display = 16000 },
 
     -- Dire Maul: West
     ["Tendris Warpwood"]   = { npc = 11489, display = 14383 },
@@ -212,6 +213,8 @@ MS.ForeverData.BOSSES = {
     ["Cannon Master Willey"]   = { npc = 10997, display = 10674 },
     ["Archivist Galford"]      = { npc = 10811, display = 10544 },
     ["Balnazzar"]              = { npc = 10813, display = 10691 },
+    ["Jarien"]                 = { npc = 16101, display = 16018 },
+    ["Sothos"]                 = { npc = 16102, display = 16003 },
 
     -- Stratholme: Undead
     ["Stonespine"]           = { npc = 10809, display = 7856 },
@@ -276,6 +279,8 @@ MS.ForeverData.BOSSES = {
     ["Quartermaster Zigris"]     = { npc = 9736,  display = 9738 },
     ["Halycon"]                  = { npc = 10220, display = 9567 },
     ["Gizrul the Slavener"]      = { npc = 10268, display = 9564 },
+    ["Mor Grayhoof"]             = { npc = 16080, display = 15997 },
+    ["Burning Felguard"]         = { npc = 10263, display = 5047 },
     ["Ghok Bashguud"]            = { npc = 9718,  display = 11809 },
     ["Overlord Wyrmthalak"]      = { npc = 9568,  display = 8711 },
 
