@@ -565,19 +565,23 @@ local function RunCells(run, bosses, y)
 end
 
 -- The instance limit (InstanceLimit.lua), once any are used this hour:
--- "Instances this hour  7 of 10", a pip for each, when the next frees. The
--- preview shows yours, or a sample (7 of 10) when you've used none.
+-- "This dungeon this hour  3 of 5" (or, counted all together, "Instances
+-- this hour"), a pip for each, when the next frees. The preview shows yours,
+-- or a sample (3 of 5) when you've used none.
 local function LimitRow(y, run)
     local info = MS.InstanceLimit and MS:InstanceLimit()
     if run._demoElapsed and info and info.used == 0 then
-        info = { used = 7, limit = info.limit, nextFree = time() + 12 * 60, entries = {} }
+        info = { scope = info.scope, used = math.max(1, info.limit - 2), limit = info.limit,
+                 nextFree = time() + 12 * 60, entries = {} }
     end
     if not (info and info.used > 0 and info.nextFree) then return y end
     local full = info.locked or info.used >= info.limit
     Rule("rule9", y); y = y - 8
     local inner = W - 2 * PAD
     local lbl = FS("illbl", "regular", 11, P.ash, "LEFT")
-    OneLine(lbl, inner - 70, 10); lbl:SetText(L["Instances this hour"]); Place(lbl, PAD, y)
+    OneLine(lbl, inner - 70, 10)
+    lbl:SetText(info.scope == "all" and L["Instances this hour"] or L["This dungeon this hour"])
+    Place(lbl, PAD, y)
     local val = FS("ilval", "semibold", 14, full and P.bloodHi or P.ivory, "RIGHT")
     OneLine(val, 70, 13); val:SetText(_fmt(L["%d of %d"], info.used, info.limit)); PlaceRight(val, W - PAD, y + 2)
     y = y - 18

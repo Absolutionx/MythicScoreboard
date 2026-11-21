@@ -433,7 +433,6 @@ T["Instances this hour: %d of %d."] = "Instances cette heure : %d sur %d."
 T["Instances this hour"] = "Instances cette heure"
 T["%d of %d"] = "%d sur %d"
 T["Warn about the instance limit"] = "Avertir de la limite d'instances"
-T["A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."] = "Un avertissement quand il ne vous reste qu'un nouveau donjon cette heure, et une ligne dans la discussion quand une place se libère."
 T["Preview the instance limit"] = "Aperçu de la limite d'instances"
 
 -- Stats: Trends
@@ -489,3 +488,15 @@ T["Your run-by-run chart and trend show here once you've done a second run."] = 
 T["Click the icon to go."] = "Cliquez sur l'icône pour y aller."
 T["Click to go to %s."] = "Cliquez pour aller à %s."
 T["A sample run, not saved. Pick a run from history to go back."] = "Une course d'exemple, non enregistrée. Choisissez une course dans l'historique pour revenir."
+
+-- Instance limit: each dungeon on its own (WoW Forever, 20 Nov 2026)
+T["%s is open again (%d of %d this hour)."] = "%s est de nouveau ouvert (%d sur %d cette heure)."
+T["%s: %d of %d this hour."] = "%s : %d sur %d cette heure."
+T["A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."] = "Un avertissement quand il ne vous reste qu'une course d'un donjon cette heure, et une ligne de discussion quand il rouvre."
+T["Dungeons this hour"] = "Donjons cette heure"
+T["Next frees at %s (in %s)"] = "Prochain libre à %s (dans %s)"
+T["One %s run left this hour. Another frees at %s."] = "Plus qu'une course de %s cette heure. La suivante se libère à %s."
+T["That was your last %s run this hour. It opens again at %s."] = "C'était votre dernière course de %s cette heure. Il rouvre à %s."
+T["This dungeon this hour"] = "Ce donjon cette heure"
+T["Your next %s run frees at %s (in %s)"] = "Votre prochaine course de %s se libère à %s (dans %s)"
+T["until you can enter %s again (%s)"] = "avant de pouvoir entrer de nouveau dans %s (%s)"

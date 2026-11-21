@@ -29,7 +29,10 @@ local function Update()
     local nextFree = preview or (info.locked and info.nextFree)
     if not (nextFree and nextFree > time()) then Hide(); return end
     panel.clock:SetText(MS:FormatTime(nextFree - time()))
-    panel.until_:SetText(_fmt(L["until you can enter another dungeon (%s)"], MS.ClockTime(nextFree)))
+    -- (Counted each on its own: the dungeon you were turned away from.)
+    local name = info.scope == "dungeon" and (info.dungeon or (preview and "Alcaz Prison"))
+    panel.until_:SetText(name and _fmt(L["until you can enter %s again (%s)"], name, MS.ClockTime(nextFree))
+        or _fmt(L["until you can enter another dungeon (%s)"], MS.ClockTime(nextFree)))
 end
 
 local function Build()

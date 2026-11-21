@@ -433,7 +433,6 @@ T["Instances this hour: %d of %d."] = "이번 시간 인스턴스: %d/%d."
 T["Instances this hour"] = "이번 시간 인스턴스"
 T["%d of %d"] = "%d/%d"
 T["Warn about the instance limit"] = "인스턴스 제한 경고"
-T["A warning when you're down to your last new dungeon this hour, and a chat line when a slot frees up again."] = "이번 시간에 새 던전이 하나만 남았을 때 경고하고, 자리가 다시 비면 대화창에 알려 줍니다."
 T["Preview the instance limit"] = "인스턴스 제한 미리보기"
 
 -- Stats: Trends
@@ -489,3 +488,15 @@ T["Your run-by-run chart and trend show here once you've done a second run."] = 
 T["Click the icon to go."] = "아이콘을 클릭하면 이동합니다."
 T["Click to go to %s."] = "클릭하면 %s(으)로 이동합니다."
 T["A sample run, not saved. Pick a run from history to go back."] = "저장되지 않는 예시 기록입니다. 돌아가려면 기록에서 하나를 고르세요."
+
+-- Instance limit: each dungeon on its own (WoW Forever, 20 Nov 2026)
+T["%s is open again (%d of %d this hour)."] = "%s 다시 입장 가능 (이번 시간 %d/%d)."
+T["%s: %d of %d this hour."] = "%s: 이번 시간 %d/%d."
+T["A warning when you're down to your last run of a dungeon this hour, and a chat line when it opens again."] = "이번 시간에 던전 입장이 한 번 남았을 때 경고하고, 다시 열리면 채팅으로 알려줍니다."
+T["Dungeons this hour"] = "이번 시간 던전"
+T["Next frees at %s (in %s)"] = "다음 입장 가능: %s (%s 후)"
+T["One %s run left this hour. Another frees at %s."] = "이번 시간 %s 입장이 한 번 남았습니다. 다음은 %s에 가능합니다."
+T["That was your last %s run this hour. It opens again at %s."] = "이번 시간 마지막 %s 입장이었습니다. %s에 다시 열립니다."
+T["This dungeon this hour"] = "이번 시간 이 던전"
+T["Your next %s run frees at %s (in %s)"] = "다음 %s 입장 가능: %s (%s 후)"
+T["until you can enter %s again (%s)"] = "%s에 다시 입장할 수 있을 때까지 (%s)"

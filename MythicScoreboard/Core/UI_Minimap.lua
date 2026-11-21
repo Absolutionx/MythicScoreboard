@@ -43,9 +43,23 @@ local function ShowTooltip(self)
         0.8, 0.8, 0.8)
     GameTooltip:AddLine(stats and L["Right-click: close your stats"] or L["Right-click: open your stats"],
         0.8, 0.8, 0.8)
-    -- The instance limit (InstanceLimit.lua): this hour's, if any.
+    -- The instance limit (InstanceLimit.lua): this hour's, if any. Counted
+    -- each on its own: a line a dungeon, its runs and when the next frees.
     local info = MS.InstanceLimit and MS:InstanceLimit()
-    if info and info.used > 0 then
+    if info and info.scope == "dungeon" and #info.dungeons > 0 then
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine(L["Dungeons this hour"], 1, 0.82, 0.3)
+        for _, d in ipairs(info.dungeons) do
+            local r, g, b = 1, 1, 1
+            if d.full then r, g, b = 0.90, 0.44, 0.41 end
+            GameTooltip:AddDoubleLine(tostring(d.name), _fmt(L["%d of %d"], d.used, info.limit), 0.8, 0.8, 0.8, r, g, b)
+            if d.full then
+                GameTooltip:AddLine("  " .. _fmt(L["Next frees at %s (in %s)"], MS.ClockTime(d.nextFree),
+                    MS.MinutesFrom(d.nextFree - time())), 0.6, 0.68, 0.42)
+            end
+        end
+        GameTooltip:AddLine(" ")
+    elseif info and info.used > 0 then
         GameTooltip:AddLine(" ")
         local full = info.locked or info.used >= info.limit
         local r, g, b = 1, 1, 1

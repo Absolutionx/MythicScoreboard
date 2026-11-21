@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.17.3
+
+### WoW Forever
+- **The instance limit is counted per dungeon.** WoW Forever now lets you reset and enter each dungeon 5 times an hour (it was 10 dungeons in all). The in-run frame, the minimap button's tooltip and `/sb limit` show how many runs of each dungeon you've had this hour and when the next one frees. The warning comes when you're down to your last run of a dungeon, and a chat line tells you when it's open again. What the addon learned under the old limit is cleared.
+- **More summoned and rare bosses:** Isalien (Dire Maul: East), Jarien and Sothos (Stratholme), Mor Grayhoof and the Burning Felguard (Lower Blackrock Spire) are on the timeline when you kill them, with their portraits. They never count against a full clear.
+
 ## 2.17.2
 
 ### WoW Forever
