@@ -375,6 +375,33 @@ function MS:RemoveArchivedFor(run)
     end
 end
 
+-- ── Removing loot ──────────────────────────────────────────────────────────
+-- From the Stats page's Loot tab: one item, or all of this character's. The
+-- runs themselves (and every stat) are kept; so is the loot column of the
+-- full runs in history. Other characters' loot is changed on them.
+function MS:RemoveArchivedLoot(entry, item)
+    if not (type(entry) == "table" and type(entry.loot) == "table" and self:IsOwnRun(entry)) then return end
+    for i = #entry.loot, 1, -1 do
+        if entry.loot[i] == item then
+            _rem(entry.loot, i)
+            if #entry.loot == 0 then entry.loot = nil end
+            Bump()
+            return true
+        end
+    end
+end
+
+function MS:ClearLootHistory()
+    local a = Store()
+    if not a then return 0 end
+    local n = 0
+    for _, e in ipairs(a.runs) do
+        if type(e.loot) == "table" then n = n + #e.loot; e.loot = nil end
+    end
+    if n > 0 then Bump() end
+    return n
+end
+
 -- Empties the archive. History is not read back in afterwards.
 function MS:ResetArchive()
     local a = Store()

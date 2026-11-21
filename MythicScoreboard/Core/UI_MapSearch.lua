@@ -73,9 +73,34 @@ local function HideList()
     if list then list:Hide() end
 end
 
+-- Turning the world map to another zone from here makes the game's own
+-- markers set themselves up under this addon's name, and in combat one of
+-- them does what only the game may do then (blocked, and blamed on us). So
+-- in combat the map turns once the fight's over, if it's still open.
+local pendingMap
+local function ShowMap(hit, directions)
+    local map = Map()
+    if not (map and map.SetMapID) then return end
+    if InCombatLockdown() then pendingMap = { hit = hit, directions = directions }; return end
+    pendingMap = nil
+    pcall(map.SetMapID, map, hit.map)
+    if hit.kind == "dungeon" and not directions then
+        -- The map adds its markers as it opens: look once they're there.
+        C_Timer.After(0, function()
+            local pin = PinFor(hit.name)
+            if pin then Pulse(pin) end
+        end)
+    end
+end
+MS:On("PLAYER_REGEN_ENABLED", function()
+    local p = pendingMap
+    pendingMap = nil
+    local map = Map()
+    if p and map and map.IsShown and map:IsShown() then ShowMap(p.hit, p.directions) end
+end)
+
 local function Choose(hit, directions)
     if not hit then return end
-    local map = Map()
     if directions then
         local dest
         if hit.kind == "dungeon" then
@@ -88,16 +113,9 @@ local function Choose(hit, directions)
             if not ok then MS:ReportError("Arrow", err) end
         end
     end
-    if map and map.SetMapID then pcall(map.SetMapID, map, hit.map) end
     box:ClearFocus()
     HideList()
-    if hit.kind == "dungeon" and not directions then
-        -- The map adds its markers as it opens: look once they're there.
-        C_Timer.After(0, function()
-            local pin = PinFor(hit.name)
-            if pin then Pulse(pin) end
-        end)
-    end
+    ShowMap(hit, directions)
 end
 
 -- ── The list under the box ─────────────────────────────────────────────────

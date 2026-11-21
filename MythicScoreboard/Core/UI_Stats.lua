@@ -315,6 +315,25 @@ local function MakeBossRow(parent)
     return row
 end
 
+-- The game's Yes/No dialog before the stats are reset.
+local RESET_POPUP = "MYTHICSCOREBOARD_RESET_STATS"
+function UI.AskResetStats(what)
+    local Dialogs = rawget(_G, "StaticPopupDialogs")
+    local Show = rawget(_G, "StaticPopup_Show")
+    if not (Dialogs and Show) then return end     -- no dialog, no resetting
+    if not Dialogs[RESET_POPUP] then
+        Dialogs[RESET_POPUP] = {
+            text = "%s", button1 = rawget(_G, "YES") or "Yes", button2 = rawget(_G, "NO") or "No",
+            timeout = 0, whileDead = 1, hideOnEscape = 1, showAlert = 1, preferredIndex = 3,
+            OnAccept = function()
+                MS:ResetArchive()
+                UI.RefreshStats(true)
+            end,
+        }
+    end
+    Show(RESET_POPUP, L["Reset your stats?"] .. "\n\n" .. (what or ""))
+end
+
 local function BuildOverview(parent)
     local o = CreateFrame("Frame", nil, parent)
     o:SetAllPoints()
@@ -323,32 +342,31 @@ local function BuildOverview(parent)
     local mates = Text(band, "medium", 13, P.ash, "LEFT")
     mates:SetPoint("LEFT", band, "LEFT", RIGHT_X, 0); mates:SetText(L["Played with"])
 
-    -- Reset stats: empties the archive (history is kept).
+    -- Reset stats: empties the archive (history is kept), after a yes in
+    -- the game's own dialog.
     local reset = Btn(band)
     reset:SetSize(140, COL_HDR_H - 6)
     reset:SetPoint("RIGHT", band, "LEFT", RIGHT_X + RIGHT_W, 0)
     local resetTxt = Text(reset, "medium", 13, P.ash2, "RIGHT")
     resetTxt:SetPoint("RIGHT", reset, "RIGHT", 0, 0); resetTxt:SetText(L["Reset stats"])
-    local function ResetLook(armed)
-        local c = armed and P.bloodHi or P.ash2
-        resetTxt:SetText(armed and L["Click again to reset"] or L["Reset stats"])
-        resetTxt:SetTextColor(c[1], c[2], c[3])
+    local function What()
+        return S.multiChar
+            and L["Removes every run of this character from your stats. Other characters keep theirs, and your run history in the dropdown is kept."]
+            or L["Removes every run from your stats. Your run history in the dropdown is kept."]
     end
-    TwoClick(reset, ResetLook, function()
-        MS:ResetArchive()
-        UI.RefreshStats(true)
+    reset:SetScript("OnClick", function()
+        GameTooltip:Hide()
+        UI.AskResetStats(What())
     end)
     reset:SetScript("OnEnter", function(self)
-        if not self.IsArmed() then resetTxt:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3]) end
+        resetTxt:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
         GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
         GameTooltip:SetText(L["Reset stats"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
-        GameTooltip:AddLine(S.multiChar
-            and L["Removes every run of this character from your stats. Other characters keep theirs, and your run history in the dropdown is kept."]
-            or L["Removes every run from your stats. Your run history in the dropdown is kept."], 0.8, 0.8, 0.8, true)
+        GameTooltip:AddLine(What(), 0.8, 0.8, 0.8, true)
         GameTooltip:Show()
     end)
-    reset:SetScript("OnLeave", function(self)
-        if not self.IsArmed() then resetTxt:SetTextColor(P.ash2[1], P.ash2[2], P.ash2[3]) end
+    reset:SetScript("OnLeave", function()
+        resetTxt:SetTextColor(P.ash2[1], P.ash2[2], P.ash2[3])
         GameTooltip:Hide()
     end)
     o.reset = reset
@@ -614,7 +632,6 @@ function UI.RefreshStats(force)
         .. "|" .. #chars .. "|" .. tostring(S.compareA) .. "|" .. tostring(S.compareB)
         .. "|" .. tostring(S.from) .. "|" .. S.detailChart .. "|" .. tostring(S.detailRun)
     if sig == drawnSig and not force then return end
-    if overview and overview.reset then overview.reset.Disarm() end
     drawnSig = sig
     S.multiChar = #chars > 1
     local stats = MS:StatsOverview()

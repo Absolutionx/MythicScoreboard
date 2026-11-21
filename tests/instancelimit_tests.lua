@@ -106,13 +106,13 @@ check("the last: when it opens again, 12-hour", last and last:find("2:32 PM", 1,
 check("Wailing Caverns: still open", Used("Wailing Caverns") == 2 and not MS:InstanceLimit("Wailing Caverns").locked)
 
 -- 12-hour times, or 24 with the game's clock set so.
-At(14, 32)
-check("12-hour", MS.ClockTime(clock) == "2:32 PM", MS.ClockTime(clock))
-At(0, 5)
-check("12-hour, after midnight", MS.ClockTime(clock) == "12:05 AM", MS.ClockTime(clock))
+-- (Times written without moving the clock: set back, it'd look like the
+-- computer's clock was, below.)
+local function T(h, m) return os.time({ year = 2026, month = 11, day = 18, hour = h, min = m, sec = 0 }) end
+check("12-hour", MS.ClockTime(T(14, 32)) == "2:32 PM", MS.ClockTime(T(14, 32)))
+check("12-hour, after midnight", MS.ClockTime(T(0, 5)) == "12:05 AM", MS.ClockTime(T(0, 5)))
 cvars.timeMgrUseMilitaryTime = "1"
-At(14, 32)
-check("24-hour when the game's clock is", MS.ClockTime(clock) == "14:32", MS.ClockTime(clock))
+check("24-hour when the game's clock is", MS.ClockTime(T(14, 32)) == "14:32", MS.ClockTime(T(14, 32)))
 cvars.timeMgrUseMilitaryTime = nil
 
 -- Turned away at Ragefire's door: it's locked; Wailing Caverns isn't; a
@@ -244,6 +244,24 @@ check("Done: both off", not MS:IsInstanceLimitPreviewOn() and not rawget(_G, "My
 -- A day later: all gone.
 Later(25 * 60)
 check("a day later: none", #MS:InstanceLimit().dungeons == 0, #MS:InstanceLimit().dungeons)
+
+-- The computer's clock set back a day: what was "later" doesn't count.
+Enter("Ragefire Chasm", 389); Leave()
+check("clock: counted", Used("Ragefire Chasm") == 1, Used("Ragefire Chasm"))
+clock = clock - 86400
+check("clock set back: the run 'from the future' isn't counted", Used("Ragefire Chasm") == 0, Used("Ragefire Chasm"))
+local st = MythicScoreboardAccountDB.instanceLimit
+for _, s2 in pairs(st) do
+    s2.locked["Wailing Caverns"] = clock + 5 * 86400
+    s2.lockedUntil = clock + 5 * 86400
+end
+local wc = MS:InstanceLimit("Wailing Caverns")
+check("clock: a lock lasts an hour at most", wc.locked and wc.nextFree <= clock + 3600, wc.nextFree and (wc.nextFree - clock))
+for _, s2 in pairs(st) do
+    check("clock: all-lock capped too", s2.lockedUntil <= clock + 3600)
+    s2.locked = "junk"; s2.entries = { { t = "x" }, 5 }
+end
+check("junk saved data: no error", pcall(MS.InstanceLimit, MS, "Wailing Caverns"))
 
 io.stdout:write(("instancelimit_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

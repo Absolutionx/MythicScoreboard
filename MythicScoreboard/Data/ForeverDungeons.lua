@@ -28,7 +28,7 @@ D.DUNGEONS = {
         "Oggleflint", "Taragaman the Hungerer", "Jergosh the Invoker", "Bazzalan",
     }},
     ["Hall of Thanes"] = { levels = {13, 20}, final = "Durgen Dirgehammer", bosses = {
-        "Faldrim Anvilmar", "Magmatus", "Plunder", { "Durgen Dirgehammer", aka = { "Dirgen Dirgehammer" } },
+        "Faldrim Anvilmar", { "Magmatus", aka = { "Infurnus" } }, "Plunder", { "Durgen Dirgehammer", aka = { "Dirgen Dirgehammer" } },
     }},
     -- (Viktor the Vile: an optional gauntlet. The Butcher: what the game
     -- called The Baron in our own runs.)

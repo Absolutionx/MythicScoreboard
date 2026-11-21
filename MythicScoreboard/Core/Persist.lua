@@ -89,3 +89,19 @@ function MS:RestoreCurrentRun()
     self:SetRunState(run._suspended and "paused" or "active", run)
     MS.Say(L["Run restored after UI reload."])
 end
+
+-- ── Leftovers ──────────────────────────────────────────────────────────────
+-- Saved data nothing reads any more, cleared at logout: the map export of
+-- old test builds, and a /sb dumptravel dump after a day (it's only kept
+-- long enough to be sent in).
+local DUMP_KEEP = 24 * 3600
+function MS:TidySavedData()
+    local acc = MS.AccountDB()
+    if type(acc) ~= "table" then return end
+    acc.mapExport = nil
+    local dump = acc.travelDump
+    if dump ~= nil and not (type(dump) == "table" and type(dump.at) == "number"
+                            and time() - dump.at < DUMP_KEEP) then
+        acc.travelDump = nil
+    end
+end

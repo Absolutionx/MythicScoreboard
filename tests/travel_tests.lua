@@ -402,6 +402,10 @@ check("hearth step: the button", jb and jb:IsShown() and MS:NavigationJump() ~= 
 check("hearth step: uses the hearthstone", jb and jb:GetAttribute("type") == "item" and jb:GetAttribute("item") == "item:6948",
     jb and tostring(jb:GetAttribute("type")))
 check("hearth step: no arrow", arrow.arrow and not arrow.arrow:IsShown())
+-- Placed on the screen, not on the arrow (or the arrow couldn't be dragged in combat).
+check("jump button not anchored to the arrow", jb and jb._at and jb._at[2] == UIParent, jb and jb._at and tostring(jb._at[2]))
+check("jump button over the arrow", jb and jb._at and jb._at[1] == "CENTER" and jb._at[5] == 60 + 110 - 28,
+    jb and jb._at and tostring(jb._at[5]))
 spells[556] = true; M.now = M.now + 5; MS:UpdateArrow()
 check("Astral Recall step: casts it", jb:GetAttribute("type") == "spell" and jb:GetAttribute("spell") == 556,
     tostring(jb:GetAttribute("type")))

@@ -112,9 +112,13 @@ for _, w in ipairs(M.allFrames) do
 end
 check("reset button found", resetBtn ~= nil)
 resetBtn:Fire("OnEnter"); resetBtn:Fire("OnLeave")
+local asked
+StaticPopupDialogs = {}
+StaticPopup_Show = function(name, text) asked = { name = name, text = text } end
 resetBtn:Fire("OnClick")
-check("reset armed, nothing removed", #MS:ArchiveRuns() == 2)
-resetBtn:Fire("OnClick"); M.RunTimers(2)
+check("reset asks first, nothing removed", asked and asked.text:find("Reset your stats%?") and #MS:ArchiveRuns() == 2, asked and asked.text)
+check("the dialog says what goes", asked and asked.text:find("run history"), asked and asked.text)
+StaticPopupDialogs[asked.name].OnAccept(); M.RunTimers(2)
 check("stats reset", #MS:ArchiveRuns() == 0)
 check("history kept", #MythicScoreboardDB.runs == 3)
 check("summary shows zero", f.Subline:GetText():find("0") ~= nil, f.Subline:GetText())

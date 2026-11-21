@@ -1,11 +1,12 @@
 local _max, _min = math.max, math.min
+local _fmt = string.format
 
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
 -- Shared from earlier UI files (see UI_Theme.lua for the design tokens).
 local P, COL_HDR_H, FRAME_W = UI.P, UI.COL_HDR_H, UI.FRAME_W
-local Text = UI.Text
+local Text, Btn, Tint, Art = UI.Text, UI.Btn, UI.Tint, UI.Art
 local MakeScrollFrame, CT = UI.MakeScrollFrame, UI.CT
 
 -- Stats page, part 3: the Loot tab, every piece of gear that dropped for you,
@@ -14,6 +15,7 @@ local MakeScrollFrame, CT = UI.MakeScrollFrame, UI.CT
 local K = UI.StatsKit                  -- shared by UI_Stats.lua
 local Band, Cells, CharName, Day, HoverRow = K.Band, K.Cells, K.CharName, K.Day, K.HoverRow
 local LCOLS, LOOT_ROW, MAX_LOOT, Pool, S = K.LCOLS, K.LOOT_ROW, K.MAX_LOOT, K.Pool, K.S
+local TwoClick = K.TwoClick
 local X0 = K.X0
 
 -- ── Loot ───────────────────────────────────────────────────────────────────
@@ -72,6 +74,53 @@ local function MakeLootRow(parent)
         GameTooltip:Show()
     end)
     row:SetScript("OnLeave", function() GameTooltip:Hide() end)
+
+    -- Remove this item from the list (two clicks). Your own items only. The
+    -- first click marks the whole row in red and says so on the row itself;
+    -- the second, within 3s, removes it.
+    local del = Btn(row)
+    del:SetSize(26, LOOT_ROW)
+    del:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    del:SetFrameLevel(row:GetFrameLevel() + 2)
+    local icon = Art(del, "Close", "OVERLAY")
+    icon:SetSize(11, 11); icon:SetPoint("CENTER"); Tint(icon, P.ash2)
+    local armBg = UI.Solid(row, "BACKGROUND", 1, P.bloodHi[1], P.bloodHi[2], P.bloodHi[3], 0.16)
+    armBg:SetAllPoints(); armBg:Hide()
+    local armTxt = Text(row, "medium", 13, P.bloodHi, "RIGHT")
+    armTxt:SetPoint("RIGHT", del, "LEFT", -4, 0)
+    armTxt:SetText(L["Click again to remove"]); armTxt:Hide()
+    row.armBg, row.armTxt = armBg, armTxt
+    local function Tip(self)
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText(L["Remove from loot list"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddLine(self.IsArmed() and L["Click again to remove this item."]
+            or L["Your runs and stats are kept."], 0.8, 0.8, 0.8, true)
+        GameTooltip:Show()
+    end
+    TwoClick(del, function(armed)
+        Tint(icon, (armed or del.hovered) and P.bloodHi or P.ash2)
+        icon:SetSize(armed and 13 or 11, armed and 13 or 11)
+        armBg:SetShown(armed); armTxt:SetShown(armed)
+        row.cells.char:SetAlpha(armed and 0 or 1)       -- the message sits over it
+        row.cells.date:SetAlpha(armed and 0 or 1)
+        if del.hovered then Tip(del) end                 -- the tooltip follows at once
+    end, function()
+        GameTooltip:Hide()
+        local it = row.data
+        if it and MS:RemoveArchivedLoot(it.run, it.item) then UI.RefreshStats(true) end
+    end)
+    del:SetScript("OnEnter", function(self)
+        self.hovered = true
+        Tint(icon, P.bloodHi)
+        Tip(self)
+    end)
+    del:SetScript("OnLeave", function(self)
+        self.hovered = false
+        if not self.IsArmed() then Tint(icon, P.ash2) end
+        GameTooltip:Hide()
+    end)
+    row.del = del
+
     -- Shift-click links it in chat, as with any item.
     row:SetScript("OnMouseUp", function(self)
         local l = self.data and self.data.item
@@ -80,12 +129,71 @@ local function MakeLootRow(parent)
     return row
 end
 
+-- ── Clear loot ─────────────────────────────────────────────────────────────
+-- Every item of this character's, after a yes in the game's own dialog.
+local POPUP = "MYTHICSCOREBOARD_CLEAR_LOOT"
+
+local function OwnItems(items)
+    local n = 0
+    for _, it in ipairs(items or MS:LootHistory()) do
+        if MS:IsOwnRun(it.run) then n = n + 1 end
+    end
+    return n
+end
+
+local function ClearNow()
+    if MS:ClearLootHistory() > 0 then UI.RefreshStats(true) end
+end
+
+function UI.AskClearLoot()
+    local n = OwnItems()
+    if n == 0 then return end
+    local Dialogs = rawget(_G, "StaticPopupDialogs")
+    local Show = rawget(_G, "StaticPopup_Show")
+    if not (Dialogs and Show) then return end     -- no dialog, no clearing
+    if not Dialogs[POPUP] then
+        Dialogs[POPUP] = {
+            text = "%s", button1 = rawget(_G, "YES") or "Yes", button2 = rawget(_G, "NO") or "No",
+            timeout = 0, whileDead = 1, hideOnEscape = 1, showAlert = 1, preferredIndex = 3,
+            OnAccept = function() ClearNow() end,
+        }
+    end
+    local text = n == 1 and L["Remove the one item from your loot list?"]
+        or _fmt(L["Remove %d items from your loot list?"], n)
+    text = text .. "\n\n" .. L["Your runs and stats are kept."]
+    if S.multiChar then text = text .. " " .. L["Only this character's items go. Your other characters keep theirs."] end
+    Show(POPUP, text)
+end
+
 local function BuildLoot(parent)
     local lv = CreateFrame("Frame", nil, parent)
     lv:SetAllPoints()
     local band = Band(lv, LCOLS, X0)
     band:SetPoint("TOPLEFT", lv, "TOPLEFT", 0, 0); band:SetPoint("TOPRIGHT", lv, "TOPRIGHT", 0, 0)
     lv.band = band
+
+    local clear = Btn(band)
+    clear:SetSize(110, COL_HDR_H - 6)
+    clear:SetPoint("RIGHT", band, "RIGHT", -(X0 + 4), 0)
+    clear:SetFrameLevel(band:GetFrameLevel() + 2)
+    local clearTxt = Text(clear, "medium", 13, P.ash2, "RIGHT")
+    clearTxt:SetPoint("RIGHT", clear, "RIGHT", 0, 0); clearTxt:SetText(L["Clear loot"])
+    clear:SetScript("OnClick", function() GameTooltip:Hide(); UI.AskClearLoot() end)
+    clear:SetScript("OnEnter", function(self)
+        clearTxt:SetTextColor(P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:SetOwner(self, "ANCHOR_BOTTOMLEFT")
+        GameTooltip:SetText(L["Clear loot"], P.bloodHi[1], P.bloodHi[2], P.bloodHi[3])
+        GameTooltip:AddLine(L["Your runs and stats are kept."], 0.8, 0.8, 0.8, true)
+        if S.multiChar then
+            GameTooltip:AddLine(L["Only this character's items go. Your other characters keep theirs."], 0.8, 0.8, 0.8, true)
+        end
+        GameTooltip:Show()
+    end)
+    clear:SetScript("OnLeave", function()
+        clearTxt:SetTextColor(P.ash2[1], P.ash2[2], P.ash2[3])
+        GameTooltip:Hide()
+    end)
+    lv.clear = clear
     lv.sf = MakeScrollFrame(lv)
     lv.sf:SetPoint("TOPLEFT", lv, "TOPLEFT", X0, -COL_HDR_H)
     lv.sf:SetPoint("BOTTOMLEFT", lv, "BOTTOMLEFT", X0, 8)
@@ -106,7 +214,9 @@ local function FillLoot(lv, items)
         local l, e = it.item, it.run
         local row = lv.rowAt(i)
         row:SetPoint("TOPLEFT", lv.sf.scrollContent, "TOPLEFT", 0, -y)
+        if not (row.data and row.data.item == it.item) then row.del.Disarm() end
         row.data = it
+        row.del:SetShown(MS:IsOwnRun(e))       -- other characters' loot is changed on them
         row.icon:SetTexture(ItemIcon(l) or 134400)            -- question mark until known
         local name = ItemName(l)
         if not name then waitingForItems = true end
@@ -123,6 +233,7 @@ local function FillLoot(lv, items)
     lv.sf.scrollContent:SetHeight(_max(1, y))
     lv.sf.UpdateRange()
     lv.empty:SetShown(n == 0)
+    lv.clear:SetShown(OwnItems(items) > 0)
 end
 
 K.BuildLoot, K.FillLoot = BuildLoot, FillLoot

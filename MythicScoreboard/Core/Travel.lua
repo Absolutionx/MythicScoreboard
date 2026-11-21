@@ -624,7 +624,7 @@ end
 -- lists them, those learned from flight maps, and the landings.
 function MS:DumpTravel()
     local acc = MS.AccountDB(true)
-    local dump = { side = MS:Side(), taxi = {}, flightSpots = acc.flightSpots, landings = acc.landings }
+    local dump = { at = time(), side = MS:Side(), taxi = {}, flightSpots = acc.flightSpots, landings = acc.landings }
     local continents = {}
     for _, f in ipairs(MS.ForeverData.FLIGHT_MASTERS or {}) do
         local c = MS:ContinentOf(f.map)

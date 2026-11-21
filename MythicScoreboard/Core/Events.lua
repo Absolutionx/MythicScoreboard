@@ -33,7 +33,8 @@ end
 local H = {}
 
 function H.PLAYER_LEAVING_WORLD() MS:FlushSave(); MS:MirrorHistory() end
-H.PLAYER_LOGOUT = H.PLAYER_LEAVING_WORLD
+-- Logging out or /reload: as above, and leftovers cleared (Persist.lua).
+function H.PLAYER_LOGOUT() H.PLAYER_LEAVING_WORLD(); MS:TidySavedData() end
 
 function H.PLAYER_ENTERING_WORLD()
     -- Reload inside a run: the run was restored at ADDON_LOADED.

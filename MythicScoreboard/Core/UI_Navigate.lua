@@ -123,18 +123,22 @@ local function SaveTarget()
         and { name = target.name, map = target.map, x = target.x, y = target.y } or nil
 end
 
+-- Where the arrow sits: an offset of its bottom from the middle of the screen.
+local ARROW_H = 110
+local function ArrowAt()
+    local pos = MS:GetSetting("navPos")
+    if type(pos) == "table" and pos.x and pos.y then return pos.x, pos.y end
+    return 0, 60
+end
+
 local function Build()
     if frame then return frame end
     frame = CreateFrame("Button", "MythicScoreboardArrow", UIParent)
-    frame:SetSize(220, 110)
+    frame:SetSize(220, ARROW_H)
     -- Where it was dragged to, or just above your character (the middle of
     -- the screen): its bottom a little over your head.
-    local pos = MS:GetSetting("navPos")
-    if type(pos) == "table" and pos.x and pos.y then
-        frame:SetPoint("BOTTOM", UIParent, "CENTER", pos.x, pos.y)
-    else
-        frame:SetPoint("BOTTOM", UIParent, "CENTER", 0, 60)
-    end
+    local ax, ay = ArrowAt()
+    frame:SetPoint("BOTTOM", UIParent, "CENTER", ax, ay)
     frame:SetMovable(true); frame:SetClampedToScreen(true)
     frame:RegisterForDrag("LeftButton")
     -- Only a Shift-click stops it: the right button goes through to the game,
@@ -160,6 +164,7 @@ local function Build()
             MS:SetSetting("navPos", at)
             self:ClearAllPoints()
             self:SetPoint("BOTTOM", UIParent, "CENTER", at.x, at.y)
+            if MS._PlaceJump then MS._PlaceJump() end
         end
     end)
     frame:SetScript("OnClick", function() if IsShiftKeyDown() then MS:StopNavigation() end end)
@@ -235,7 +240,11 @@ local function BuildJump()
     if jump then return jump end
     jump = CreateFrame("Button", "MythicScoreboardJump", UIParent, "SecureActionButtonTemplate")
     jump:SetSize(48, 48)
-    jump:SetPoint("CENTER", frame, "TOP", 0, -28)          -- where the arrow is
+    -- Where the arrow is, but placed on the screen itself, not on the arrow:
+    -- a secure button anchored to a frame makes that frame protected too,
+    -- and the arrow couldn't then be dragged in combat. Kept in step with it
+    -- out of combat (PlaceJump).
+    jump:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
     -- Over the arrow's frame (which takes the mouse for dragging), or the
     -- clicks and the tooltip would go to that instead.
     jump:SetFrameStrata(frame:GetFrameStrata() or "MEDIUM")
@@ -273,6 +282,17 @@ local function BuildJump()
     return jump
 end
 
+-- Over the arrow (its top, 28 down). Not in combat: then after.
+local function PlaceJump()
+    if not jump then return end
+    local InCombat = rawget(_G, "InCombatLockdown")
+    if InCombat and InCombat() then return end
+    local ax, ay = ArrowAt()
+    jump:ClearAllPoints()
+    jump:SetPoint("CENTER", UIParent, "CENTER", ax, ay + ARROW_H - 28)
+end
+MS._PlaceJump = PlaceJump
+
 -- Shows the button for a step ({ item or spell, name }), or hides it (nil).
 -- In combat: nothing yet (PLAYER_REGEN_ENABLED, below, does it after).
 local function SetJump(to)
@@ -285,6 +305,7 @@ local function SetJump(to)
         return
     end
     BuildJump()
+    PlaceJump()
     local key = (to.item and "item:" .. to.item) or ("spell:" .. tostring(to.spell))
     if jump.key ~= key then
         jump.key = key

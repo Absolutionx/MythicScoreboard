@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.17.4
+
+### Everyone
+- **Remove items from the loot list.** On the Stats page's Loot tab, each of your items has an x at the end of its row. Click it and the row turns red and asks you to click again; a second click within 3 seconds removes the item. Your runs and stats are kept.
+- **Clear loot** at the right of the Loot tab's header removes all of your items at once, after a yes in the game's own dialog. With several characters shown, only the character you're on loses its items.
+- **Reset stats asks in a dialog** instead of the two-click red text, and says what will be removed and what's kept.
+- Old test data that nothing reads any more is cleared from your saved files at logout.
+
+### WoW Forever
+- **Magmatus kills count.** The game sometimes reports him as "Infurnus"; both names now work.
+- **No more "action blocked" from the map search in combat.** Picking a dungeon in the world map's search box during a fight made the game block one of its own map functions and blame the addon. In combat the map now turns once the fight is over, if it's still open; your directions are set right away.
+- **The arrow can be dragged in combat.** The hearthstone and teleport button was attached to the arrow, which stopped the arrow from moving during a fight. It's now placed on the screen over the arrow and kept lined up with it.
+- **The instance limit survives a clock change.** If your computer's clock is set back, runs "from the future" no longer count against the limit, and a dungeon is never shown as locked for more than an hour.
+
 ## 2.17.3
 
 ### WoW Forever

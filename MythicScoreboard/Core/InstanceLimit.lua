@@ -63,17 +63,27 @@ local function Store()
     return s
 end
 
+-- (The computer's clock set back: what's more than an hour "later than now"
+-- can't be trusted, and would count for as long as the clock was out. It
+-- goes; a lock lasts an hour at most.)
+local AHEAD = HOUR               -- (a few minutes either way is just clocks disagreeing)
 local function Prune(s, now)
     for i = #s.entries, 1, -1 do
         local e = s.entries[i]
-        if type(e) ~= "table" or not e.t or now - e.t >= KEEP then table.remove(s.entries, i) end
+        if type(e) ~= "table" or type(e.t) ~= "number" or now - e.t >= KEEP or e.t > now + AHEAD then
+            table.remove(s.entries, i)
+        end
     end
     for name, at in pairs(s.resets) do
-        if now - at >= KEEP then s.resets[name] = nil end
+        if type(at) ~= "number" or now - at >= KEEP or at > now + AHEAD then s.resets[name] = nil end
     end
     for name, at in pairs(s.locked) do
-        if now >= at then s.locked[name] = nil end
+        if type(at) ~= "number" or now >= at then s.locked[name] = nil
+        elseif at > now + HOUR then s.locked[name] = now + HOUR end
     end
+    if s.lockedUntil ~= nil and (type(s.lockedUntil) ~= "number" or now >= s.lockedUntil) then s.lockedUntil = nil
+    elseif s.lockedUntil and s.lockedUntil > now + HOUR then s.lockedUntil = now + HOUR end
+    if type(s.last) == "table" and type(s.last.at) == "number" and s.last.at > now + AHEAD then s.last.at = now end
 end
 
 local function InInstance()
