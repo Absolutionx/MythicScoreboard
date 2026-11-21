@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.17.5
+
+### WoW Forever
+- **Boss kills the game doesn't announce are counted.** Some Forever bosses send no boss events at all (Bossman Toof in Krol'dok Stronghold), or only the end of the fight, so their kills were missed. A run whose final boss was missed never showed as cleared, and leaving made it Abandoned. A boss now also counts as killed from the experience line, from a death the game reports, or from its corpse on your target, mouseover or a nameplate (bosses gray to you give no experience). Only that dungeon's bosses count, once each; dead trash never shows as a boss.
+- **Rares and summoned bosses show up when killed**, the same ways, in the in-run frame's boss list.
+- **Kills are matched by the game's encounter ID first,** so they count whatever the game calls the boss, including on German, French and other clients.
+- **Fights that end two bosses count both:** Gyth with Rend, Morphaz with Hazzas.
+- **Blackrock Depths can be fully cleared.** The Ring of Law is one boss, whichever challenger shows up (all six were required), and Princess Moira is optional.
+- **Optional now:** Lord Hel'nurath (Dire Maul: West), Postmaster Malown (Stratholme) and the Fel Steed (Shadowfang Keep).
+- **Added:** Sabella No-Eyes, a rare in Blackmaw Hold, with her portrait.
+- **More of the names the game uses:** Boss Kof, Overseer Mugg, Kirtonos, Darkreaver, Ras Frostwhisperer, Zin'aka and Fras Siabi, and the translated names of Morphaz, Dreamscythe and Braxton.
+- **The in-run frame ticks off a boss killed under another of its names** (The Butcher for The Baron); the row stayed gray.
+
 ## 2.17.4
 
 ### Everyone

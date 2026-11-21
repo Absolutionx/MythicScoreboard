@@ -123,10 +123,16 @@ local function KeyObjectives(run)
     return out
 end
 
+-- The same boss, under any of its names (Forever: "The Butcher" for The
+-- Baron, the Ring of Law's challenger for the Ring of Law).
+local function Same(run, a, b)
+    if MS.SameBossName(a, b) then return true end
+    return MS.ForeverSameBoss ~= nil and MS:ForeverSameBoss(run, b, a)
+end
 local function LastFight(run, name)
     for i = #(run.bosses or {}), 1, -1 do
         local b = run.bosses[i]
-        if MS.SameBossName(b.name, name) then return b end
+        if Same(run, b.name, name) then return b end
     end
 end
 
@@ -156,7 +162,7 @@ local function Bosses(run, best)
         local b = LastFight(run, n.name)
         local bt
         for _, x in ipairs(best and best.bosses or {}) do
-            if MS.SameBossName(x.n, n.name) then bt = x.t end
+            if Same(run, x.n, n.name) then bt = x.t end
         end
         _ins(out, { name = n.name, kill = b and b.killTime, done = n.done or (b and b.killTime ~= nil),
                     fighting = b ~= nil and run.activeBoss == b and not b.killTime, best = bt })

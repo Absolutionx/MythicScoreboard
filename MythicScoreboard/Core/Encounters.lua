@@ -189,7 +189,15 @@ local function EndFight(self, bossName, dungeonEncounterId, field, at)
     local run = self.currentRun
     if not run then return nil end
     local boss = OpenFight(run, bossName)
-    if not boss then return LateEnd(self, run, bossName, dungeonEncounterId, field) end
+    if not boss then
+        local late = LateEnd(self, run, bossName, dungeonEncounterId, field)
+        -- (WoW Forever) The game's kill for a fight it never started: a kill
+        -- all the same.
+        if not late and field == "killTime" and not at and MS.FLAVOR == "forever" then
+            return self:BossKillSeen(bossName, dungeonEncounterId, "event")
+        end
+        return late
+    end
     boss[field] = at or Now(run)
     NoteEncounter(boss, dungeonEncounterId)
     if run.activeBoss == boss then run.activeBoss = nil end
@@ -201,6 +209,39 @@ end
 
 function MS:BossKill(bossName, dungeonEncounterId) return EndFight(self, bossName, dungeonEncounterId, "killTime") end
 function MS:BossWipe(bossName, dungeonEncounterId) return EndFight(self, bossName, dungeonEncounterId, "wipeTime") end
+
+-- ── A kill with no fight ───────────────────────────────────────────────────
+-- Some bosses on WoW Forever send no ENCOUNTER_START, or no boss events at
+-- all, so no fight is open when they die. Their death, seen another way (the
+-- game's ENCOUNTER_END alone, the experience line, the corpse), is recorded
+-- here: killed when seen, the fight's length unknown (pull = kill, so no
+-- split is made of it). Once per boss in a run: a second report of the same
+-- death only adds what the first didn't know. how: "event", "xp", "corpse"
+-- or "npc", for /sb debug.
+function MS:BossKillSeen(bossName, dungeonEncounterId, how)
+    local run = self.currentRun
+    if not (run and self.inDungeon) or type(bossName) ~= "string" or bossName == "" then return nil end
+    for _, b in ipairs(run.bosses) do
+        if b.killTime and (MS.SameBossName(b.name, bossName)
+                or (self.ForeverSameBoss and self:ForeverSameBoss(run, b.name, bossName))) then
+            NoteEncounter(b, dungeonEncounterId)
+            return nil
+        end
+    end
+    local open = OpenFight(run, bossName)
+    if open then return EndFight(self, bossName, dungeonEncounterId, "killTime") end
+    local now = Now(run)
+    local boss = { name = bossName, pullTime = now, killTime = now, dungeonEncounterId = dungeonEncounterId,
+                   seen = how or "event" }
+    _ins(run.bosses, boss)
+    self:SnapshotBossProgress(boss)
+    if self.ResolveBossIcon then self:ResolveBossIcon(boss) end
+    FightChanged(run, boss)
+    self:SaveCurrentRun()
+    if self.CheckClearedAfterKill and self:CurrentDifficulty() ~= MS.MYTHIC_PLUS then self:CheckClearedAfterKill(boss) end
+    self:Changed("run")
+    return boss
+end
 
 -- A boss fight the game started but never ended (no ENCOUNTER_END: the boss
 -- reset, or some encounters on Forever simply don't send one). Ended at `at`:
@@ -222,11 +263,16 @@ end
 
 -- A mob the experience line said died: a boss whose fight is open is killed
 -- (kept until the fight ends, in case ENCOUNTER_END follows as it should).
-function MS:NoteMobDied(name)
+function MS:NoteMobDied(name, how)
     local run = self.currentRun
-    local boss = run and run.activeBoss
-    if not boss or boss.killTime or boss.wipeTime or type(name) ~= "string" then return end
-    if MS.SameBossName(boss.name, name) then boss._diedAt = Now(run) end
+    if not run or type(name) ~= "string" then return end
+    local boss = run.activeBoss
+    if boss and not boss.killTime and not boss.wipeTime and MS.SameBossName(boss.name, name) then
+        boss._diedAt = Now(run)
+        return
+    end
+    -- No fight open for it: one of this dungeon's bosses dying is its kill.
+    if self.ForeverIsBoss and self:ForeverIsBoss(run, name) then self:BossKillSeen(name, nil, how or "xp") end
 end
 
 -- Out of combat with a fight still open: once nobody in the group has been

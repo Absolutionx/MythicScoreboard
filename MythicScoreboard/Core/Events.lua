@@ -114,17 +114,30 @@ MS._WatchingPull = function() return watchingPull end     -- for tests
 
 -- encounterID is the dungeonEncounterID (as in EJ_GetEncounterInfoByIndex's
 -- seventh value), not the journal's own encounter ID.
+-- (WoW Forever: the boss is known by the encounter's ID first, whatever the
+-- game calls it; Forever.lua: ForeverEncounterName.)
+local function EncounterName(encounterID, bossName)
+    if MS.ForeverEncounterName then return MS:ForeverEncounterName(encounterID, bossName) end
+    return bossName, nil
+end
+
 function H.ENCOUNTER_START(encounterID, bossName)
-    if MS.inDungeon then MS:StartClock(); MS:BossPull(bossName or "Boss", encounterID) end
+    if not MS.inDungeon then return end
+    bossName = EncounterName(encounterID, bossName)
+    MS:StartClock(); MS:BossPull(bossName or "Boss", encounterID)
 end
 
 function H.ENCOUNTER_END(encounterID, bossName, _, _, success)
     if not MS.inDungeon then return end
+    local also
+    bossName, also = EncounterName(encounterID, bossName)
     if success == 0 then
         MS:BossWipe(bossName or "Boss", encounterID)
     elseif success == 1 then
         local killedBoss = MS:BossKill(bossName or "Boss", encounterID)
         MS:SnapshotBossProgress(killedBoss)
+        -- The fight ended other bosses too (Gyth with Rend).
+        for _, other in ipairs(also or {}) do MS:BossKillSeen(other, nil, "event") end
         if MS:CurrentDifficulty() ~= MYTHIC_PLUS then MS:CheckClearedAfterKill(killedBoss) end
     end
 end

@@ -52,6 +52,7 @@ MS.ForeverData.BOSSES = {
     ["Moontouched Wanderer"]   = { npc = 269104, display = 12235 },
     ["Gortek the Apprentice"]  = { npc = 269111, display = 145808 },
     ["Tunnelweb Matriarch"]    = { npc = 250034, display = 2424 },
+    ["Sabella No-Eyes"]        = { npc = 269151, display = 6829 },
 
     -- Alcaz Prison
     ["Overseer Wrex"]        = { npc = 255391, display = 7914 },

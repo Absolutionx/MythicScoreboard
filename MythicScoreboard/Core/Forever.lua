@@ -456,25 +456,55 @@ if MS.FLAVOR == "forever" then
         if #list > 0 then DEATH_PATTERNS = list end      -- (kept once the game's strings are there)
         return list
     end
+    -- A boss among the dead is its kill, if no fight of it was open
+    -- (Encounters.lua: NoteMobDied, BossKillSeen).
+    local function BossDied(npc, name, how)
+        local run = MS.currentRun
+        if not run then return end
+        name = name or MS:ForeverBossByNpc(run, npc)
+        if name then MS:NoteMobDied(name, how) end
+    end
     MS:On("CHAT_MSG_COMBAT_HOSTILE_DEATH", function(_, text)
         if not MS.inDungeon then return end
         text = MS.Readable(text)
         if not text then return end
         for _, fp in ipairs(Patterns()) do
             local mob = MS.MatchFormat(text, fp)
-            if mob and mob ~= "" then MS:NoteForeverKill(nil, mob); return end
+            if mob and mob ~= "" then MS:NoteForeverKill(nil, mob); BossDied(nil, mob, "death"); return end
         end
     end)
     MS:On("UNIT_DIED", function(_, guid)
         if not MS.inDungeon then return end
         local npc = NpcOf(guid)
-        if npc then MS:NoteForeverKill(npc, nil) end
+        if npc then MS:NoteForeverKill(npc, nil); BossDied(npc, nil, "npc") end
     end)
     MS:On("PARTY_KILL", function(_, _, guid)
         if not MS.inDungeon then return end
         local npc = NpcOf(guid)
-        if npc then MS:NoteForeverKill(npc, nil) end
+        if npc then MS:NoteForeverKill(npc, nil); BossDied(npc, nil, "npc") end
     end)
+
+    -- A boss's corpse, seen on your target, mouseover or a nameplate: it's
+    -- dead, whoever saw it die (inside, Forever hides most deaths from
+    -- addons, and a boss gray to you gives no experience line). Only a boss
+    -- of this dungeon, only once.
+    local function Corpse(unit)
+        if not (MS.inDungeon and MS.currentRun and type(unit) == "string") then return end
+        if not (UnitExists and UnitExists(unit)) then return end
+        local okP, isPlayer = pcall(UnitIsPlayer, unit)
+        if not okP or MS.IsSecret(isPlayer) or isPlayer then return end
+        local okD, dead = pcall(UnitIsDead, unit)
+        if not okD or MS.IsSecret(dead) or dead ~= true then return end
+        local okN, name = pcall(UnitName, unit)
+        name = okN and MS.Readable(name)
+        local npc = NpcOf(select(2, pcall(UnitGUID, unit)))
+        if type(name) ~= "string" or name == "" then name = nil end
+        if not (name and MS:ForeverIsBoss(MS.currentRun, name)) then name = MS:ForeverBossByNpc(MS.currentRun, npc) end
+        if name then MS:BossKillSeen(name, nil, "corpse") end
+    end
+    MS:On("PLAYER_TARGET_CHANGED", function() Corpse("target") end)
+    MS:On("UPDATE_MOUSEOVER_UNIT", function() Corpse("mouseover") end)
+    MS:On("NAME_PLATE_UNIT_ADDED", function(_, unit) Corpse(unit) end)
 end
 
 -- /sb wingdebug: everything the wing check goes on, said in chat, now and
@@ -668,6 +698,56 @@ MS:SetClearStrategy({
     isCleared = CheckRunCleared,
     canDetect = function(self, run) return self:ForeverCanDetectClear(run) end,
 })
+
+-- ── Is it one of this dungeon's bosses? ─────────────────────────────────────
+-- For kills seen without a boss fight (Encounters.lua: BossKillSeen): the
+-- name, or another name for it, in this dungeon's boss list (rares and
+-- summoned bosses too). Trash with a boss's name elsewhere doesn't count.
+local function EntryFor(run, name)
+    local def = MS:ForeverDungeon(run)
+    for _, e in ipairs(def and def.bosses or {}) do
+        if EntryMatches(e, name) then return e end
+    end
+end
+function MS:ForeverIsBoss(run, name)
+    return EntryFor(run, name) ~= nil
+end
+-- Two names for the same boss of this dungeon ("Zarmok", "Twilight Commander Zarmok").
+function MS:ForeverSameBoss(run, a, b)
+    local e = EntryFor(run, a)
+    return e ~= nil and EntryMatches(e, b)
+end
+-- A boss fight by its encounter ID (Data/ForeverEncounters.lua): the name
+-- to record it under, and the other bosses the same fight ends. The game's
+-- own name is kept when it's one of the boss's names; otherwise (another
+-- language, a name the list doesn't have) the list's name is used, so the
+-- kill counts. Unknown IDs: the game's name, as before.
+function MS:ForeverEncounterName(id, name)
+    local enc = type(id) == "number" and (MS.ForeverData.ENCOUNTERS or {})[id]
+    if not enc then return name, nil end
+    local def = DUNGEONS[enc[1]]
+    for _, e in ipairs(def and def.bosses or {}) do
+        if e.name == enc[2] then
+            if type(name) == "string" and EntryMatches(e, name) then return name, enc.also end
+            return e.name, enc.also
+        end
+    end
+    return name, enc.also
+end
+
+-- This dungeon's boss with this NPC ID (ForeverBossNpcs.lua), by name.
+function MS:ForeverBossByNpc(run, npc)
+    if not npc then return nil end
+    local def = MS:ForeverDungeon(run)
+    local npcs = MS.ForeverData.BOSSES or {}
+    for _, e in ipairs(def and def.bosses or {}) do
+        for n in pairs(Names(e)) do
+            for name, info in pairs(npcs) do
+                if info.npc == npc and Norm(name) == n then return e.name end
+            end
+        end
+    end
+end
 
 -- "6 of 9": required bosses killed / required bosses.
 function MS:ForeverBossProgress(run)

@@ -45,7 +45,7 @@ D.DUNGEONS = {
         "Mr. Smite", "Captain Greenskin", "Edwin VanCleef", "Cookie",
     }},
     ["Shadowfang Keep"] = { levels = {20, 30}, final = "Archmage Arugal", bosses = {
-        "Rethilgore", { "Fel Steed / Shadow Charger", aka = { "Fel Steed", "Shadow Charger" } },
+        "Rethilgore", { "Fel Steed / Shadow Charger", rare = true, aka = { "Fel Steed", "Shadow Charger" } },
         "Razorclaw the Butcher", "Baron Silverlaine", "Commander Springvale", "Odo the Blindwatcher",
         { "Deathsworn Captain", rare = true }, "Arugal's Voidwalker", "Fenrus the Devourer",
         "Wolf Master Nandos", "Archmage Arugal",
@@ -117,19 +117,23 @@ D.DUNGEONS = {
     ["Sunken Temple"] = { levels = {49, 56}, final = "Shade of Eranikus", bosses = {
         { "Gasher", rare = true }, { "Loro", rare = true }, { "Zolo", rare = true },
         { "Hukku", rare = true }, { "Mijan", rare = true }, { "Zul'Lor", rare = true },
-        "Atal'alarion", "Dreamscythe", "Weaver", "Avatar of Hakkar", "Jammal'an the Prophet",
-        "Ogom the Wretched", "Morphaz", "Hazzas", "Shade of Eranikus",
+        "Atal'alarion", { "Dreamscythe", aka = { "Dreamscythe & Weaver",
+        "Traumsense", "Fauche-rêve", "Guadañasueños", "Darquimeros", "Жнец Снов", "드림사이드", "德姆塞卡尔", "德姆塞卡爾" } }, "Weaver", "Avatar of Hakkar", "Jammal'an the Prophet",
+        "Ogom the Wretched", { "Morphaz", aka = { "Morphaz & Hazzas", "Морфаз", "몰파즈", "摩弗拉斯" } }, "Hazzas", "Shade of Eranikus",
     }},
     ["Blackrock Depths"] = { levels = {52, 60}, final = "Emperor Dagran Thaurissan", bosses = {
-        "High Interrogator Gerstahn", "Lord Roccor", "Houndmaster Grebmar", "Gorosh the Dervish",
-        "Grizzle", "Eviscerator", "Ok'thor the Breaker", "Anub'shiah", "Hedrum the Creeper",
+        "High Interrogator Gerstahn", "Lord Roccor", "Houndmaster Grebmar",
+        -- (The Ring of Law: one fight, against whichever of the six shows up.)
+        { "Ring of Law", aka = { "Gorosh the Dervish", "Grizzle", "Eviscerator", "Ok'thor the Breaker",
+                                 "Anub'shiah", "Hedrum the Creeper" } },
         "Pyromancer Loregrain", "Fineous Darkvire", "Warder Stilgiss", "Lord Incendius", "Bael'Gar",
         "General Angerforge", "Golem Lord Argelmach", "Hurley Blackbreath", "Phalanx",
         "Ribbly Screwspigot", "Plugger Spazzring", { "Theldren", summon = true }, "Ambassador Flamelash",
         { "Panzor the Invincible", rare = true },
         { "The Seven", aka = { "Doom'rel", "Hate'rel", "Anger'rel", "Vile'rel", "Gloom'rel", "Seeth'rel",
                                "Dope'rel" } },
-        "Magmus", "Princess Moira Bronzebeard", "Emperor Dagran Thaurissan",
+        -- (Moira: often spared, killing the Emperor without her.)
+        "Magmus", { "Princess Moira Bronzebeard", rare = true }, "Emperor Dagran Thaurissan",
     }},
     ["Lower Blackrock Spire"] = { instance = "Blackrock Spire", levels = {55, 60}, final = "Overlord Wyrmthalak", bosses = {
         { "Spirestone Butcher", rare = true }, { "Spirestone Battle Lord", rare = true },
@@ -149,23 +153,23 @@ D.DUNGEONS = {
     }},
     ["Dire Maul: West"] = { levels = {57, 60}, final = "Prince Tortheldrin", bosses = {
         "Tendris Warpwood", "Illyanna Ravenoak", { "Tsu'zee", rare = true }, "Magister Kalendris",
-        "Immol'thar", "Lord Hel'nurath", "Prince Tortheldrin",
+        "Immol'thar", { "Lord Hel'nurath", summon = true }, "Prince Tortheldrin",
     }},
     ["Dire Maul: North"] = { levels = {57, 60}, final = "King Gordok", bosses = {
         "Guard Mol'dar", "Stomper Kreeg", "Guard Fengus", "Guard Slip'kik", "Captain Kromcrush",
         "Cho'Rush the Observer", "King Gordok",
     }},
     ["Scholomance"] = { levels = {58, 60}, final = "Darkmaster Gandling", bosses = {
-        { "Kirtonos the Herald", summon = true }, "Jandice Barov", "Rattlegore", "Marduk Blackpool",
-        "Vectus", "Ras Frostwhisper", "Instructor Malicia", "Doctor Theolen Krastinov",
+        { "Kirtonos the Herald", summon = true, aka = { "Kirtonos" } }, "Jandice Barov", "Rattlegore", "Marduk Blackpool",
+        "Vectus", { "Ras Frostwhisper", aka = { "Ras Frostwhisperer" } }, "Instructor Malicia", "Doctor Theolen Krastinov",
         "Lorekeeper Polkelt", "The Ravenian", "Lord Alexei Barov", "Lady Illucia Barov",
-        { "Death Knight Darkreaver", summon = true }, { "Kormok", summon = true },
+        { "Death Knight Darkreaver", summon = true, aka = { "Darkreaver" } }, { "Kormok", summon = true },
         "Darkmaster Gandling",
     }},
     ["Stratholme: Living"] = { levels = {58, 60}, final = "Balnazzar", bosses = {
         { "Skul", rare = true }, { "Hearthsinger Forresten", rare = true }, "The Unforgiven",
-        "Timmy the Cruel", { "Malor the Zealous", rare = true }, "Postmaster Malown",
-        { "Ezra Grimm", rare = true }, "Cannon Master Willey", "Archivist Galford",
+        "Timmy the Cruel", { "Malor the Zealous", rare = true }, { "Postmaster Malown", summon = true },
+        { "Ezra Grimm", rare = true, aka = { "Fras Siabi" } }, "Cannon Master Willey", "Archivist Galford",
         { "Jarien and Sothos", summon = true, aka = { "Jarien", "Sothos" } }, "Balnazzar",
     }},
     ["Stratholme: Undead"] = { levels = {58, 60}, final = "Baron Rivendare", bosses = {
@@ -175,14 +179,14 @@ D.DUNGEONS = {
     -- WoW Forever's own dungeons (sources above).
     ["Krol'dok Stronghold"] = { levels = {40, 45}, final = "Overlord Mugg", bosses = {
         "Slavecrusher Grox", { "Twilight Commander Zarmok", aka = { "Zarmok" } },
-        { "War Handler Ashka", aka = { "Handler Ashka" } }, "Nar'gurk", "Bossman Toof",
-        { "Kroog", rare = true }, "Overlord Mugg",
+        { "War Handler Ashka", aka = { "Handler Ashka" } }, "Nar'gurk", { "Bossman Toof", aka = { "Boss Kof" } },
+        { "Kroog", rare = true }, { "Overlord Mugg", aka = { "Overseer Mugg" } },
     }},
     ["The Drowned City"] = { levels = {35, 40}, final = "Min'loth the Serpent", bosses = {
-        "Zul'Alai", "Var'Taka", { "Primeval Elemental", summon = true }, "Captain Dreadrise",
+        "Zul'Alai", { "Var'Taka", aka = { "Zin'aka" } }, { "Primeval Elemental", summon = true }, "Captain Dreadrise",
         { "Deathless Marrow", aka = { "Deathless Guardians" } },
         { "Umbra", rare = true }, { "Gill", rare = true },
-        { "\"Pyromancer\" Braxton", rare = true, aka = { "Pyromancer Braxton" } },
+        { "\"Pyromancer\" Braxton", rare = true, aka = { "Pyromancer Braxton", "\"Пиромант\" Бракстон" } },
         { "Min'loth the Serpent", aka = { "Min'loth" } },
     }},
     -- (Zarla Ober becomes Blazeroar partway through the fight.)
@@ -197,7 +201,7 @@ D.DUNGEONS = {
         { "Elder Shaman Bloodmane", aka = { "Bloodmane" } },
         { "Blackmaw Behemoth", aka = { "Clawbert" } },
         { "Moontouched Wanderer", rare = true }, { "Gortek the Apprentice", rare = true, aka = { "Gortek" } },
-        { "Tunnelweb Matriarch", rare = true },
+        { "Tunnelweb Matriarch", rare = true }, { "Sabella No-Eyes", rare = true, aka = { "Sabella" } },
         { "Varrox Bleakhoof", aka = { "Varrox" } },
     }},
     -- (The four crystal bosses open the way to Nanaya; Vitrix can be skipped
