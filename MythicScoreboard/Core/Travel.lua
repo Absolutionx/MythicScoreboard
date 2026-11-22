@@ -184,9 +184,7 @@ function MS:LearnFlightMap()
     end
 end
 
-if MS.FLAVOR == "forever" then
-    MS:On("TAXIMAP_OPENED", function() MS:LearnFlightMap() end)
-end
+MS:On("TAXIMAP_OPENED", function() MS:LearnFlightMap() end)
 
 -- Where a flight from the open flight map goes: { kind = "flight", name,
 -- c, x, y } for its slot (TakeTaxiNode's), or nil.
@@ -415,12 +413,10 @@ function MS:OnHearthBound()
     if name and not Landings().inns[name] then Keep("inns", name, c, x, y) end
 end
 
-if MS.FLAVOR == "forever" then
-    MS:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spell)
-        if unit == "player" then MS:OnTravelSpell(spell) end
-    end)
-    MS:On("HEARTHSTONE_BOUND", function() MS:OnHearthBound() end)
-end
+MS:On("UNIT_SPELLCAST_SUCCEEDED", function(_, unit, _, spell)
+    if unit == "player" then MS:OnTravelSpell(spell) end
+end)
+MS:On("HEARTHSTONE_BOUND", function() MS:OnHearthBound() end)
 
 -- Where your hearthstone is set, as a place: learned, or the inn of that
 -- name in the shipped list. Or nil.

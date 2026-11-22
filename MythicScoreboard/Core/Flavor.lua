@@ -28,6 +28,9 @@ MS.Flavor = {
     -- A blacklist of players, with warnings and red names in the group
     -- finder (Core/Blacklist.lua, loaded only where this is on).
     blacklist     = false,
+    silentBosses  = false,   -- some bosses send no ENCOUNTER_START (or nothing)
+    journalIcons  = true,    -- the dungeon journal has the bosses' icons
+    directions    = false,   -- the arrow and routes to dungeons (UI_Navigate.lua)
 }
 MS.FLAVOR = MS.Flavor.name
 

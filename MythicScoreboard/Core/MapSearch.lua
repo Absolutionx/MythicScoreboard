@@ -113,11 +113,14 @@ function MS:SearchableZones()
     return list
 end
 
+-- A dungeon's levels, lowest and highest: the entrance's own, or the
+-- dungeon's (Data/ForeverDungeons.lua). (MapPins.lua shows them too.)
 local function Levels(name, levels)
     local def = MS.FOREVER_DUNGEONS and MS.FOREVER_DUNGEONS[name]
     local lv = levels or (def and def.levels)
     if lv then return lv[1], lv[2] end
 end
+MS.DungeonLevels = Levels
 
 -- What fits what's typed, best first: { kind = "dungeon" | "zone", name,
 -- map, x, y (dungeons), lo, hi (their levels) }. At most `limit` (8).

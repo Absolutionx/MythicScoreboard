@@ -1,14 +1,14 @@
 -- WoW Forever boss encounters by ID: ENCOUNTER_START/END's first value, the
 -- same number in every client language. A kill is matched by it first, so
 -- it counts whatever the game calls the boss (another language, a name the
--- list doesn't have). Data only; the rules are in Core/Forever.lua. Loaded
--- only by MythicScoreboard_Forever.toc.
+-- list doesn't have). Data only; the rules are in Core/ForeverBosses.lua.
+-- Loaded only by MythicScoreboard_Forever.toc.
 --
 -- [id] = { dungeon, boss as ForeverDungeons.lua names it, also = { other
 -- bosses the same fight ends } }
 --
--- Sources: Forever's DungeonEncounter table (build 1.60.1), warcraft.wiki.gg; and
--- the encounters the game sent in our own runs.
+-- Sources: Forever's DungeonEncounter table, warcraft.wiki.gg, and the
+-- encounters the game sent in our own runs.
 local MS = _G["MythicScoreboard"]
 MS.ForeverData = MS.ForeverData or {}
 MS.ForeverData.ENCOUNTERS = {

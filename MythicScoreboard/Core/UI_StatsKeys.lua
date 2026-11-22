@@ -1,3 +1,6 @@
+-- The Stats page's Keys tab (retail): your Mythic+ rating over time, keys
+-- by level, and the best and latest keys.
+
 local _floor, _max, _min = math.floor, math.max, math.min
 local _fmt = string.format
 
@@ -44,11 +47,7 @@ local LIST_TOP  = CHART_TOP + CHART_H + 30
 local LEVEL_W   = 56                           -- "+15"
 local COUNT_W   = 86                           -- "4 of 6"
 
-local function Thousands(n)
-    n = _floor((n or 0) + 0.5)
-    local B = rawget(_G, "BreakUpLargeNumbers")
-    return B and B(n) or tostring(n)
-end
+local Thousands = MS.FormatThousands     -- (Util.lua)
 
 -- How a key went, as a medal: gold for +3, silver for +2, bronze for +1,
 -- red over time. (In time with the upgrade unknown: at least +1.)
@@ -61,6 +60,7 @@ local function UpgradeColor(e)
     return P.bloodHi
 end
 
+-- A key in a line: dungeon, +level and how many levels it went up.
 local function KeyLine(e)
     local up = tonumber(e.up)
     return (e.dungeon or "?") .. "  " .. CT(P.bronzeHi, "+" .. (e.key or 0))
@@ -105,6 +105,7 @@ local function Step(span)
     return 1000
 end
 
+-- The rating chart: every key in time order, a line per character.
 local function FillChart(k, ks)
     local c = k.chart
     -- Every point, in time order across characters: x is its place in that order.
@@ -201,6 +202,7 @@ local function MakeDungeonRow(parent)
     return row
 end
 
+-- One row of the keys-by-level table.
 local function MakeLevelRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(RIGHT_W, LIST_ROW)
@@ -227,6 +229,7 @@ local function MakeLevelRow(parent)
     return row
 end
 
+-- The tab, built once.
 local function BuildKeys(parent)
     local k = CreateFrame("Frame", nil, parent)
     k:SetAllPoints()
@@ -310,6 +313,7 @@ local function BuildKeys(parent)
     return k
 end
 
+-- The tab filled from KeyStats (Archive.lua).
 local function FillKeys(k, ks)
     local any = ks.keys > 0
     k.empty:SetShown(not any)

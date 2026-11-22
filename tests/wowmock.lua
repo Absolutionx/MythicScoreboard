@@ -16,6 +16,7 @@ local function noop() end
 -- game call. A new game method used by the addon is added to this list.
 local NOOP_METHODS = {
     AddDoubleLine=1, AddLine=1, AddMaskTexture=1, EnableMouse=1, EnableMouseWheel=1, Play=1,
+    SetAutoFocus=1, SetMaxLetters=1, SetTextInsets=1, HighlightText=1, ClearFocus=1, SetFocus=1, HasFocus=1,
     Raise=1, RegisterForClicks=1, RegisterForDrag=1, SetAllPoints=1, SetAlpha=1, SetBackdrop=1,
     SetBlendMode=1, SetClampedToScreen=1, SetColorTexture=1, SetDesaturated=1, SetDuration=1,
     SetFormattedText=1, SetFrameLevel=1, SetFromAlpha=1, SetGradient=1,

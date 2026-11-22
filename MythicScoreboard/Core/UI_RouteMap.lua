@@ -81,7 +81,6 @@ function MS:RouteOnMap(mapID)
 end
 
 -- ── On the map ─────────────────────────────────────────────────────────────
-if MS.FLAVOR ~= "forever" then return end
 
 local CreateFromMixins = rawget(_G, "CreateFromMixins")
 local PinBase = rawget(_G, "MapCanvasPinMixin")

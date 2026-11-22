@@ -57,5 +57,17 @@ do
     end
 end
 
+-- Drawn over other addons' map markers: a strata above the map's.
+do
+    local mix = rawget(_G, "MythicScoreboardEntrancePinMixin")
+    local mapF = CreateFrame("Frame", nil, UIParent); mapF:SetFrameStrata("HIGH")
+    local pinF = CreateFrame("Frame", nil, mapF)
+    for k, v in pairs(mix) do if type(v) == "function" and not pinF[k] then pinF[k] = v end end
+    pinF.GetMap = function() return mapF end
+    pinF.SetPosition = function() end
+    mix.OnAcquired(pinF, { x = 0.5, y = 0.5, name = "Test" })
+    check("entrance marker drawn a strata above the map", pinF:GetFrameStrata() == "DIALOG", pinF:GetFrameStrata())
+end
+
 io.stdout:write(("mappins_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)

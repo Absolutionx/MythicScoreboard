@@ -1,3 +1,6 @@
+-- The minimap button: click to open or close the scoreboard, drag it round
+-- the minimap's edge (the angle is saved), hover for the run at a glance.
+
 local _rad, _deg, _cos, _sin = math.rad, math.deg, math.cos, math.sin
 local _atan2 = math.atan2 or math.atan
 local _fmt = string.format
@@ -15,6 +18,7 @@ local ICON = "Interface\\AddOns\\MythicScoreboard\\Icons\\Icon"
 local DEFAULT_ANGLE = 215
 local btn
 
+-- On the minimap's edge at the saved angle.
 local function Place()
     local a = _rad(MS:GetMinimapAngle() or DEFAULT_ANGLE)
     local r = Minimap:GetWidth() / 2 + 5
@@ -22,6 +26,7 @@ local function Place()
     btn:SetPoint("CENTER", Minimap, "CENTER", _cos(a) * r, _sin(a) * r)
 end
 
+-- While dragging: the angle from the minimap's middle to the cursor.
 local function FollowCursor()
     local mx, my = Minimap:GetCenter()
     local cx, cy = GetCursorPosition()
@@ -31,10 +36,12 @@ local function FollowCursor()
     Place()
 end
 
+-- Is the scoreboard window open?
 local function ScoreboardShown()
     return UI.frame and UI.frame:IsShown()
 end
 
+-- The button's tooltip: what a click does, and the run or limit at a glance.
 local function ShowTooltip(self)
     GameTooltip:SetOwner(self, "ANCHOR_LEFT")
     GameTooltip:SetText(L["Mythic Scoreboard"])
@@ -76,6 +83,7 @@ local function ShowTooltip(self)
     GameTooltip:Show()
 end
 
+-- Made the first time it's wanted; true once it exists.
 local function Build()
     if btn or not Minimap then return btn end
     btn = CreateFrame("Button", "MythicScoreboardMinimapButton", Minimap)
@@ -129,6 +137,7 @@ local function Build()
     return btn
 end
 
+-- Shown or hidden as the setting says (Settings: minimapButton).
 function MS:UpdateMinimapButton()
     if self:GetMinimapButton() then
         if Build() then btn:Show(); Place() end

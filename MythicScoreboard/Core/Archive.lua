@@ -42,42 +42,11 @@ function MS:StatsRevision() return _rev end   -- changes whenever any archived r
 -- saved with the character and copied account-wide (written twice); that
 -- copy is moved over the first time the character logs in.
 
-local function Account()
-    local acc = MS.AccountDB(true)
-    if type(acc.chars) ~= "table" then acc.chars = {} end
-    return acc
-end
-
 local Plain = MS.ReadableValue
+-- Who you are (Characters.lua): the account's characters, this one's key.
+local function Account() return MS.AccountWithChars() end
+local WrongRealm, CharKey = MS.WrongRealm, MS.CharKeyNow
 
--- name@realm, or nil until your name's known. When the game won't say the
--- realm (WoW Forever, at times for a whole session): the key this character
--- was saved under before, if there's just one; else "Name@". (An earlier
--- version made "Name@" alongside the real one: SyncAccountStats folds it in.)
--- A realm an earlier version saved by mistake: none, or (2.17.1, for a
--- moment) your WoW Forever surname ("Jay-Breezy@Breezy").
-local function WrongRealm(name, realm)
-    return type(realm) ~= "string" or realm == "" or realm == (name or ""):match("%-(.+)$")
-end
-
-local function CharKey()
-    local name = Plain(MS.UnitPlayerName and MS:UnitPlayerName("player") or UnitName("player"))
-    if type(name) ~= "string" or name == "" then return nil end
-    local realm = MS.PlayerRealm()
-    if realm then return name .. "@" .. realm, name, realm end
-    local acc = MS.AccountDB and MS.AccountDB()
-    local _, cls = UnitClass("player")
-    cls = Plain(cls)
-    local found
-    for key, c in pairs(acc and type(acc.chars) == "table" and acc.chars or {}) do
-        if c.name == name and not WrongRealm(name, c.realm) and (not cls or not c.class or c.class == cls) then
-            if found then return name .. "@", name, "" end      -- (two: can't tell which)
-            found = key
-        end
-    end
-    if found then return found, name, acc.chars[found].realm end
-    return name .. "@", name, ""
-end
 
 -- One archive's runs added to another's (the same run, by its start and
 -- dungeon, once), oldest first.
@@ -91,8 +60,6 @@ local function MergeArchive(into, from)
     end
     table.sort(into.runs, function(a, b) return (a.at or 0) < (b.at or 0) end)
 end
-
-MS._CharKeyNow = function() return (CharKey()) end   -- for tests
 
 local function NewArchive() return { v = MS.ARCHIVE_VERSION, runs = {} } end
 local function Valid(a) return type(a) == "table" and type(a.runs) == "table" end
@@ -131,22 +98,17 @@ local function MoveAccountWide(key)
     return c.archive
 end
 
--- This character's key (name@realm), once known (set by Store and
--- SyncAccountStats).
-local _charKey
-function MS:CharKey() return _charKey end
-
 -- This character's archive table: { v = data version, runs, seeded }.
 -- Reading it changes nothing once it's in place.
 local function Store()
     if not MythicScoreboardDB then return nil end
-    local key = _charKey or CharKey()
+    local key = MS:CharKey() or CharKey()
     if not key then
         -- Name not known yet: keep it with the character until it is.
         if not Valid(MythicScoreboardDB.archive) then MythicScoreboardDB.archive = NewArchive() end
         return Ready(MythicScoreboardDB.archive)
     end
-    _charKey = key
+    MS:SetCharKey(key)
     local acc = MS.AccountDB()
     local c = acc and type(acc.chars) == "table" and acc.chars[key]
     if c and Valid(c.archive) and c.runs == nil and MythicScoreboardDB.archive == nil then
@@ -426,7 +388,7 @@ function MS:SyncAccountStats()
     c.name, c.realm = name, realm
     local _, cls = UnitClass("player")
     c.class = Plain(cls) or c.class
-    _charKey = key
+    MS:SetCharKey(key)
     -- Made by an earlier version under a wrong realm (none, or your
     -- surname): this same character twice over. Its runs join this one's;
     -- it goes. (Only once this one's realm is a real one.)
@@ -442,22 +404,14 @@ function MS:SyncAccountStats()
     end
 end
 
--- "all", or one character's key.
-function MS:GetStatsChar()
-    local want = Account().statsChar or "all"
-    if want ~= "all" and not Account().chars[want] then want = "all" end
-    return want
-end
-function MS:SetStatsChar(key) Account().statsChar = key; Bump() end
-
 -- Characters with runs: this one first, then the others by name.
 function MS:StatsCharacters()
     self:SyncAccountStats()
     local out = {}
     for key, c in pairs(Account().chars) do
         local n = #CharRuns(c)
-        if n > 0 or key == _charKey then
-            _ins(out, { key = key, name = c.name or key, class = c.class, runs = n, me = key == _charKey })
+        if n > 0 or key == MS:CharKey() then
+            _ins(out, { key = key, name = c.name or key, class = c.class, runs = n, me = key == MS:CharKey() })
         end
     end
     _sort(out, function(x, y)
@@ -467,12 +421,10 @@ function MS:StatsCharacters()
     return out
 end
 
-function MS:CharacterInfo(key) return key and Account().chars[key] end
-
 -- The cache key for what the Stats page shows right now.
 local _memo, _memoKey = {}, nil
 local function StatsKey(self)
-    local parts = { _rev, tostring(_charKey), self:GetStatsChar() }
+    local parts = { _rev, tostring(MS:CharKey()), self:GetStatsChar() }
     for key, c in pairs(Account().chars) do
         local runs = CharRuns(c)
         parts[#parts + 1] = key .. tostring(runs) .. #runs
@@ -491,9 +443,9 @@ end
 -- Which character each archived run belongs to.
 local function OwnersNow(self)
     local out = {}
-    for _, e in ipairs(self:ArchiveRuns()) do out[e] = _charKey end
+    for _, e in ipairs(self:ArchiveRuns()) do out[e] = MS:CharKey() end
     for key, c in pairs(Account().chars) do
-        if key ~= _charKey then
+        if key ~= MS:CharKey() then
             for _, e in ipairs(CharRuns(c)) do out[e] = key end
         end
     end
@@ -501,9 +453,9 @@ local function OwnersNow(self)
 end
 function MS:RunOwner(e) return Memo(self, "owners", OwnersNow)[e] end
 function MS:IsOwnRun(e)
-    if not _charKey then return true end      -- name not known yet: everything is ours
+    if not MS:CharKey() then return true end      -- name not known yet: everything is ours
     local owner = self:RunOwner(e)
-    return owner ~= nil and owner == _charKey
+    return owner ~= nil and owner == MS:CharKey()
 end
 
 -- The runs the Stats page shows, oldest first.
@@ -515,7 +467,7 @@ function MS:StatsRuns()
 end
 function StatsRunsNow(self)
     local mine = self:ArchiveRuns()
-    local me, want = _charKey, self:GetStatsChar()
+    local me, want = MS:CharKey(), self:GetStatsChar()
     if not me or want == me then return mine end
     local out = {}
     for key, c in pairs(Account().chars) do

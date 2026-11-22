@@ -284,11 +284,7 @@ local function DefaultPlayerSort(a, b)
     return (a.damageDone or 0) > (b.damageDone or 0)
 end
 
-local function Thousands(n)
-    n = _floor(n + 0.5)
-    local B = rawget(_G, "BreakUpLargeNumbers")
-    return B and B(n) or tostring(n)
-end
+local Thousands = MS.FormatThousands     -- (Util.lua)
 
 -- ── Header ─────────────────────────────────────────────────────────────────
 -- The title, badge, the line under them, affixes and the buttons on the

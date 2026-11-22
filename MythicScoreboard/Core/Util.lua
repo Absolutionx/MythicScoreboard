@@ -132,3 +132,19 @@ hub:SetScript("OnEvent", function(_, event, ...)
         if not ok then MS:ReportError(event, err) end
     end
 end)
+
+-- 12400 -> "12,400" (the game's way for your language where it has one),
+-- rounded to a whole number. One helper for every window.
+function MS.FormatThousands(n)
+    n = math.floor((tonumber(n) or 0) + 0.5)
+    local Break = rawget(_G, "BreakUpLargeNumbers")
+    if Break then
+        local ok, s = pcall(Break, n)
+        if ok and type(s) == "string" then return s end
+    end
+    local sep = rawget(_G, "LARGE_NUMBER_SEPARATOR")
+    sep = (type(sep) == "string" and sep ~= "") and sep or ","
+    local neg, digits = tostring(n):match("^(%-?)(%d+)$")
+    local out = digits:reverse():gsub("(%d%d%d)", "%1\1"):reverse():gsub("^\1", "")
+    return neg .. out:gsub("\1", function() return sep end)
+end

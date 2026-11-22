@@ -63,26 +63,6 @@ check("account file lost: the character keeps its own", (function()
     return #MythicScoreboardDB.runs == 2
 end)(), #MythicScoreboardDB.runs)
 
--- ── 2. Left out by the test build (runsAt): put back ───────────────────────
-playRun()
-key = MS:CharKey()
-M.Fire("PLAYER_LOGOUT")
-local db, acc = copy(MythicScoreboardDB), copy(MythicScoreboardAccountDB)
-db.runs, db.runsAt = nil, key
-MythicScoreboardDB, MythicScoreboardAccountDB = db, acc
-login()
-check("put back from the account file", type(MythicScoreboardDB.runs) == "table" and #MythicScoreboardDB.runs == 3,
-    MythicScoreboardDB.runs and #MythicScoreboardDB.runs)
-check("the note goes", MythicScoreboardDB.runsAt == nil)
-check("same table account-wide again", MythicScoreboardAccountDB.chars[key].history == MythicScoreboardDB.runs)
-M.Fire("PLAYER_LOGOUT")
-check("then saved in both again", type(MythicScoreboardDB.runs) == "table" and #MythicScoreboardDB.runs == 3)
--- the note, but nothing where it points: an empty list, no error
-db = copy(MythicScoreboardDB); db.runs, db.runsAt = nil, "Nobody@Nowhere"
-MythicScoreboardDB = db
-login()
-check("pointing at nothing: empty, no error", type(MythicScoreboardDB.runs) == "table" and MythicScoreboardDB.runsAt == nil)
-
 -- ── 5. Leftovers ───────────────────────────────────────────────────────────
 local acc2 = MythicScoreboardAccountDB
 acc2.mapExport = { 1, 2, 3 }

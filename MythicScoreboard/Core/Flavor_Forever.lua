@@ -16,6 +16,9 @@ F.dungeonLevels = true
 F.bossProgress  = true
 F.progressStats = true
 F.blacklist     = true
+F.silentBosses  = true
+F.journalIcons  = false
+F.directions    = true
 MS.FLAVOR = F.name
 
 -- Forever dungeons have a single difficulty: every dungeon run is tracked and

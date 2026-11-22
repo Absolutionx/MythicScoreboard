@@ -411,7 +411,7 @@ local _askedFor = {}       -- npc -> true: asked this session (once is enough)
 function MS:BossPortrait(boss, run)
     if not boss then return nil end
     local icon = CachedIcon(boss)
-    if not icon and MS.FLAVOR ~= "forever" then
+    if not icon and MS.Flavor.journalIcons then
         BuildJournalIndex()                 -- saved runs from before icons were kept
         icon = CachedIcon(boss)
     end

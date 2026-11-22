@@ -9,11 +9,7 @@ local L = MS.L
 
 local _fmt, _ins = string.format, table.insert
 
-local function Levels(name, levels)
-    local def = MS.FOREVER_DUNGEONS and MS.FOREVER_DUNGEONS[name]
-    local lv = levels or (def and def.levels)
-    if lv then return lv[1], lv[2] end
-end
+local function Levels(name, levels) return MS.DungeonLevels(name, levels) end   -- (MapSearch.lua)
 
 -- Where a spot on a zone's map is on another map (the continent's), or nil.
 local function OnMap(zone, x, y, mapID)
@@ -61,7 +57,6 @@ end
 -- ── On the map ─────────────────────────────────────────────────────────────
 -- A data provider: the map asks for its markers each time it changes, and
 -- sizes and places them as it does its own.
-if MS.FLAVOR ~= "forever" then return end
 
 local CreateFromMixins = rawget(_G, "CreateFromMixins")
 local PinBase, ProviderBase = rawget(_G, "MapCanvasPinMixin"), rawget(_G, "MapCanvasDataProviderMixin")
@@ -98,9 +93,26 @@ function PinMixin:OnLoad()
     end
 end
 
+-- Over other addons' map markers: some put theirs at the highest frame
+-- level there is (10000), so ours go one strata up from the map instead
+-- (HIGH: DIALOG). The map still clips them to itself.
+local STRATA = { "BACKGROUND", "LOW", "MEDIUM", "HIGH", "DIALOG", "FULLSCREEN", "FULLSCREEN_DIALOG" }
+local function Above(strata)
+    for i, s in ipairs(STRATA) do
+        if s == strata then return STRATA[math.min(i + 1, #STRATA)] end
+    end
+    return "DIALOG"
+end
+local function OnTop(self)
+    local map = self.GetMap and self:GetMap()
+    local base = map and map.GetFrameStrata and map:GetFrameStrata()
+    if self.SetFrameStrata then self:SetFrameStrata(Above(base)) end
+end
+
 function PinMixin:OnAcquired(pin)
     self.pin = pin
     self:SetPosition(pin.x, pin.y)
+    pcall(OnTop, self)
 end
 
 function PinMixin:OnMouseEnter()

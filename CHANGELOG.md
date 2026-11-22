@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.17.6
+
+### WoW Forever
+- **Long boss lists fit the in-run frame.** In dungeons with many bosses, like Blackrock Depths, the bosses you've killed fold into one "N killed" line and the rest into "+N more", with your latest two kills and the final boss always shown. Hover a folded line to see which bosses it holds.
+- **The instance limit line isn't cut off** under "Dungeons this hour": it shows when the next run frees up and how long that is from now, sized to fit the frame.
+- **The boss you're fighting** shows "fighting" in the time column, in the same font as the rest of the list.
+- **Preview any dungeon:** `/sb compact demo blackrock depths` plays a sample run of that dungeon, with its own bosses.
+- **Dungeon entrance markers are drawn on top** of other markers on the world map.
+- **The instance limit countdown is smaller,** and the dungeon's name and the time it opens are no longer cut off: a long line wraps onto a second one.
+
+### Everyone
+- **The in-run frame uses less CPU:** it redraws once a second instead of four times. Kills and deaths still show the moment they happen.
+- If one window fails to refresh, the others still update, and the error is shown once in chat.
+
 ## 2.17.5
 
 ### WoW Forever

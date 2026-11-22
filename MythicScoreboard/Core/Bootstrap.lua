@@ -7,7 +7,6 @@ local L = MS.L
 local function InitDB()
     MythicScoreboardDB = MythicScoreboardDB or {}
     local db = MythicScoreboardDB
-    MS:AttachHistory(db)                    -- history left out by a test build, put back (History.lua)
     db.runs = db.runs or {}
     db.mobForces = db.mobForces or {}
     MS:InitSettings(db)

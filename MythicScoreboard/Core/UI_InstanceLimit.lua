@@ -16,6 +16,7 @@ local _fmt = string.format
 -- row; turning either off turns both off.
 
 local panel, ticker
+local WIDTH, UNTIL_Y = 230, 56            -- the panel's width; where its last line starts
 local closedFor                          -- the lock it was closed for
 local preview                            -- while previewing: the sample's "next free" time
 
@@ -33,12 +34,15 @@ local function Update()
     local name = info.scope == "dungeon" and (info.dungeon or (preview and "Alcaz Prison"))
     panel.until_:SetText(name and _fmt(L["until you can enter %s again (%s)"], name, MS.ClockTime(nextFree))
         or _fmt(L["until you can enter another dungeon (%s)"], MS.ClockTime(nextFree)))
+    -- (A long dungeon name wraps to a second line: the panel grows to fit.)
+    local h = panel.until_.GetStringHeight and panel.until_:GetStringHeight()
+    panel:SetHeight(UNTIL_Y + math.ceil(tonumber(h) or 13) + 12)
 end
 
 local function Build()
     if panel then return panel end
     panel = CreateFrame("Button", "MythicScoreboardInstanceLimit", UIParent)
-    panel:SetSize(300, 112)
+    panel:SetSize(WIDTH, 84)
     local pos = MS:GetSetting("limitPanelPos")
     if type(pos) == "table" and pos[1] then
         panel:SetPoint(pos[1], UIParent, pos[2], tonumber(pos[3]) or 0, tonumber(pos[4]) or 0)
@@ -56,14 +60,18 @@ local function Build()
         if p then MS:SetSetting("limitPanelPos", { p, rp, math.floor(x + 0.5), math.floor(y + 0.5) }) end
     end)
     UI.Box(panel)
-    local title = Text(panel, "semibold", 12, P.bloodHi, "LEFT")
-    title:SetPoint("TOPLEFT", 16, -14); title:SetText(L["Instance limit reached"])
-    panel.clock = Text(panel, "semibold", 34, P.ivory, "LEFT")
-    panel.clock:SetPoint("TOPLEFT", 16, -32)
-    panel.until_ = Text(panel, "regular", 13, P.ash, "LEFT")
-    panel.until_:SetPoint("TOPLEFT", 16, -74); panel.until_:SetWidth(268)
-    local close = Text(panel, "regular", 11, P.ash, "RIGHT")
-    close:SetPoint("TOPRIGHT", -14, -14); close:SetText(L["Click to close."])
+    local title = Text(panel, "semibold", 11, P.bloodHi, "LEFT")
+    title:SetPoint("TOPLEFT", 12, -11); title:SetText(L["Instance limit reached"])
+    panel.clock = Text(panel, "semibold", 24, P.ivory, "LEFT")
+    panel.clock:SetPoint("TOPLEFT", 12, -26)
+    panel.until_ = Text(panel, "regular", 11, P.ash, "LEFT")
+    panel.until_:SetPoint("TOPLEFT", 12, -UNTIL_Y); panel.until_:SetWidth(WIDTH - 24)
+    panel.until_:SetWordWrap(true)
+    if panel.until_.SetMaxLines then panel.until_:SetMaxLines(2) end
+    local close = Text(panel, "regular", 10, P.ash, "RIGHT")
+    close:SetPoint("TOPRIGHT", -10, -11); close:SetText(L["Click to close."])
+    -- (Long translations: the title gives way to "Click to close.")
+    title:SetPoint("RIGHT", close, "LEFT", -8, 0)
     panel:SetScript("OnClick", function(self)
         if self._dragged then self._dragged = nil; return end   -- the end of a drag, not a click
         if preview then MS:ToggleInstanceLimitPreview(); return end

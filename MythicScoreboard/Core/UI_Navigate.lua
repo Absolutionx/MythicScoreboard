@@ -522,7 +522,6 @@ function MS:ToggleNavigation(pin)
     end
 end
 
-if MS.FLAVOR ~= "forever" then return end
 
 -- Back after a /reload; done once inside a dungeon. A new zone (off a boat,
 -- say): the route again straight away.
@@ -589,7 +588,7 @@ end)
 
 -- Any flight taken (the addon's or your own choice): where it lands, kept,
 -- so the steps carry on from there.
-if MS.FLAVOR == "forever" and type(rawget(_G, "TakeTaxiNode")) == "function" then
+if type(rawget(_G, "TakeTaxiNode")) == "function" then
     hooksecurefunc("TakeTaxiNode", function(slot)
         local ok, spot = pcall(MS.TaxiNodeSpot, MS, slot)
         if ok and spot then

@@ -1,3 +1,6 @@
+-- The blacklist window (WoW Forever): the players you've blacklisted, with
+-- a note each, and the warning when one of them invites you.
+
 local MS = _G["MythicScoreboard"]
 local L = MS.L
 local UI = MS.UI
@@ -10,6 +13,7 @@ local Art, Box, Btn, P, Solid, Text, Tint = UI.Art, UI.Box, UI.Btn, UI.P, UI.Sol
 local W, H, ROW_H, PAD = 400, 440, 46, 14
 local frame, rows = nil, {}
 
+-- The window's close button (top right).
 local function CloseButton(parent)
     local b = Btn(parent)
     b:SetSize(26, 26)
@@ -21,6 +25,7 @@ local function CloseButton(parent)
     return b
 end
 
+-- A plain text button in the window's style.
 local function TextButton(parent, label)
     local b = Btn(parent)
     Box(b, true)
@@ -46,6 +51,7 @@ local function Added(e)
 end
 UI._BlacklistDate = Added
 
+-- One player: name, note, when added; edit the note or remove them.
 local function MakeRow(parent)
     local row = Btn(parent)
     row:SetHeight(ROW_H)
@@ -119,6 +125,7 @@ local function MakeRow(parent)
     return row
 end
 
+-- The list redrawn from the saved blacklist, newest first.
 function UI.RefreshBlacklist()
     if not (frame and frame:IsShown()) then return end
     local entries = MS:BlacklistEntries()
@@ -147,6 +154,7 @@ function UI.RefreshBlacklist()
     frame.count:SetText(MS.Plural(#entries, "%d player", "%d players"))
 end
 
+-- The window, made the first time it's opened.
 local function Build()
     if frame then return frame end
     frame = CreateFrame("Frame", "MythicScoreboardBlacklistFrame", UIParent)
@@ -204,12 +212,14 @@ local function Build()
     return frame
 end
 
+-- Open the window (/sb blacklist).
 function MS:ShowBlacklist()
     Build()
     if frame:IsShown() then frame:Raise() else frame:Show() end
     UI.RefreshBlacklist()
 end
 
+-- Open or close it.
 function MS:ToggleBlacklist()
     if frame and frame:IsShown() then frame:Hide() else MS:ShowBlacklist() end
 end
@@ -218,6 +228,8 @@ MS:OnBlacklistChanged(function() UI.RefreshBlacklist() end)
 
 -- ── Under the game's invite box: who it is and your note ──────────────────
 local invite
+-- A red warning beside the game's invite dialog when the inviter is on
+-- your blacklist (e: their entry).
 function MS.ShowBlacklistInviteWarning(_, dialog, e)
     if not invite then
         invite = CreateFrame("Frame", nil, UIParent)

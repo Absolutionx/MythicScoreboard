@@ -78,19 +78,6 @@ function MS:MirrorHistory()
     chars[key].history = runs
 end
 
--- ── Brought back ───────────────────────────────────────────────────────────
--- A test build left the history out of the character's file at logout
--- (db.runsAt naming its place in the account file). Kept in both again;
--- one left out is put back from there at login, before anything reads it.
-function MS:AttachHistory(db)
-    local key = db.runsAt
-    db.runsAt = nil
-    if db.runs ~= nil or type(key) ~= "string" then return end
-    local chars = AccountChars()
-    local c = chars and chars[key]
-    if c and type(c.history) == "table" then db.runs = c.history end
-end
-
 -- Whose runs the history list shows: "all" characters or just "me".
 function MS:GetHistoryScope()
     local acc = MS.AccountDB()

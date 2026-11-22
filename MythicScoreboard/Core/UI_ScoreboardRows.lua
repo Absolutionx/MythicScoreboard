@@ -108,45 +108,9 @@ end
 local KICK_HEALERS = { SHAMAN = true, MONK = true, EVOKER = true }
 
 -- One tooltip handler for every row; it reads the row's player and run.
-local function RowOnEnter(self2)
-    local pc = self2._player
-    if not pc then return end
-    GameTooltip:SetOwner(self2, "ANCHOR_CURSOR_RIGHT", 12, 12)
-    local r2, g2, b2 = ClassColor(pc.class)
-    GameTooltip:SetText(DN(pc.name) or "?", r2, g2, b2)
-    local listed = MS.Flavor.blacklist and MS:BlacklistEntryForPlayer(pc)
-    if listed then
-        GameTooltip:AddLine(L["On your blacklist"], 1, 0.13, 0.13)
-        if (listed.note or "") ~= "" then GameTooltip:AddLine(listed.note, 1, 0.55, 0.55, true) end
-    end
-    local spec, specRole
-    if MS.SpecLabel then spec, specRole = MS.SpecLabel(pc.specID, pc.class) end
-    if spec then
-        local role = (pc.role ~= "" and pc.role) or specRole
-        local roleName = role and rawget(_G, role)
-        GameTooltip:AddDoubleLine(spec, type(roleName) == "string" and roleName or "", r2, g2, b2, 1, 1, 1)
-    end
-
-    if (pc.level or 0) > 0 and MS.Flavor.dungeonLevels then
-        local lo, hi = MS:ForeverLevelRange(self2._run)
-        local range = lo and ("  (" .. _fmt(L["dungeon %d-%d"], lo, hi) .. ")") or ""
-        GameTooltip:AddDoubleLine(L["Level"], pc.level .. range, 0.8, 0.8, 0.8, 1, 1, 1)
-    end
-    local sc = pc.mythicScore or 0
-    if sc > 0 then
-        local sr, sg, sb2 = ScoreColor(sc)
-        local gain = (pc.ratingGain or 0) > 0 and (" " .. CT(P.verdHi, "(+" .. pc.ratingGain .. ")")) or ""
-        GameTooltip:AddDoubleLine(L["Mythic+ rating"], sc .. gain, 0.8, 0.8, 0.8, sr, sg, sb2)
-    end
-    if (pc.itemLevel or 0) > 0 then
-        GameTooltip:AddDoubleLine(L["Item level"], pc.itemLevel, 0.8, 0.8, 0.8, 1, 1, 1)
-    end
-    local avoid = pc.avoidableDamageTaken or 0
-    if avoid > 0 then
-        GameTooltip:AddDoubleLine(L["Avoidable damage"], Abbrev(avoid),
-            0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
-    end
-
+-- The rest of a row's tooltip (RowOnEnter, below): the interrupt and
+-- death badges, loot, and what a right-click does.
+local function AddRowExtras(pc, self2)
     -- Highest / lowest interrupt badge (healers without an interrupt are left
     -- out of "lowest").
     local intCount = pc.interrupts or 0
@@ -230,6 +194,48 @@ local function RowOnEnter(self2)
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(L["Right-click: blacklist"], 0.55, 0.55, 0.55)
     end
+end
+
+local function RowOnEnter(self2)
+    local pc = self2._player
+    if not pc then return end
+    GameTooltip:SetOwner(self2, "ANCHOR_CURSOR_RIGHT", 12, 12)
+    local r2, g2, b2 = ClassColor(pc.class)
+    GameTooltip:SetText(DN(pc.name) or "?", r2, g2, b2)
+    local listed = MS.Flavor.blacklist and MS:BlacklistEntryForPlayer(pc)
+    if listed then
+        GameTooltip:AddLine(L["On your blacklist"], 1, 0.13, 0.13)
+        if (listed.note or "") ~= "" then GameTooltip:AddLine(listed.note, 1, 0.55, 0.55, true) end
+    end
+    local spec, specRole
+    if MS.SpecLabel then spec, specRole = MS.SpecLabel(pc.specID, pc.class) end
+    if spec then
+        local role = (pc.role ~= "" and pc.role) or specRole
+        local roleName = role and rawget(_G, role)
+        GameTooltip:AddDoubleLine(spec, type(roleName) == "string" and roleName or "", r2, g2, b2, 1, 1, 1)
+    end
+
+    if (pc.level or 0) > 0 and MS.Flavor.dungeonLevels then
+        local lo, hi = MS:ForeverLevelRange(self2._run)
+        local range = lo and ("  (" .. _fmt(L["dungeon %d-%d"], lo, hi) .. ")") or ""
+        GameTooltip:AddDoubleLine(L["Level"], pc.level .. range, 0.8, 0.8, 0.8, 1, 1, 1)
+    end
+    local sc = pc.mythicScore or 0
+    if sc > 0 then
+        local sr, sg, sb2 = ScoreColor(sc)
+        local gain = (pc.ratingGain or 0) > 0 and (" " .. CT(P.verdHi, "(+" .. pc.ratingGain .. ")")) or ""
+        GameTooltip:AddDoubleLine(L["Mythic+ rating"], sc .. gain, 0.8, 0.8, 0.8, sr, sg, sb2)
+    end
+    if (pc.itemLevel or 0) > 0 then
+        GameTooltip:AddDoubleLine(L["Item level"], pc.itemLevel, 0.8, 0.8, 0.8, 1, 1, 1)
+    end
+    local avoid = pc.avoidableDamageTaken or 0
+    if avoid > 0 then
+        GameTooltip:AddDoubleLine(L["Avoidable damage"], Abbrev(avoid),
+            0.8, 0.8, 0.8, P.avoid[1], P.avoid[2], P.avoid[3])
+    end
+
+    AddRowExtras(pc, self2)
     GameTooltip:Show()
 end
 

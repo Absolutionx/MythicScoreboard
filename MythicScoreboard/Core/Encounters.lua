@@ -193,7 +193,7 @@ local function EndFight(self, bossName, dungeonEncounterId, field, at)
         local late = LateEnd(self, run, bossName, dungeonEncounterId, field)
         -- (WoW Forever) The game's kill for a fight it never started: a kill
         -- all the same.
-        if not late and field == "killTime" and not at and MS.FLAVOR == "forever" then
+        if not late and field == "killTime" and not at and MS.Flavor.silentBosses then
             return self:BossKillSeen(bossName, dungeonEncounterId, "event")
         end
         return late

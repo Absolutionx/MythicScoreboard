@@ -46,39 +46,9 @@ local MAX_W  = 760          -- the dropdown never gets wider than this
 local probe                -- measures dungeon names
 local CHAR_W = 96           -- the character column, when other characters' runs are shown
 
-local function MakeRow()
-    local row = Btn(drop)
-    local hov = Solid(row, "BACKGROUND", 1, P.bronze[1], P.bronze[2], P.bronze[3], 0.14)
-    hov:SetAllPoints()
-    local mark = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 1)
-    mark:SetPoint("TOPLEFT"); mark:SetPoint("BOTTOMLEFT"); mark:SetWidth(2)
-    row.hov, row.mark = hov, mark
-
-    row.fIdx = Text(row, "medium", 12, P.ash2, "CENTER")
-    row.fIdx:SetPoint("LEFT", 6, 0); row.fIdx:SetWidth(28)
-    row.fRes = Text(row, "medium", 13, P.verd, "RIGHT")
-    row.fRes:SetPoint("RIGHT", -30, 0); row.fRes:SetWidth(76)
-    row.fTime = Text(row, "medium", 13, P.ash, "RIGHT")
-    row.fTime:SetPoint("RIGHT", row.fRes, "LEFT", -8, 0); row.fTime:SetWidth(40)
-    row.fChar = Text(row, "game", 12, P.ivory, "LEFT")
-    row.fChar:SetPoint("RIGHT", row.fTime, "LEFT", -10, 0); row.fChar:SetWidth(CHAR_W)
-    row.fLvl = Text(row, "semibold", 13, P.ash, "LEFT")
-    row.fLvl:SetWidth(84)
-    row.fName = Text(row, "game", 12, P.ivory, "LEFT")
-    row.fName:SetPoint("LEFT", row.fLvl, "RIGHT", 4, 0)
-    row.fLvl:SetPoint("LEFT", row.fIdx, "RIGHT", 4, 0)
-
-    local delBtn = Btn(row)
-    delBtn:SetSize(22, DROP_ROW_H)
-    delBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
-    delBtn:SetFrameLevel(row:GetFrameLevel() + 2)
-    local delIcon = Art(delBtn, "Close", "OVERLAY")
-    delIcon:SetSize(12, 12); delIcon:SetPoint("CENTER")
-    Tint(delIcon, P.ash2)
-    row.delBtn = delBtn
-
-    row:SetScript("OnEnter", function() hov:Show() end)
-    row:SetScript("OnLeave", function() if not row.selected then hov:Hide() end end)
+-- A history row's clicks (MakeRow, below): its X deletes the run in two
+-- clicks; the row itself shows that run.
+local function WireRowClicks(delBtn, delIcon, hov, row)
     -- Two clicks: the first asks (the X turns red, "Click again to delete"),
     -- the second, within a few seconds, deletes.
     local armed, timer = false, nil
@@ -146,6 +116,42 @@ local function MakeRow()
         if UI.statsOpen then UI.CloseStats() end
         MS:RefreshOverview()
     end)
+end
+
+local function MakeRow()
+    local row = Btn(drop)
+    local hov = Solid(row, "BACKGROUND", 1, P.bronze[1], P.bronze[2], P.bronze[3], 0.14)
+    hov:SetAllPoints()
+    local mark = Solid(row, "ARTWORK", 0, P.bronze[1], P.bronze[2], P.bronze[3], 1)
+    mark:SetPoint("TOPLEFT"); mark:SetPoint("BOTTOMLEFT"); mark:SetWidth(2)
+    row.hov, row.mark = hov, mark
+
+    row.fIdx = Text(row, "medium", 12, P.ash2, "CENTER")
+    row.fIdx:SetPoint("LEFT", 6, 0); row.fIdx:SetWidth(28)
+    row.fRes = Text(row, "medium", 13, P.verd, "RIGHT")
+    row.fRes:SetPoint("RIGHT", -30, 0); row.fRes:SetWidth(76)
+    row.fTime = Text(row, "medium", 13, P.ash, "RIGHT")
+    row.fTime:SetPoint("RIGHT", row.fRes, "LEFT", -8, 0); row.fTime:SetWidth(40)
+    row.fChar = Text(row, "game", 12, P.ivory, "LEFT")
+    row.fChar:SetPoint("RIGHT", row.fTime, "LEFT", -10, 0); row.fChar:SetWidth(CHAR_W)
+    row.fLvl = Text(row, "semibold", 13, P.ash, "LEFT")
+    row.fLvl:SetWidth(84)
+    row.fName = Text(row, "game", 12, P.ivory, "LEFT")
+    row.fName:SetPoint("LEFT", row.fLvl, "RIGHT", 4, 0)
+    row.fLvl:SetPoint("LEFT", row.fIdx, "RIGHT", 4, 0)
+
+    local delBtn = Btn(row)
+    delBtn:SetSize(22, DROP_ROW_H)
+    delBtn:SetPoint("RIGHT", row, "RIGHT", -2, 0)
+    delBtn:SetFrameLevel(row:GetFrameLevel() + 2)
+    local delIcon = Art(delBtn, "Close", "OVERLAY")
+    delIcon:SetSize(12, 12); delIcon:SetPoint("CENTER")
+    Tint(delIcon, P.ash2)
+    row.delBtn = delBtn
+
+    row:SetScript("OnEnter", function() hov:Show() end)
+    row:SetScript("OnLeave", function() if not row.selected then hov:Hide() end end)
+    WireRowClicks(delBtn, delIcon, hov, row)
     return row
 end
 

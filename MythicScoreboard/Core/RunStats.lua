@@ -607,10 +607,4 @@ function MS.FormatGold(copper)
     return c .. C
 end
 
--- 12400 -> "12,400".
-function MS.FormatThousands(n)
-    local s = tostring(math.floor(n or 0))
-    local sep = GameString("LARGE_NUMBER_SEPARATOR", ",")
-    local out = s:reverse():gsub("(%d%d%d)", "%1\1"):reverse()
-    return (out:gsub("^\1", ""):gsub("\1", function() return sep end))
-end
+-- (12400 -> "12,400": MS.FormatThousands, Util.lua.)

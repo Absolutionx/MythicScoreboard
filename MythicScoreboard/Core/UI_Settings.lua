@@ -100,7 +100,7 @@ local GROUPS = {
     -- When a run counts as cleared (Forever: no Mythic+ completion event).
     { col = 2, title = LK("Mark a run cleared when"), rows = { { kind = "clear" } }, shown = MS.CLEAR_RULES ~= nil },
     -- WoW Forever: the dungeon directions (UI_Navigate.lua) and the blacklist.
-    { col = 2, title = LK("Directions"), shown = MS.FLAVOR == "forever", rows = {
+    { col = 2, title = LK("Directions"), shown = MS.Flavor.directions, rows = {
         T(LK("Take flights automatically"), "AutoTakeFlights",
           LK("When the directions say to fly, talking to the flight master skips to the flight map and takes that flight. Hold Shift to pick your own.")),
     } },

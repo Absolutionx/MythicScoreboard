@@ -12,7 +12,6 @@ local Art, Box, Btn, P, Solid, Text, Tint = UI.Art, UI.Box, UI.Btn, UI.P, UI.Sol
 -- Alt-click anywhere on the map: the way to that spot (on the route's line
 -- or a dot of it: the directions off).
 
-if MS.FLAVOR ~= "forever" then return end
 
 local BOX_W, BOX_H, ROW_H, ROWS = 230, 24, 22, 8
 local box, list, rows, results, sel = nil, nil, {}, {}, 1

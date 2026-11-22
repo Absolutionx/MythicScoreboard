@@ -1,3 +1,8 @@
+-- The Stats page's dungeon page (one dungeon, clicked from All dungeons or
+-- Trends): the numbers at the top, a chart, every run, and on the right the
+-- bosses, groups by level and where the XP and gold came from. Also the
+-- two-run comparison (BuildCompare, FillCompare).
+
 local _abs, _ceil, _floor, _max, _min = math.abs, math.ceil, math.floor, math.max, math.min
 local _fmt = string.format
 
@@ -55,6 +60,7 @@ local function PickRun(e)
     UI.RefreshStats(true)
 end
 
+-- One bar of the run-time chart.
 local function MakeChartBar(parent)
     local b = Btn(parent)
     b:SetScript("OnClick", function(self) if self.entry then PickRun(self.entry) end end)
@@ -66,6 +72,7 @@ local function MakeChartBar(parent)
     return b
 end
 
+-- One run in the list: date, time, result, deaths, and (Forever) XP and gold.
 local function MakeRunRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(LEFT_W, LIST_ROW)
@@ -199,11 +206,13 @@ end
 local METRIC = {}
 for _, m in ipairs(METRICS) do METRIC[m.key] = m end
 
+-- A label and its value on a tooltip line.
 local function AddLine(label, value, col)
     col = col or P.ivory
     GameTooltip:AddDoubleLine(label, value, P.ash[1], P.ash[2], P.ash[3], col[1], col[2], col[3])
 end
 
+-- A section's heading on the right side.
 local function SecHeading(parent, text)
     local h = Text(parent, "medium", 13, P.ash, "LEFT")
     h:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, 0)
@@ -211,6 +220,7 @@ local function SecHeading(parent, text)
     return h
 end
 
+-- One of the eight number tiles at the top.
 local function MakeTile(parent, i)
     local x = X0 + ((i - 1) % TILES_A_ROW) * TILE_W
     local y = TILE_TOP + _floor((i - 1) / TILES_A_ROW) * TILE_H
@@ -224,6 +234,7 @@ local function MakeTile(parent, i)
     return tile
 end
 
+-- One row of the by-level (or by-difficulty) table.
 local function MakeGroupRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(RIGHT_W, LIST_ROW)
@@ -267,6 +278,7 @@ local function MakeSplit(parent, y)
     return s
 end
 
+-- A split bar: two parts of a total side by side (mobs and quests, say).
 local function FillSplit(s, title, total, a, b, colA, colB, nameA, nameB)
     s.title:SetText(title)
     s.total:SetText(total)
@@ -305,7 +317,9 @@ local function MakeChartChoice(parent, key, label)
     return b
 end
 
-local function BuildDetail(parent)
+-- The dungeon page's parts, built once each (BuildDetail, below). The
+-- header band: back, the dungeon's name, the line under it.
+local function BuildHeader(parent)
     local d = CreateFrame("Frame", nil, parent)
     d:SetAllPoints()
     local band = Band(d)
@@ -347,10 +361,19 @@ local function BuildDetail(parent)
     runX:Hide()
     d.runX = runX
 
+    return d
+end
+
+-- The number tiles.
+local function BuildTiles(d)
     -- Headline numbers: two rows of four.
     d.tiles = {}
     for i = 1, 2 * TILES_A_ROW do d.tiles[i] = MakeTile(d, i) end
 
+end
+
+-- The chart: its choices, the bars or the trend line, the comparison bars.
+local function BuildChart(d)
     -- The chart: run times, or the rate run by run.
     d.choices = { MakeChartChoice(d, "time", L["Run time"]) }
     d.choices[1]:SetPoint("TOPLEFT", d, "TOPLEFT", X0, -(CHART_TOP - 3))
@@ -433,6 +456,10 @@ local function BuildDetail(parent)
     end)
     d.rateHolder, d.rate = rateHolder, rc
 
+end
+
+-- The list of every run.
+local function BuildRunList(d)
     -- Every run, newest first.
     local lband = Band(d, RCOLS, X0)
     lband:SetPoint("TOPLEFT", d, "TOPLEFT", 0, -LIST_TOP); lband:SetWidth(X0 + LEFT_W)
@@ -442,6 +469,10 @@ local function BuildDetail(parent)
     d.sf:SetWidth(LEFT_W + 10)
     d.rowAt, d.rowsHideFrom = Pool(function() return MakeRunRow(d.sf.scrollContent) end)
 
+end
+
+-- The right side, scrolling: bosses, by level, your numbers, the sources.
+local function BuildRight(d)
     -- Right, scrolling: bosses, by level, where it came from.
     d.rsf = MakeScrollFrame(d)
     -- From 8px left of the column (its headers' bands reach there) to the
@@ -526,16 +557,27 @@ local function BuildDetail(parent)
         end)
         d.secSource = ss
     end
+end
+
+-- The dungeon page, built once.
+local function BuildDetail(parent)
+    local d = BuildHeader(parent)
+    BuildTiles(d)
+    BuildChart(d)
+    BuildRunList(d)
+    BuildRight(d)
     return d
 end
 
 local MAX_BARS = 40
 
+-- "52" or "52-60".
 local function Levels(lo, hi)
     if not lo then return nil end
     return lo == hi and tostring(lo) or (lo .. "–" .. hi)
 end
 
+-- The run-time chart: a bar a run, oldest on the left, the best in bronze.
 local function FillBars(d, s)
     local runs = s.runs
     local first = _max(1, #runs - MAX_BARS + 1)
@@ -597,7 +639,9 @@ local function FillBars(d, s)
     d.typLbl:SetShown(s.typical ~= nil)
 end
 
-local function FillDetail(d, s)
+-- The dungeon page, a part at a time (FillDetail, below). The header:
+-- the run picked if any, and the line under the title.
+local function FillHeader(d, s)
     local runs = s.runs
     -- A run picked (still one of this dungeon's): its numbers in place of all of them.
     local sel = S.detailRun
@@ -633,6 +677,11 @@ local function FillDetail(d, s)
         d.summary:SetText(table.concat(parts, "  ·  "))
     end
 
+    return runs, sel, all, b, time, deaths
+end
+
+-- The eight numbers at the top: of all runs, or of the one picked.
+local function FillTiles(d, s, runs, sel, b, time, deaths)
     -- Headline numbers.
     local dash = CT(P.ash2, "-")
     local best = s.best and CT(P.bronzeHi, Dur(s.best)) or dash
@@ -694,13 +743,16 @@ local function FillDetail(d, s)
         tile.value:SetText(tiles[i][2])
     end
 
+end
+
+-- The chart: the metric picked, run by run; or the comparison bars.
+local function FillChart(d, s, runs, sel, all)
     -- The chart.
     -- (A choice this game doesn't have, such as XP an hour outside Forever: DPS.)
     if S.detailChart ~= "time" and not METRIC[S.detailChart] then S.detailChart = "dps" end
     local m = METRIC[S.detailChart]
     for _, c in ipairs(d.choices) do c.Look() end
-    local bAll = b
-    b = all                                      -- the chart is every run, the picked one marked
+    local b = all                                -- the chart is every run, the picked one marked
     if d.choiceRate then d.choiceRate.text:SetText(b and b.byGold and L["Gold an hour"] or L["XP an hour"]) end
     d.chart:SetShown(not m)
     d.rateHolder:SetShown(m ~= nil)
@@ -774,7 +826,6 @@ local function FillDetail(d, s)
         FillBars(d, s)
         d.chartChange:SetText("")
     end
-    b = bAll
     -- The picked run stands out; the rest fade.
     if not m then
         for i = 1, _min(#runs, MAX_BARS) do
@@ -783,6 +834,10 @@ local function FillDetail(d, s)
         end
     end
 
+end
+
+-- Every run, newest first, the picked one marked.
+local function FillRunList(d, s, runs, sel)
     -- Every run.
     local y, k = 0, 0
     for i = #runs, 1, -1 do
@@ -820,6 +875,10 @@ local function FillDetail(d, s)
     d.sf.scrollContent:SetHeight(_max(1, y))
     d.sf.UpdateRange()
 
+end
+
+-- The right side: bosses, by level, your numbers, where it came from.
+local function FillRight(d, s, sel, b)
     -- Right: the sections one under another.
     local content = d.rsf.scrollContent
     local top = 0
@@ -958,6 +1017,15 @@ local function FillDetail(d, s)
     d.rsf.UpdateRange()
 end
 
+-- The page filled for one dungeon (s: its StatsForDungeon numbers).
+local function FillDetail(d, s)
+    local runs, sel, all, b, time, deaths = FillHeader(d, s)
+    FillTiles(d, s, runs, sel, b, time, deaths)
+    FillChart(d, s, runs, sel, all)
+    FillRunList(d, s, runs, sel)
+    FillRight(d, s, sel, b)
+end
+
 -- ── Compare ────────────────────────────────────────────────────────────────
 -- Two runs of one dungeon. Top: each run as a bar on one time scale, with a
 -- line joining each boss's kill in the earlier run to the same kill in the
@@ -981,20 +1049,24 @@ local LANE_W = FRAME_W - 2 - LANE_X - X0 - 10
 local LANE_H = 14
 local RUN_COL = { P.ash, P.bronzeHi }          -- run 1 (earlier), run 2 (later)
 
+-- A time difference: "-1:20" (faster, green), "+0:45" (slower), "same".
 local function Signed(d)
     if not d then return CT(P.ash2, "-") end
     if _abs(d) < 1 then return CT(P.ash, "same") end
     return d < 0 and CT(P.verd, "-" .. Dur(-d)) or CT(P.bloodHi, "+" .. Dur(d))
 end
 
+-- The same, said of a split: "1:20 ahead" or "0:45 behind".
 local function Split(d)
     if not d then return CT(P.ash2, "-") end
     if _abs(d) < 1 then return CT(P.ash, L["level"]) end
     return d < 0 and CT(P.verd, _fmt(L["%s ahead"], Dur(-d))) or CT(P.bloodHi, _fmt(L["%s behind"], Dur(d)))
 end
 
+-- A value (formatted with f), or a dash for none.
 local function OrDash(v, f) return v and (f and f(v) or v) or CT(P.ash2, "-") end
 
+-- The comparison of two runs, built once.
 local function BuildCompare(parent)
     local c = CreateFrame("Frame", nil, parent)
     c:SetAllPoints()
@@ -1103,6 +1175,7 @@ local function PlaceLaneTimes(lane, e, runEnd, At)
     lane.killsHideFrom(n + 1)
 end
 
+-- Two runs side by side (cmp: CompareRuns, Archive.lua), boss by boss.
 local function FillCompare(c, cmp)
     local A, B = cmp.first, cmp.second
     c.backTxt:SetText(A.dungeon or L["Back"])

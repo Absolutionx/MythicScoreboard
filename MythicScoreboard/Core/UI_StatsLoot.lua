@@ -1,3 +1,7 @@
+-- The Stats page's Loot tab: every piece of gear that dropped for you, newest
+-- first, with its dungeon, boss and date. Items can be removed one at a
+-- time (two clicks on the x) or all at once (Clear loot, after a yes).
+
 local _max, _min = math.max, math.min
 local _fmt = string.format
 
@@ -21,6 +25,7 @@ local X0 = K.X0
 -- ── Loot ───────────────────────────────────────────────────────────────────
 local function ItemID(item) return tonumber(tostring(item or ""):match("item:(%d+)")) end
 
+-- An item's name: from its link, or the game's item cache (nil until cached).
 local function ItemName(l)
     local fromLink = l.l and l.l:match("|h%[(.-)%]|h")
     if fromLink then return fromLink end
@@ -30,6 +35,7 @@ local function ItemName(l)
     return nil
 end
 
+-- Its icon, or a question mark until the game has the item.
 local function ItemIcon(l)
     local id = ItemID(MS.LootItemString(l))
     if not id then return nil end
@@ -38,6 +44,7 @@ local function ItemIcon(l)
     return ok and icon or nil
 end
 
+-- The colour of a quality (green, blue, purple...).
 local function QualityColor(q)
     if not q then return P.ivory end
     return { UI.QualityColor(q) }
@@ -51,6 +58,7 @@ MS:On("GET_ITEM_INFO_RECEIVED", function()
     C_Timer.After(0.3, function() if UI.statsOpen and S.tab == "loot" then UI.RefreshStats(true) end end)
 end)
 
+-- One row of the list: icon, name, dungeon, boss, date, character, and the x.
 local function MakeLootRow(parent)
     local row = CreateFrame("Frame", nil, parent)
     row:SetSize(FRAME_W - 2 * X0 - 10, LOOT_ROW)
@@ -133,6 +141,7 @@ end
 -- Every item of this character's, after a yes in the game's own dialog.
 local POPUP = "MYTHICSCOREBOARD_CLEAR_LOOT"
 
+-- How many of the listed items are this character's (the only ones it can remove).
 local function OwnItems(items)
     local n = 0
     for _, it in ipairs(items or MS:LootHistory()) do
@@ -141,10 +150,12 @@ local function OwnItems(items)
     return n
 end
 
+-- Every item of this character's gone from the list (after the dialog's yes).
 local function ClearNow()
     if MS:ClearLootHistory() > 0 then UI.RefreshStats(true) end
 end
 
+-- Clear loot: asks first, in the game's own Yes/No dialog.
 function UI.AskClearLoot()
     local n = OwnItems()
     if n == 0 then return end
@@ -165,6 +176,7 @@ function UI.AskClearLoot()
     Show(POPUP, text)
 end
 
+-- The tab: its column headers, the Clear loot button, the scrolling list.
 local function BuildLoot(parent)
     local lv = CreateFrame("Frame", nil, parent)
     lv:SetAllPoints()
@@ -206,6 +218,7 @@ local function BuildLoot(parent)
     return lv
 end
 
+-- The list filled from LootHistory (Archive.lua), newest first.
 local function FillLoot(lv, items)
     lv.band.labels.char:SetShown(S.multiChar)
     local y, n = 0, _min(#items, MAX_LOOT)

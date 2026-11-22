@@ -13,10 +13,16 @@ MS.version = GetMeta and GetMeta("MythicScoreboard", "Version") or "dev"   -- fr
 --   "loot"       an item dropped or was looked up
 --   "portraits"  a boss portrait was learned
 --   "history"    saved runs added or removed
+-- Each listener runs on its own, as the event hub runs handlers (Util.lua):
+-- one that fails is said once in chat, and the rest still hear of it.
 local listeners = {}
 function MS:OnChanged(fn) listeners[#listeners + 1] = fn end
 function MS:Changed(what)
-    for i = 1, #listeners do listeners[i](what or "run") end
+    what = what or "run"
+    for i = 1, #listeners do
+        local ok, err = pcall(listeners[i], what)
+        if not ok then MS:ReportError("Refresh", err) end
+    end
 end
 
 -- An error worth one line in chat (once per message), from anywhere.

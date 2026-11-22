@@ -58,12 +58,7 @@ local TDCOLS = {   -- elsewhere: your DPS, a row per dungeon
 local COLS = MS.Flavor.progressStats and TFCOLS or TDCOLS
 
 -- 12,345 (MS.FormatThousands is WoW Forever's; the game's own elsewhere).
-local function Thousands(n)
-    n = _floor((n or 0) + 0.5)
-    if MS.FormatThousands then return MS.FormatThousands(n) end
-    local big = rawget(_G, "BreakUpLargeNumbers")
-    return big and big(n) or tostring(n)
-end
+local Thousands = MS.FormatThousands     -- (Util.lua)
 
 local function Short(n)
     return UI.Abbrev and UI.Abbrev(n) or Thousands(n)
@@ -431,10 +426,9 @@ local function BuildDayPanel(t)
     return p
 end
 
-local function BuildTrends(parent)
-    local t = CreateFrame("Frame", nil, parent)
-    t:SetAllPoints()
-
+-- The Trends tab, a part at a time (BuildTrends, below). Activity: a
+-- square a day.
+local function BuildActivity(t)
     -- Activity: a square a day.
     t.actTitle = Heading(t, X0, 16, L["Activity"])
     local grid = CreateFrame("Frame", nil, t)
@@ -457,6 +451,10 @@ local function BuildTrends(parent)
         t.sums[i] = val
     end
 
+end
+
+-- The chart, its choices and which dungeon.
+local function BuildTrendChart(t)
     -- The chart: what it shows (a row of choices), then which dungeon and
     -- how far back; a dot a run, and the trend through them.
     t.metricBtns = {}
@@ -518,6 +516,10 @@ local function BuildTrends(parent)
     t.chart = c
     t.day = BuildDayPanel(t)
 
+end
+
+-- A row per dungeon, sortable by any column.
+local function BuildDungeonList(t)
     -- Right: a row per dungeon.
     t.listTitle = Heading(t, RIGHT_X, 16)
     t.listNote = Text(t, "regular", 12, P.ash, "LEFT")
@@ -566,6 +568,15 @@ local function BuildTrends(parent)
     t.noList = Text(t, "regular", 14, P.ash, "CENTER")
     t.noList:SetPoint("TOP", t, "TOPLEFT", RIGHT_X + 190, -(60 + COL_HDR_H + 40))
     t.noList:SetWidth(340); t.noList:SetWordWrap(true)
+end
+
+local function BuildTrends(parent)
+    local t = CreateFrame("Frame", nil, parent)
+    t:SetAllPoints()
+
+    BuildActivity(t)
+    BuildTrendChart(t)
+    BuildDungeonList(t)
     return t
 end
 

@@ -104,5 +104,21 @@ M.Fire("UNIT_PET", "party4"); M.RunTimers(3)
 check("in a run: pets are looked at", rebuilds > 0, rebuilds)
 MS.RebuildPetGUIDCache = realRebuild
 
+-- One listener that fails doesn't stop the others.
+do
+    local later = 0
+    MS:OnChanged(function() error("boom") end)
+    MS:OnChanged(function() later = later + 1 end)
+    MS:Changed("run")
+    check("a failing change listener doesn't stop the next", later == 1, later)
+    local said = false
+    for _, p in ipairs(M.printed) do if p:find("Refresh error") and p:find("boom") then said = true end end
+    check("and its error is said", said)
+    MS:Changed("run")
+    local n = 0
+    for _, p in ipairs(M.printed) do if p:find("boom") then n = n + 1 end end
+    check("once", n == 1, n)
+end
+
 io.stdout:write(("inspect_tests: %d passed, %d failed\n"):format(passes, fails))
 os.exit(fails == 0 and 0 or 1)
