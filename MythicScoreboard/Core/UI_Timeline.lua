@@ -581,16 +581,26 @@ end
 
 -- ── Axis ───────────────────────────────────────────────────────────────────
 -- Labels near the completion time are dropped (it's printed there).
+local TICK_STEPS = { 30, 60, 120, 300, 600, 900, 1200, 1800, 3600 }
+local TICK_GAP = 64            -- px between minute labels, at least
+-- Every 30 seconds up to 3 minutes, a minute up to 8, 2 up to 15, then 5;
+-- and on a long run (three hours in BRD) the smallest step that keeps the
+-- labels 64px apart, so they don't pile on top of each other.
+local function TickStep(totalDur, W)
+    local least = totalDur <= 3*60 and 30 or totalDur <= 8*60 and 60 or totalDur <= 15*60 and 120 or 300
+    for _, step in ipairs(TICK_STEPS) do
+        if step >= least and (totalDur <= 0 or W * step / totalDur >= TICK_GAP) then return step end
+    end
+    return TICK_STEPS[#TICK_STEPS]
+end
+UI._TickStep = TickStep     -- for tests
+
 local function DrawAxis(c)
     local cv, totalDur, W, X, At, Solid = c.cv, c.totalDur, c.W, c.X, c.At, c.Solid
     local Text, compSec = c.Text, c.compSec
     local skipX = compSec and X(compSec)
     local function clear(x) return not skipX or _abs(x - skipX) > 38 end
-    local tickInterval
-    if     totalDur <= 3*60  then tickInterval = 30
-    elseif totalDur <= 8*60  then tickInterval = 60
-    elseif totalDur <= 15*60 then tickInterval = 2*60
-    else                          tickInterval = 5*60 end
+    local tickInterval = TickStep(totalDur, W)
     local t = 0
     while t <= totalDur + 0.5 do
         local x = X(t)

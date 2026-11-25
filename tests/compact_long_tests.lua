@@ -103,6 +103,30 @@ do
     MS.RefreshCompact = real
 end
 
+-- The clock shows every second, once: a run that started part way through
+-- a second, the game at 60 frames a second (it skipped one now and then).
+do
+    local run, fr = MS.currentRun, frame()
+    local real, shownSecs = MS.RefreshCompact, {}
+    MS.RefreshCompact = function(...)
+        shownSecs[#shownSecs + 1] = math.floor(MS:GetRunDuration(run))
+        return real(...)
+    end
+    for _, start in ipairs({ 0.02, 0.13, 0.24, 0.5, 0.97 }) do
+        for k in pairs(shownSecs) do shownSecs[k] = nil end
+        run.startTime = math.floor(M.now) - 100 + start
+        for _ = 1, 60 * 20 do M.now = M.now + 1 / 60; fr:Fire("OnUpdate", 1 / 60) end
+        local skipped, twice = 0, 0
+        for i = 2, #shownSecs do
+            local d = shownSecs[i] - shownSecs[i - 1]
+            if d > 1 then skipped = skipped + 1 elseif d == 0 then twice = twice + 1 end
+        end
+        check("started at ." .. start .. ": no second skipped", skipped == 0, skipped)
+        check("started at ." .. start .. ": each second once", twice == 0 and #shownSecs >= 19, twice .. " " .. #shownSecs)
+    end
+    MS.RefreshCompact = real
+end
+
 -- The demo, in a dungeon you name.
 zone({ "Orgrimmar", "none", 0 })
 if MS.currentRun and MS.currentRun._suspended then MS:ClosePausedRun() end

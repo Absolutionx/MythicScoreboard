@@ -176,7 +176,9 @@ local function CrowdedFallback(states, info, bi)
     for _, st in ipairs(states) do
         for k = -10, 10 do
             for row = 1, 2 do
-                local cx = info.mx + k * CIRCLE
+                -- Inside the window, as every other spot is (a crowded long
+                -- run pushed medallions past its edges).
+                local cx = _min(_max(info.mx + k * CIRCLE, 4 + MED_R), FRAME_W - 6 - MED_R)
                 local c = { row = row, mode = MODES[5], x1 = cx - MED_R, x2 = cx + MED_R, cx = cx, mx = info.mx,
                             elbow = ELBOWS[2], segs = Segments(info.mx, cx, row, ELBOWS[2]),
                             far = _max(cx + MED_R, info.mx), cost = 300 + math.abs(k) * 20 }

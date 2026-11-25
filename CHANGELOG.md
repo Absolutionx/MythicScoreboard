@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.17.7
+
+### Everyone
+- **The in-run frame's clock ticks every second again.** Since 2.17.6 it could stand still for a second and then jump two, depending on when the run started.
+- **Long runs fit the timeline.** On a run of two or three hours the minute marks under the timeline no longer pile on top of each other: they spread out to every 10, 15 or 20 minutes as needed. Boss portraits on a crowded run stay inside the window.
+
 ## 2.17.6
 
 ### WoW Forever

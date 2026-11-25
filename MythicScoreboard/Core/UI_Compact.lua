@@ -845,13 +845,21 @@ local function Build()
     -- "frees in 12 min") moves once a second, as the second turns. The demo
     -- runs fast: four times a second.
     local wait, lastSecond = 0, nil
+    -- Redrawn when the run's clock ticks over a second (not the computer's
+    -- second: the run started part way through one, and redrawing on the
+    -- computer's showed the clock skipping a second now and then), and at
+    -- least once a second while it stands still (paused, before the pull).
+    local lastDraw = 0
     f:SetScript("OnUpdate", function(_, elapsed)
         wait = wait - elapsed
         if wait > 0 then return end
-        wait = 0.25
-        local second = _floor(GetTime())
-        if demo == nil and second == lastSecond then return end
-        lastSecond = second
+        wait = 0.05
+        local now = GetTime()
+        local run = MS.inDungeon and MS.currentRun
+        local second = run and _floor(Clock(run)) or _floor(now)
+        if demo == nil and second == lastSecond and now - lastDraw < 1 then return end
+        if demo ~= nil and now - lastDraw < 0.25 then return end
+        lastSecond, lastDraw = second, now
         MS:RefreshCompact()
     end)
 end
