@@ -141,6 +141,39 @@ SlashCmdList.MYTHICSCOREBOARD("compact demo"); M.RunTimers(2)
 SlashCmdList.MYTHICSCOREBOARD("compact demo nowhere at all"); M.RunTimers(2)
 check("unknown name: said so, no demo", MS._CompactDemo() == nil and M.printed[#M.printed]:find("nowhere at all"), M.printed[#M.printed])
 
+-- Garbage and redraws: in game the addon showed 56 MB, from about 30 KB of
+-- garbage a redraw, and a redraw for every change (a pull's kills, XP, loot).
+do
+    zone({ "Blackrock Depths", "party", 1 })
+    MS:RefreshCompact(); M.RunTimers(2)
+    local fr = frame()
+    check("back in BRD: shown", fr._shown and MS.inDungeon)
+    collectgarbage("collect"); collectgarbage("stop")
+    local a = collectgarbage("count")
+    for _ = 1, 50 do M.now = M.now + 1; MS:RefreshCompact() end
+    local per = (collectgarbage("count") - a) / 50
+    collectgarbage("restart")
+    check("a redraw: little garbage (the mock's own included)", per < 15, string.format("%.1f KB", per))
+    -- A burst of changes: one redraw, at the frame's next check.
+    local real, n = MS.RefreshCompact, 0
+    MS.RefreshCompact = function(...) n = n + 1; return real(...) end
+    for _ = 1, 20 do MS:Changed("run") end
+    check("20 changes: none drawn at once", n == 0, n)
+    fr:Fire("OnUpdate", 0.06)
+    check("20 changes: drawn once", n == 1, n)
+    fr:Fire("OnUpdate", 0.06)
+    check("nothing new: not again", n == 1, n)
+    MS.RefreshCompact = real
+    -- The boss list kept between fights still changes as a fight starts and ends.
+    local boss = "High Interrogator Gerstahn"
+    wait(30); M.Fire("ENCOUNTER_START", nil, boss); M.RunTimers(1)
+    fr:Fire("OnUpdate", 0.06)
+    check("pulled: fighting", shown("fighting"))
+    M.Fire("ENCOUNTER_END", nil, boss, 1, 5, 1); M.RunTimers(2)
+    M.now = M.now + 1; fr:Fire("OnUpdate", 0.06)
+    check("killed: within a second, no longer fighting", not shown("fighting"))
+end
+
 local function errorsPrinted() for _, p in ipairs(M.printed) do if p:find("rror") then return p end end end
 check("no errors", not errorsPrinted(), errorsPrinted())
 io.stdout:write(("%s: %d passed, %d failed\n"):format(MS.FLAVOR, passes, fails))

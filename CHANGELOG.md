@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.17.8
+
+### Everyone
+- **Much less memory.** The in-run frame made a lot of throwaway data each time it redrew, and it redrew for every little change in a run: each kill, each bit of XP or gold. Memory use could climb to 50 MB or more during a dungeon. It now makes about a seventh as much per redraw, and a burst of changes is one redraw, so the addon stays at a few MB.
+
 ## 2.17.7
 
 ### Everyone

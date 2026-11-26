@@ -26,6 +26,7 @@ local PANEL = { 0.12, 0.10, 0.08 }     -- the pace strip
 
 local f                                -- the frame, made the first time it's shown
 local demo                             -- the sample run, while /sb compact demo is on
+local changed = false                  -- the run changed since the last draw
 local el, used = {}, {}                -- pieces by name; the ones this draw used
 
 -- A script handler that can't break: an error is said once in chat
@@ -51,13 +52,22 @@ local function Piece(key, make)
     x:Show()
     return x
 end
+-- The piece if it's been made (shown and kept for this draw), else nil. The
+-- callers below write "Got(key) or Piece(key, function() ... end)" so the
+-- maker, a new function each time, is only made the first time: the frame
+-- redraws every second and these added up to a lot of garbage.
+local function Got(key)
+    local x = el[key]
+    if x then used[key] = true; x:Show() end
+    return x
+end
 -- Text is in the game's own font (Friz Quadrata, or the client's font for
 -- its language), a size smaller than the sizes given: it runs wider than the
 -- condensed font they were picked for. With the game's drop shadow, so it
 -- stays sharp on any background.
 local function GameSize(size) return size >= 20 and size - 2 or size - 1 end
 local function FS(key, _, size, col, justify)
-    local fs = Piece(key, function()
+    local fs = Got(key) or Piece(key, function()
         local t = Text(f, "game", GameSize(size), col, justify)
         t:SetShadowOffset(1, -1); t:SetShadowColor(0, 0, 0, 0.9)
         return t
@@ -71,7 +81,7 @@ end
 local LAYER = { back = { "BORDER", 0 }, fill = { "ARTWORK", 1 }, mark = { "ARTWORK", 3 } }
 local function Bar(key, col, a, kind)
     local lay = LAYER[kind or "fill"]
-    local t = Piece(key, function() return Solid(f, lay[1], lay[2], 1, 1, 1, 1) end)
+    local t = Got(key) or Piece(key, function() return Solid(f, lay[1], lay[2], 1, 1, 1, 1) end)
     t:SetColorTexture(col[1], col[2], col[3], a or 1)
     return t
 end
@@ -136,7 +146,29 @@ local function LastFight(run, name)
 end
 
 -- The bosses to list: { name, kill (the game's timer), done, fighting, best }.
+local BuildBosses
+-- Kept until a fight starts or ends (outside keys, whose objectives come from
+-- the game): the frame redraws every second, and building the list each
+-- time, a table per boss, was most of its garbage.
+local bossCache = {}
 local function Bosses(run, best)
+    if IsKey(run) or run._demo then return BuildBosses(run, best) end
+    local list = run.bosses or {}
+    local n = #list
+    local last, act = list[n], run.activeBoss
+    local c = bossCache
+    if c.out and c.run == run and c.best == best and c.n == n and c.last == last
+            and c.lastKill == (last and last.killTime) and c.act == act
+            and c.actKill == (act and act.killTime) and c.name == run.dungeonName and c.wing == run.wingName and c.map == run.uiMapID then
+        return c.out
+    end
+    c.out = BuildBosses(run, best)
+    c.run, c.best, c.n, c.last, c.act = run, best, n, last, act
+    c.lastKill, c.actKill = last and last.killTime, act and act.killTime
+    c.name, c.wing, c.map = run.dungeonName, run.wingName, run.uiMapID
+    return c.out
+end
+function BuildBosses(run, best)
     local names = {}
     if IsKey(run) then
         for _, o in ipairs(KeyObjectives(run)) do _ins(names, { name = o.name, done = o.done }) end
@@ -234,7 +266,7 @@ local function Affixes(run, y)
         local ok, name, desc, fileID = pcall(getInfo, id)
         if ok and fileID then
             n = n + 1
-            local b = Piece("affix" .. n, function()
+            local b = Got("affix" .. n) or Piece("affix" .. n, function()
                 local fr = CreateFrame("Frame", nil, f)
                 fr:SetSize(18, 18); fr:EnableMouse(true)
                 fr.icon = fr:CreateTexture(nil, "ARTWORK"); fr.icon:SetAllPoints()
@@ -390,7 +422,7 @@ local function BossRows(run, bosses, y, withBest)
         y = y - 15
     end
     for i, b in ipairs(bosses) do
-        local dia = Piece("bd" .. i, function() return Art(f, "Diamond", "ARTWORK", 2) end)
+        local dia = Got("bd" .. i) or Piece("bd" .. i, function() return Art(f, "Diamond", "ARTWORK", 2) end)
         dia:SetSize(10, 10); Place(dia, PAD, y - 2)
         Tint(dia, b.done and P.bronzeHi or P.ash2, b.done and 1 or 0.7)
         dia:SetShown(not b.more)
@@ -406,7 +438,7 @@ local function BossRows(run, bosses, y, withBest)
         Place(name, PAD + 16, y); OneLine(name, W - 2 * PAD - 16 - right, 13)
         UI.FitText(name, b.name, "game", GameSize(13), 9)
         -- A folded line names what it stands for on hover.
-        local hov = Piece("bhov" .. i, function()
+        local hov = Got("bhov" .. i) or Piece("bhov" .. i, function()
             local h = CreateFrame("Frame", nil, f)
             h:EnableMouse(true)
             if h.SetMouseClickEnabled then h:SetMouseClickEnabled(false) end
@@ -480,7 +512,7 @@ local function Deaths(run, y)
     local val = FS("dv", "semibold", 13, n > 0 and P.bloodHi or P.ivory, "RIGHT"); PlaceRight(val, W - PAD, y)
     val:SetText(n > 0 and (n .. (IsKey(run) and cost > 0 and ("  -" .. T(cost)) or "")) or "0")
     -- Hovering the line: who died, and how often.
-    local hov = Piece("dhover", function()
+    local hov = Got("dhover") or Piece("dhover", function()
         local h = CreateFrame("Frame", nil, f)
         h:EnableMouse(true)
         if h.SetMouseClickEnabled then h:SetMouseClickEnabled(false) end
@@ -522,7 +554,7 @@ end
 -- Hover areas: they show a tooltip but let clicks and drags through to the
 -- frame (so it still moves and clicks wherever you grab it).
 local function HoverArea(key, onEnter)
-    return Piece(key, function()
+    return Got(key) or Piece(key, function()
         local h = CreateFrame("Frame", nil, f)
         h:EnableMouse(true)
         if h.SetMouseClickEnabled then h:SetMouseClickEnabled(false) end
@@ -840,10 +872,11 @@ local function Build()
         shown = function() return demo ~= nil end,
     })
 
-    -- Anything that changes in the run redraws the frame as it happens
-    -- (MS:OnChanged, below); what moves on its own (the clock, the timer bar,
-    -- "frees in 12 min") moves once a second, as the second turns. The demo
-    -- runs fast: four times a second.
+    -- Anything that changes in the run redraws the frame at its next check
+    -- (MS:OnChanged, below: a burst of changes in one moment, a pull's kills,
+    -- XP and loot, is one redraw, not one each); what moves on its own (the
+    -- clock, the timer bar, "frees in 12 min") moves once a second, as the
+    -- second turns. The demo runs fast: four times a second.
     local wait, lastSecond = 0, nil
     -- Redrawn when the run's clock ticks over a second (not the computer's
     -- second: the run started part way through one, and redrawing on the
@@ -857,7 +890,7 @@ local function Build()
         local now = GetTime()
         local run = MS.inDungeon and MS.currentRun
         local second = run and _floor(Clock(run)) or _floor(now)
-        if demo == nil and second == lastSecond and now - lastDraw < 1 then return end
+        if demo == nil and not changed and second == lastSecond and now - lastDraw < 1 then return end
         if demo ~= nil and now - lastDraw < 0.25 then return end
         lastSecond, lastDraw = second, now
         MS:RefreshCompact()
@@ -893,6 +926,7 @@ local function Refresh(self)
     Draw(run, style)
 end
 function MS:RefreshCompact()
+    changed = false
     local ok, err = pcall(Refresh, self)
     if not ok then MS:ReportError("In-run frame", err) end
 end
@@ -1001,7 +1035,11 @@ function MS:CompactCommand(arg)
     self:RefreshCompact()
 end
 
-MS:OnChanged(function() MS:RefreshCompact() end)
+-- Shown: redrawn at the frame's next check (within 0.05s). Hidden: at once,
+-- as the change may be what shows it.
+MS:OnChanged(function()
+    if f and f:IsShown() then changed = true else MS:RefreshCompact() end
+end)
 MS:WatchRunState(function(state)
     if state == "active" then demo, previewStyle = nil, nil end      -- a real run takes the frame
     MS:RefreshCompact()
