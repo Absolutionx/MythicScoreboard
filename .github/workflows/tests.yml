@@ -8,11 +8,11 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - name: Install Lua 5.1 and luacheck
+      - uses: actions/checkout@v5
+      - name: Install Lua 5.1, luacheck and fontTools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq lua5.1 luarocks
+          sudo apt-get install -y -qq lua5.1 luarocks python3-fonttools
           sudo luarocks --lua-version=5.1 install luacheck
       - name: Lint
         run: luacheck MythicScoreboard
@@ -22,7 +22,7 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Install Lua 5.1 and luacov
         run: |
           sudo apt-get update -qq
