@@ -24,7 +24,7 @@ timeline, and keeps permanent stats across all your characters.
 
 ## Running the tests
 
-Needs Lua 5.1 (`lua5.1`) and Python 3.
+Needs Lua 5.1 (`lua5.1`), and Python 3 with fontTools (`pip install fonttools`).
 
     tests/run.sh
 
