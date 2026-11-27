@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.18.0
+
+### WoW Forever
+- **Raids: a first look (work in progress).** A raid scoreboard ahead of the new raids. Until they open it shows sample raids, not yours, and says so with an amber "Work in progress" tag in its header. Click the tag for the CurseForge and GitHub links, ready to copy, to leave comments and suggestions.
+  - Open it with the **Raids** button under the scoreboard's close button, or `/sb raid 10`, `/sb raid 20` or `/sb raid 40`. Inside a raid, `/sb` opens the raid view; the **Dungeons** button goes back.
+  - **Overview** of the whole raid by role (tanks, healers, damage) with loot, deaths, damage taken, damage, healing, interrupts and dispels; tabs that rank everyone by one stat, shown as raid frames in groups of five.
+  - **A boss timeline:** each pull as a kill or a wipe, boss portraits at each kill with the kill time, and deaths marked with the player's class. Click a boss to see that fight on its own; **Whole raid** goes back.
+  - **Run history** dropdown to pick another raid.
+  - Hover anything for more: a player's damage and healing by spell, dispels by type and deaths; an item's tooltip and who looted it; a pull's time and deaths.
+  - `/sb raid dump` saves what the game knows about the new raids (bosses and their IDs), so the addon can learn them when the raids open.
+- **The boss's health in the in-run frame.** While you fight a dungeon boss, its health shows in place of "fighting", with a thin bar under its name.
+
+### Everyone
+- **Tooltips in the addon's windows match its look:** dark stone, bronze edges and the addon's fonts. Tooltips elsewhere in the game are unchanged.
+- **Delete a finished run right away.** The × now shows on the "Now" row in the history as soon as the run is complete, without leaving the dungeon first.
+- **Much less memory when opening a saved run.** A long run (Zul'Farrak, Sunken Temple) could take 10 to 20 MB to lay out its timeline; it now takes about a third of that.
+
 ## 2.17.8
 
 ### Everyone

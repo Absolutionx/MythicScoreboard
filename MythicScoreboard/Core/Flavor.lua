@@ -30,6 +30,7 @@ MS.Flavor = {
     blacklist     = false,
     silentBosses  = false,   -- some bosses send no ENCOUNTER_START (or nothing)
     journalIcons  = true,    -- the dungeon journal has the bosses' icons
+    bossHealth    = false,   -- the in-run frame shows the boss's health while you fight
     directions    = false,   -- the arrow and routes to dungeons (UI_Navigate.lua)
 }
 MS.FLAVOR = MS.Flavor.name

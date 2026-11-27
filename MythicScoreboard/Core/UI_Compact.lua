@@ -407,6 +407,125 @@ local function Trim(bosses)
     return out
 end
 
+-- ── The boss's health ──────────────────────────────────────────────────────
+-- During a fight, a thin bar under the boss's line and its health in place of
+-- "fighting", from the game's boss frames. The bar is a status bar, which can
+-- show the health even when the game hides the numbers from addons; the
+-- percent is shown the same way. Updated five times a second, on its own.
+local IsSecret = MS.IsSecret or function() return false end
+local function G(n) return rawget(_G, n) end
+-- The boss's unit: a boss frame, else (many dungeon bosses have none) your
+-- target, focus or mouseover, or a nameplate. Which of those is the boss:
+-- by which creature it is, or its name, when the game shows them; in
+-- instances it hides both, so then by what it does show: the boss is the
+-- elite in the fight with the highest level (bosses are a level or two above
+-- the rest, or a skull).
+local function NpcOf(u)
+    local ok, guid = pcall(UnitGUID, u)
+    if not ok or IsSecret(guid) or type(guid) ~= "string" then return nil end
+    local kind, id = guid:match("^(%a+)%-[^%-]*%-[^%-]*%-[^%-]*%-[^%-]*%-(%d+)")
+    if kind ~= "Creature" and kind ~= "Vehicle" then return nil end
+    return tonumber(id)
+end
+-- true / false when the unit can be told apart, nil when the game hides it.
+local function IsBoss(u, name, npc)
+    local id = npc and NpcOf(u)
+    if id then return id == npc end
+    local ok, n = pcall(UnitName, u)
+    if ok and not IsSecret(n) and type(n) == "string" then return n == name end
+    return nil
+end
+local ELITE = { elite = true, worldboss = true, rareelite = true }
+local function Read(fn, ...)
+    if not fn then return nil end
+    local ok, v = pcall(fn, ...)
+    if not ok or IsSecret(v) then return nil end
+    return v
+end
+-- An enemy elite in the fight: its level (-1, a skull, counts highest).
+local function EliteLevel(u)
+    if not UnitExists(u) or Read(UnitIsDead, u) then return nil end
+    if not Read(G("UnitCanAttack"), "player", u) then return nil end
+    if not ELITE[Read(G("UnitClassification"), u) or ""] then return nil end
+    if Read(G("UnitAffectingCombat"), u) == false then return nil end
+    local l = Read(G("UnitEffectiveLevel"), u) or Read(G("UnitLevel"), u)
+    if type(l) ~= "number" then return nil end
+    return l == -1 and 1000 or l
+end
+local UNITS = { "target", "focus", "mouseover" }
+local function Candidates()
+    local list = {}
+    for _, u in ipairs(UNITS) do list[#list + 1] = u end
+    local NP = G("C_NamePlate")
+    local ok, plates = pcall(NP and NP.GetNamePlates or error)
+    if ok and type(plates) == "table" then
+        for _, plate in ipairs(plates) do
+            local u = plate.namePlateUnitToken or (plate.UnitFrame and plate.UnitFrame.unit)
+            if u then list[#list + 1] = u end
+        end
+    end
+    return list
+end
+local function BossUnit(name)
+    for i = 1, 5 do
+        local u = "boss" .. i
+        if UnitExists(u) then return u end
+    end
+    if not name then return nil end
+    local npc = MS.BossNpcID and MS:BossNpcID(name)
+    local best, bestL, hidden = nil, -1, false
+    for _, u in ipairs(Candidates()) do
+        if UnitExists(u) then
+            local is = IsBoss(u, name, npc)
+            if is == true then return u end
+            if is == nil then
+                hidden = true
+                local l = EliteLevel(u)
+                if l and l > bestL then best, bestL = u, l end     -- (the target first, on a tie)
+            end
+        end
+    end
+    return hidden and best or nil
+end
+UI._BossUnit = BossUnit                      -- for tests
+
+-- Fills the bar and the percent; false when there's no health to show.
+local function ShowBossHealth(bar, pct)
+    local u = BossUnit(bar.bossName)
+    if not u then return false end
+    local okC, hp = pcall(G("UnitHealth"), u)
+    local okM, most = pcall(G("UnitHealthMax"), u)
+    if not (okC and okM) then return false end
+    if not (pcall(bar.SetMinMaxValues, bar, 0, most) and pcall(bar.SetValue, bar, hp)) then return false end
+    if not IsSecret(hp) and not IsSecret(most) and type(hp) == "number" and type(most) == "number" then
+        if most <= 0 then return false end
+        pct:SetText(_fmt("%d%%", _floor(hp / most * 100 + 0.5)))
+        return true
+    end
+    local okP, v = pcall(G("UnitHealthPercent") or error, u, true, G("CurveConstants") and G("CurveConstants").ScaleTo100)
+    if not okP or v == nil then return false end
+    local SU = G("C_StringUtil")
+    local okR, txt = pcall(SU and SU.RoundToNearestString or error, v)
+    if okR and txt ~= nil and pcall(pct.SetFormattedText, pct, "%s%%", txt) then return true end
+    return (pcall(pct.SetFormattedText, pct, "%.0f%%", v))
+end
+UI._ShowBossHealth = ShowBossHealth        -- for tests
+-- What the boss's health is read from, for a check in game (/sb raid hp):
+-- what the game says about your target, and the boss it's matched against.
+function UI.BossHealthCheck()
+    local run = MS.currentRun
+    local b = run and run.activeBoss
+    local name = b and b.name
+    local npc = name and MS.BossNpcID and MS:BossNpcID(name)
+    local okN, n = pcall(UnitName, "target")
+    local okG, guid = pcall(UnitGUID, "target")
+    local function Say(v, ok) return not ok and "error" or IsSecret(v) and "hidden" or tostring(v) end
+    MS.Say(_fmt("Boss health check: fighting %s (npc %s). Target name: %s, creature: %s, level: %s, kind: %s. Boss frame: %s. Found: %s.",
+        tostring(name), tostring(npc), Say(n, okN), IsSecret(guid) and "hidden" or tostring(okG and NpcOf("target")),
+        tostring(Read(G("UnitEffectiveLevel"), "target")), tostring(Read(G("UnitClassification"), "target")),
+        UnitExists("boss1") and "yes" or "no", tostring(BossUnit(name))))
+end
+
 -- Every boss, with when it died, your best, and the difference (detailed).
 local COLS = { kill = 92, best = 50, diff = 0 }    -- right edges, in from the right margin
 local function BossRows(run, bosses, y, withBest)
@@ -433,6 +552,40 @@ local function BossRows(run, bosses, y, withBest)
         local kill = FS("bk" .. i, "medium", 13, P.ivory, "RIGHT")
         PlaceRight(kill, W - PAD - (withBest and COLS.kill or 0), y)
         kill:SetText(killText)
+        if b.fighting and not b.kill and MS.Flavor.bossHealth then
+            local hp = Got("bhp") or Piece("bhp", function()
+                local bar = CreateFrame("StatusBar", nil, f)
+                bar:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
+                bar:SetStatusBarColor(P.blood[1], P.blood[2], P.blood[3], 0.9)
+                bar.track = bar:CreateTexture(nil, "BACKGROUND")
+                bar.track:SetAllPoints(); bar.track:SetColorTexture(0, 0, 0, 0.45)
+                bar.pct = Text(f, "game", GameSize(13), P.bronzeHi, "RIGHT")
+                bar.pct:SetShadowOffset(1, -1); bar.pct:SetShadowColor(0, 0, 0, 0.9)
+                bar:SetScript("OnUpdate", function(self, dt)
+                    self.acc = (self.acc or 0) + dt
+                    if self.acc < 0.2 then return end
+                    self.acc = 0
+                    local ok = ShowBossHealth(self, self.pct)
+                    self.pct:SetShown(ok); self:SetAlpha(ok and 1 or 0)
+                    if self.kill then self.kill:SetAlpha(ok and 0 or 1) end
+                end)
+                bar:SetScript("OnHide", function(self)
+                    self.pct:Hide()
+                    if self.kill then self.kill:SetAlpha(1) end
+                end)
+                return bar
+            end)
+            hp:ClearAllPoints()
+            hp:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 16, y - 15)
+            hp:SetPoint("TOPRIGHT", f, "TOPLEFT", W - PAD - (withBest and COLS.kill or 0), y - 15)
+            hp:SetHeight(2)
+            hp.kill, hp.bossName = kill, b.name
+            PlaceRight(hp.pct, W - PAD - (withBest and COLS.kill or 0), y)
+            local ok = ShowBossHealth(hp, hp.pct)
+            hp.pct:SetShown(ok); hp:SetAlpha(ok and 1 or 0); kill:SetAlpha(ok and 0 or 1)
+        else
+            kill:SetAlpha(1)
+        end
         local right = withBest and 130 or _max(50, TextWidth(kill) + 8)
         local name = FS("bn" .. i, "medium", 13, (b.done and not b.folded) and P.ivory or P.ash, "LEFT")
         Place(name, PAD + 16, y); OneLine(name, W - 2 * PAD - 16 - right, 13)

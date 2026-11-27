@@ -116,3 +116,110 @@ function UI.AddProgressLines(prog, fromArchive)
             a, b, c, P.verdHi[1], P.verdHi[2], P.verdHi[3])
     end
 end
+
+-- ===========================================================================
+-- The addon's look on the game tooltip
+-- ===========================================================================
+-- While one of the addon's frames owns the game tooltip, it wears the
+-- scoreboard's stone and bronze and its fonts. For anything else it's left
+-- exactly as the game draws it: the look comes off as soon as another owner
+-- takes the tooltip, or it hides.
+
+-- The addon's frames all carry its name ("MythicScoreboardFrame",
+-- "MythicScoreboardCompact", ...); anything inside one is ours.
+local function Ours(f)
+    for _ = 1, 25 do
+        if not f then return false end
+        local n = f.GetName and f:GetName()
+        if type(n) == "string" and n:find("^MythicScoreboard") then return true end
+        f = f.GetParent and f:GetParent()
+    end
+    return false
+end
+
+local skin, worn, fonts = nil, false, {}
+
+local function BuildSkin(tip)
+    local list = {}
+    local function Add(t) list[#list + 1] = t; t:Hide(); return t end
+    local c = P.bronzeDk
+    Add(UI.Solid(tip, "BACKGROUND", -7, 0, 0, 0, 1)):SetAllPoints()
+    local inner = Add(UI.Solid(tip, "BACKGROUND", -6, c[1], c[2], c[3], 1))
+    inner:SetPoint("TOPLEFT", 1, -1); inner:SetPoint("BOTTOMRIGHT", -1, 1)
+    local body = Add(tip:CreateTexture(nil, "BACKGROUND", nil, -5))
+    body:SetPoint("TOPLEFT", 2, -2); body:SetPoint("BOTTOMRIGHT", -2, 2)
+    UI.VGrad(body, P.stoneBot, P.stoneTop)
+    local grain = Add(UI.Art(tip, "Grain", "BACKGROUND", -4, true))
+    grain:SetPoint("TOPLEFT", 2, -2); grain:SetPoint("BOTTOMRIGHT", -2, 2)
+    grain:SetBlendMode("ADD"); grain:SetAlpha(0.5)
+    local tl = Add(tip:CreateTexture(nil, "BACKGROUND", nil, -3))
+    tl:SetPoint("TOPLEFT", 2, -2); tl:SetPoint("BOTTOMRIGHT", tip, "TOP", 0, -3)
+    UI.HGrad(tl, P.bronze, P.bronzeHi, 0, 0.9)
+    local tr = Add(tip:CreateTexture(nil, "BACKGROUND", nil, -3))
+    tr:SetPoint("TOPRIGHT", -2, -2); tr:SetPoint("BOTTOMLEFT", tip, "TOP", 0, -3)
+    UI.HGrad(tr, P.bronzeHi, P.bronze, 0.9, 0)
+    return list
+end
+
+local function Frame9(tip) return tip.NineSlice end
+
+local function Wear(tip)
+    skin = skin or BuildSkin(tip)
+    for _, t in ipairs(skin) do t:Show() end
+    local ns = Frame9(tip)
+    if ns then ns:SetAlpha(0) end
+    worn = true
+end
+
+local function RestoreFonts()
+    for fs, f in pairs(fonts) do
+        fs:SetFont(f[1], f[2], f[3])
+        fs._msKind = nil
+    end
+    fonts = {}
+end
+
+local function TakeOff(tip)
+    if not worn then return end
+    for _, t in ipairs(skin or {}) do t:Hide() end
+    local ns = Frame9(tip)
+    if ns then ns:SetAlpha(1) end
+    RestoreFonts()
+    worn = false
+end
+
+-- The addon's fonts on each line: the first in semibold, the rest medium.
+local function FontLines(tip)
+    local name = tip:GetName()
+    if not name then return end
+    for i = 1, tip:NumLines() do
+        for _, side in ipairs({ "Left", "Right" }) do
+            local fs = _G[name .. "Text" .. side .. i]
+            if fs then
+                if not fonts[fs] then
+                    local path, size, flags = fs:GetFont()
+                    if path then fonts[fs] = { path, size, flags } end
+                end
+                UI.SetFont(fs, i == 1 and "semibold" or "medium", i == 1 and 15 or 13)
+            end
+        end
+    end
+end
+
+local relayout = false
+local function Hook(tip)
+    if not (tip and hooksecurefunc) then return end
+    hooksecurefunc(tip, "SetOwner", function(self, owner)
+        if Ours(owner) then Wear(self) else TakeOff(self) end
+    end)
+    hooksecurefunc(tip, "Show", function(self)
+        if not worn or relayout then return end
+        FontLines(self)
+        relayout = true
+        self:Show()                      -- once more, so it sizes to the new fonts
+        relayout = false
+    end)
+    tip:HookScript("OnHide", function(self) TakeOff(self) end)
+end
+Hook(GameTooltip)
+UI._TooltipSkin = { Ours = Ours, IsWorn = function() return worn end }   -- for tests

@@ -445,6 +445,28 @@ function MS:AbandonRun()
     return true
 end
 
+-- Deleting the live run once it's finished (from the history list): gone
+-- from history and stats, as a saved run's delete. Inside, a new one isn't
+-- started until you leave (or click "Start new run").
+function MS:DeleteCurrentRun()
+    local run = self.currentRun
+    if not run or not run.completed then return false end
+    local runs = MythicScoreboardDB and MythicScoreboardDB.runs
+    for i, r in ipairs(runs or {}) do
+        if r == run then
+            if self.RemoveArchivedFor then self:RemoveArchivedFor(run) end
+            table.remove(runs, i)
+            break
+        end
+    end
+    if self.inDungeon then self._abandonedIn = run.dungeonName end
+    if self.displayRun == run then self.displayRun = nil end
+    self:ForgetLastSaved(run)
+    self:DiscardCurrentRun()
+    self:Changed("run")
+    return true
+end
+
 -- After abandoning a run while still inside: whether a fresh one can be
 -- started here and now (rather than by leaving and coming back in).
 function MS:CanStartFresh()

@@ -62,6 +62,63 @@ M.Fire("ENCOUNTER_START", nil, "Warder Stilgiss"); M.RunTimers(1)
 MS:RefreshCompact(); M.RunTimers(1)
 check("fighting: the name alone", shown("^Warder Stilgiss$"))
 check("fighting: said on its own", shown("fighting"))
+-- With the boss's frame up: its health in place of "fighting", and a bar.
+local ue, uh, um = UnitExists, rawget(_G, "UnitHealth"), rawget(_G, "UnitHealthMax")
+UnitExists = function(u) return u == "boss1" or ue(u) end
+rawset(_G, "UnitHealth", function() return 600 end)
+rawset(_G, "UnitHealthMax", function() return 1000 end)
+MS:RefreshCompact(); M.RunTimers(1)
+check("fighting: the boss's health", shown("^60%%$"), shown("%%"))
+rawset(_G, "UnitHealth", function() return 250 end)
+local bar
+for _, fr in ipairs(M.allFrames) do if fr.pct and fr.SetStatusBarColor then bar = fr end end
+bar:Fire("OnUpdate", 0.25)
+check("fighting: health follows the fight", shown("^25%%$"), shown("%%"))
+-- No boss frame: the boss as your target, by name.
+local un = UnitName
+UnitExists = function(u) return u == "target" or ue(u) end
+UnitName = function(u) if u == "target" then return "Warder Stilgiss" end return un(u) end
+rawset(_G, "UnitHealth", function() return 410 end)
+bar:Fire("OnUpdate", 0.25)
+check("fighting: the boss as your target", shown("^41%%$"), shown("%%"))
+UnitName = function(u) if u == "target" then return "Some Trash Mob" end return un(u) end
+bar:Fire("OnUpdate", 0.25)
+check("fighting: not a target that isn't the boss", not shown("^41%%$"))
+-- The name hidden in a fight: the boss found by which creature it is.
+local ug = UnitGUID
+local secretName = { __secret = true }
+UnitName = function(u) if u == "target" then return secretName end return un(u) end
+UnitGUID = function(u) if u == "target" then return "Creature-0-1-2-3-9999-0001" end return ug(u) end
+local bossNpc = MS.BossNpcID
+MS.BossNpcID = function(_, name) if name == "Warder Stilgiss" then return 9999 end return bossNpc(MS, name) end
+rawset(_G, "UnitHealth", function() return 330 end)
+bar:Fire("OnUpdate", 0.25)
+check("fighting: a hidden name, found by creature", shown("^33%%$"), shown("%%"))
+UnitGUID = function(u) if u == "target" then return "Creature-0-1-2-3-1234-0001" end return ug(u) end
+bar:Fire("OnUpdate", 0.25)
+check("fighting: another creature isn't the boss", not shown("^33%%$"))
+-- In instances the game hides who a unit is (name and creature): then the
+-- boss is the elite in the fight with the highest level.
+UnitGUID = function(u) if u == "target" or u == "nameplate3" then return secretName end return ug(u) end
+UnitName = function(u) if u == "target" or u == "nameplate3" then return secretName end return un(u) end
+local lv = { target = 15, nameplate3 = 16 }
+local keepG = {}
+for _, k in ipairs({ "UnitCanAttack", "UnitClassification", "UnitAffectingCombat", "UnitEffectiveLevel", "C_NamePlate" }) do keepG[k] = rawget(_G, k) end
+rawset(_G, "UnitCanAttack", function() return true end)
+rawset(_G, "UnitClassification", function() return "elite" end)
+rawset(_G, "UnitAffectingCombat", function() return true end)
+rawset(_G, "UnitEffectiveLevel", function(u) return lv[u] end)
+rawset(_G, "C_NamePlate", { GetNamePlates = function() return { { namePlateUnitToken = "nameplate3" } } end })
+UnitExists = function(u) return u == "target" or u == "nameplate3" or ue(u) end
+check("hidden: the highest elite is the boss (a trash mob targeted)", MS.UI._BossUnit("Warder Stilgiss") == "nameplate3",
+    MS.UI._BossUnit("Warder Stilgiss"))
+lv.target = 16; lv.nameplate3 = 14
+check("hidden: the boss targeted", MS.UI._BossUnit("Warder Stilgiss") == "target")
+lv.nameplate3 = -1
+check("hidden: a skull outranks", MS.UI._BossUnit("Warder Stilgiss") == "nameplate3")
+for k, v in pairs(keepG) do rawset(_G, k, v) end
+MS.BossNpcID, UnitGUID = bossNpc, ug
+UnitExists = ue; UnitName = un; rawset(_G, "UnitHealth", uh); rawset(_G, "UnitHealthMax", um)
 M.Fire("ENCOUNTER_END", nil, "Warder Stilgiss", 1, 5, 1); M.RunTimers(2)
 MS:RefreshCompact(); M.RunTimers(1)
 check("fighting gone after the kill", not shown("fighting"))

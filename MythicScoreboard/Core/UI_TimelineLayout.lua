@@ -72,25 +72,38 @@ local HIDE_RULE = true
 -- different elbow heights so two of them can pass without touching.
 local TOP = TRACK_Y + TRACK_H
 local ELBOWS = { TOP + 4, TOP + 8, TOP + 12 }
--- lo/hi: the x range the stem covers, padded past every margin Crosses
--- uses, so two stems whose ranges don't meet can't cross.
-local function Segments(mx, cx, row, elbow)
-    local bottom = MED_ROWS[row] - MED_R
-    local lo, hi = _min(mx, cx) - 5, _max(mx, cx) + 5
-    if math.abs(cx - mx) < 1 then return { v = { { mx, TOP, bottom } }, h = {}, lo = lo, hi = hi } end
-    return { v = { { mx, TOP, elbow }, { cx, elbow, bottom } }, h = { { elbow, _min(mx, cx), _max(mx, cx) } },
-             lo = lo, hi = hi }
-end
-local function Crosses(a, b)
-    for _, h in ipairs(a.h) do
-        for _, v in ipairs(b.v) do
-            if v[1] > h[2] - 3 and v[1] < h[3] + 3 and h[1] > v[2] - 2 and h[1] < v[3] + 2 then return true end
-        end
-        for _, h2 in ipairs(b.h) do
-            if math.abs(h[1] - h2[1]) < 3 and _min(h[3], h2[3]) - _max(h[2], h2[2]) > -4 then return true end
-        end
+-- lo/hi (Geo, below): the x range the stem covers, padded past every margin
+-- BendHits uses, so two stems whose ranges don't meet can't cross.
+
+-- A spot's keys, made once (not a new string for every spot of every boss:
+-- a long run made megabytes of them).
+local KEYS, KEYSHIFT = {}, {}
+for row = 1, 2 do
+    for mi, mode in ipairs(MODES) do
+        local key = row .. tostring(mode.left) .. tostring(mode.compact) .. tostring(mode.bare)
+        KEYS[row * 10 + mi] = key
+        for si, shift in ipairs(SHIFTS) do KEYSHIFT[(row * 10 + mi) * 10 + si] = key .. shift end
     end
-    return false
+end
+
+-- A spot's stem, in plain numbers, worked out the first time it's needed
+-- (as Segments draws it; no tables: a crowded long run checks thousands).
+local function Geo(c)
+    if c.lo then return end
+    c.bottom = MED_ROWS[c.row] - MED_R
+    c.lo, c.hi = _min(c.mx, c.cx) - 5, _max(c.mx, c.cx) + 5
+    c.bent = math.abs(c.cx - c.mx) >= 1
+end
+local function VHit(h, x1, x2, vx, vy1, vy2)
+    return vx > x1 - 3 and vx < x2 + 3 and h > vy1 - 2 and h < vy2 + 2
+end
+-- Whether a's bend runs into b's stem (Crosses, for the plain numbers).
+local function BendHits(a, b)
+    if not a.bent then return false end
+    local h, x1, x2 = a.elbow, _min(a.mx, a.cx), _max(a.mx, a.cx)
+    if not b.bent then return VHit(h, x1, x2, b.mx, TOP, b.bottom) end
+    if VHit(h, x1, x2, b.mx, TOP, b.elbow) or VHit(h, x1, x2, b.cx, b.elbow, b.bottom) then return true end
+    return math.abs(h - b.elbow) < 3 and _min(x2, _max(b.mx, b.cx)) - _max(x1, _min(b.mx, b.cx)) > -4
 end
 
 -- Every spot a boss could take (row, side, label size, shift, elbow),
@@ -99,7 +112,7 @@ local function Shapes(info)
     local out = {}
     local mx = info.mx
     for pass = 1, 2 do
-        for _, shift in ipairs(SHIFTS) do
+        for si, shift in ipairs(SHIFTS) do
             for row = 1, 2 do
                 for mi = (pass == 1 and 1 or 3), (pass == 1 and 2 or 5) do
                     local mode = MODES[mi]
@@ -114,12 +127,12 @@ local function Shapes(info)
                             if not mode.bare then
                                 if mode.left then l1, l2 = x1, cx - MED_R - 2 else l1, l2 = cx + MED_R + 2, x2 end
                             end
-                            local key = row .. tostring(mode.left) .. tostring(mode.compact) .. tostring(mode.bare)
+                            local k = row * 10 + mi
                             out[#out + 1] = {
                                 full = (pass == 1), shift = shift, ei = ei,
-                                key = key, keyShift = key .. shift,
+                                key = KEYS[k], keyShift = KEYSHIFT[k * 10 + si],
                                 row = row, mode = mode, x1 = x1, x2 = x2, l1 = l1, l2 = l2, cx = cx, mx = mx,
-                                elbow = elbow, segs = Segments(mx, cx, row, elbow), far = _max(x2, cx, mx),
+                                elbow = elbow, far = _max(x2, cx, mx),
                                 cost = (mode.bare and 300 or mode.compact and 150 or 0)
                                      + (shift ~= 0 and (20 + math.abs(shift) * 0.3) or 0)
                                      + (row - 1) * 0.5 + (mode.left and 0.25 or 0) + ei * 0.01,
@@ -161,11 +174,11 @@ local function Fits(near, c)
             if HIDE_RULE and math.abs(o.cx - cx) < MED_R + 4 then return false, false end
         end
     end
-    local cs = c.segs
+    Geo(c)
     for _, o in ipairs(near) do
-        local os_ = o.segs
-        if cs.hi >= os_.lo and os_.hi >= cs.lo
-                and (Crosses(cs, os_) or Crosses(os_, cs)) then return false, true end
+        Geo(o)
+        if c.hi >= o.lo and o.hi >= c.lo
+                and (BendHits(c, o) or BendHits(o, c)) then return false, true end
     end
     return true
 end
@@ -173,15 +186,22 @@ end
 -- Nowhere clean at all (very crowded): every state's least-bad bare medallion.
 local function CrowdedFallback(states, info, bi)
     local nextStates = {}
+    -- The spots, the same for every state: made once.
+    local spots = {}
+    for k = -10, 10 do
+        for row = 1, 2 do
+            -- Inside the window, as every other spot is (a crowded long
+            -- run pushed medallions past its edges).
+            local cx = _min(_max(info.mx + k * CIRCLE, 4 + MED_R), FRAME_W - 6 - MED_R)
+            spots[#spots + 1] = { row = row, mode = MODES[5], x1 = cx - MED_R, x2 = cx + MED_R, cx = cx, mx = info.mx,
+                                  elbow = ELBOWS[2],
+                                  far = _max(cx + MED_R, info.mx), cost = 300 + math.abs(k) * 20 }
+        end
+    end
     for _, st in ipairs(states) do
-        for k = -10, 10 do
-            for row = 1, 2 do
-                -- Inside the window, as every other spot is (a crowded long
-                -- run pushed medallions past its edges).
-                local cx = _min(_max(info.mx + k * CIRCLE, 4 + MED_R), FRAME_W - 6 - MED_R)
-                local c = { row = row, mode = MODES[5], x1 = cx - MED_R, x2 = cx + MED_R, cx = cx, mx = info.mx,
-                            elbow = ELBOWS[2], segs = Segments(info.mx, cx, row, ELBOWS[2]),
-                            far = _max(cx + MED_R, info.mx), cost = 300 + math.abs(k) * 20 }
+        for _, c in ipairs(spots) do
+            do
+                local row, cx = c.row, c.cx
                 local clashes = 0
                 for _, o in ipairs(st.near) do
                     if o.row == row and _min(c.x2, o.x2 + 6) - _max(c.x1, o.x1 - 6) > 0 then

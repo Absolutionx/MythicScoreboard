@@ -191,6 +191,19 @@ do
     check("no button on a cleared run", not ab:IsShown())
     check("cleared run can't be abandoned", MS:AbandonRun() == false)
     MS.currentRun.completed = false
+    check("a run in progress can't be deleted", MS:DeleteCurrentRun() == false and MS.currentRun ~= nil)
+    -- A cleared live run can be deleted (from the history list): gone, and
+    -- no new one until you leave.
+    MS.currentRun.completed = true
+    local gone = MS.currentRun
+    check("cleared live run deleted", MS:DeleteCurrentRun() == true and MS.currentRun == nil)
+    local still = false
+    for _, r in ipairs(MythicScoreboardDB.runs or {}) do if r == gone then still = true end end
+    check("not in history", not still)
+    check("nothing saved to come back", MythicScoreboardDB.activeRun == nil)
+    zone(RFC)
+    check("no new run while still inside after deleting", MS:RunState() == "none", MS:RunState())
+    zone(WORLD); zone(RFC)
 
     -- Paused: abandoned, timed to the pause.
     wait(100); zone(WORLD)

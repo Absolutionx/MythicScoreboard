@@ -421,10 +421,14 @@ local function HeaderAffixes(run, isMPlus)
     UI.frame.LayoutAffixIcons(count)
 end
 
--- Abandon / Start new run / Whole run, on the right. Returns the boss in focus.
+-- Abandon / Start new run / Whole run, on the right (left of the Raids
+-- button, where there is one). Returns the boss in focus.
 local function HeaderButtons(run)
+    local rightX = UI.frame.raidButton and -(16 + UI.frame.raidButton:GetWidth() + 12) or -14
     -- The run in progress can be abandoned by hand.
     local ab = AbandonButton()
+    ab:ClearAllPoints(); ab:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", rightX, -54)
+    StartFreshButton():ClearAllPoints(); StartFreshButton():SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", rightX, -54)
     local canAbandon = run == MS.currentRun and not run.completed
     if not canAbandon and ab:IsShown() then ab.Disarm() end
     ab:SetShown(canAbandon)
@@ -436,7 +440,7 @@ local function HeaderButtons(run)
     wr:ClearAllPoints()
     if canAbandon then wr:SetPoint("RIGHT", ab, "LEFT", -12, 0)
     elseif fresh then wr:SetPoint("RIGHT", StartFreshButton(), "LEFT", -12, 0)
-    else wr:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", -14, -54) end
+    else wr:SetPoint("TOPRIGHT", UI.frame, "TOPRIGHT", rightX, -54) end
     return boss
 end
 

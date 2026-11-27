@@ -16,14 +16,14 @@ local function noop() end
 -- game call. A new game method used by the addon is added to this list.
 local NOOP_METHODS = {
     AddDoubleLine=1, AddLine=1, AddMaskTexture=1, EnableMouse=1, EnableMouseWheel=1, Play=1,
-    SetAutoFocus=1, SetMaxLetters=1, SetTextInsets=1, HighlightText=1, ClearFocus=1, SetFocus=1, HasFocus=1,
+    SetAutoFocus=1, SetMaxLetters=1, SetCursorPosition=1, SetHighlightColor=1, SetTextInsets=1, HighlightText=1, ClearFocus=1, SetFocus=1, HasFocus=1,
     Raise=1, RegisterForClicks=1, RegisterForDrag=1, SetAllPoints=1, SetAlpha=1, SetBackdrop=1,
     SetBlendMode=1, SetClampedToScreen=1, SetColorTexture=1, SetDesaturated=1, SetDuration=1,
     SetFormattedText=1, SetFrameLevel=1, SetFromAlpha=1, SetGradient=1,
     SetHighlightTexture=1, SetHyperlink=1, SetJustifyH=1, SetJustifyV=1, SetLooping=1, SetMaxLines=1,
     SetMovable=1, SetObeyStepOnDrag=1, SetOrientation=1, SetRotation=1, SetScrollChild=1,
     SetShadowColor=1, SetShadowOffset=1, SetSmoothing=1, SetSnapToPixelGrid=1, SetTexCoord=1,
-    SetTexelSnappingBias=1, SetTextColor=1, SetThumbTexture=1, SetToAlpha=1, SetToplevel=1,
+    SetTexelSnappingBias=1, SetStatusBarTexture=1, SetStatusBarColor=1, SetTextColor=1, SetThumbTexture=1, SetToAlpha=1, SetToplevel=1,
     SetValueStep=1, SetVertexColor=1, SetVerticalScroll=1, SetWordWrap=1, StartMoving=1,
     StopMovingOrSizing=1,
 }
@@ -42,7 +42,7 @@ local function New(kind, parent, name)
                              _w = 100, _h = 20, _text = "", _children = {}, _points = 0 }, WidgetMT)
     if parent and type(parent) == "table" and parent._children then table.insert(parent._children, w) end
     allFrames[#allFrames + 1] = w
-    if name then _G[name] = w end
+    if name then _G[name] = w; w._name = name end
     return w
 end
 M.New = New
@@ -105,7 +105,7 @@ function Widget:SetScale(s) self._scale = s end
 function Widget:SetFrameStrata(st) self._strata = st end
 function Widget:GetFrameStrata() return self._strata or "MEDIUM" end
 function Widget:GetObjectType() return self._kind end
-function Widget:GetName() return nil end
+function Widget:GetName() return self._name end
 function Widget:GetNumPoints() return self._points end
 function Widget:SetPoint(a, rel, b, x, y) self._points = self._points + 1; self._at = { a, rel, b, x, y } end
 function Widget:ClearAllPoints() self._points = 0 end

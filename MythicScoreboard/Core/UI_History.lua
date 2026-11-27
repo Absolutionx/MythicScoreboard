@@ -96,6 +96,12 @@ local function WireRowClicks(delBtn, delIcon, hov, row)
         GameTooltip:Hide()
         local runs = MythicScoreboardDB and MythicScoreboardDB.runs
         local run = row.run
+        if row.live then
+            MS:DeleteCurrentRun()
+            if MS.currentRun or (runs and #runs > 0) then Fill() else CloseHistDropdown() end
+            MS:RefreshOverview()
+            return
+        end
         if runs then
             for i, r in ipairs(runs) do
                 if r == run then
@@ -233,8 +239,9 @@ local function MakeScopeRow()
 end
 
 -- The live run (if any) sits on top as "Now", so you can get back to it
--- after looking at a saved run. It can't be deleted from here, and nor can
--- another character's run (only that character can).
+-- after looking at a saved run. It can be deleted from here once it's
+-- finished (one in progress is abandoned instead); another character's run
+-- can't be (only that character can).
 function Fill()
     local others = #MS:OtherHistoryChars() > 0
     local showChars = others and MS:GetHistoryScope() == "all"
@@ -334,7 +341,8 @@ function Fill()
         else
             row.fName:SetPoint("RIGHT", row.fTime, "LEFT", -8, 0)
         end
-        row.delBtn:SetShown(row.own and not entry.live)
+        -- (The live run too, once it's finished; one in progress is abandoned instead.)
+        row.delBtn:SetShown(row.own and (not entry.live or run.completed == true))
         yOff = yOff - DROP_ROW_H
     end
     for n = visRows + 1, #dropRows do dropRows[n]:Hide() end

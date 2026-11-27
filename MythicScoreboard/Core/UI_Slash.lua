@@ -68,12 +68,15 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
     local langArg = _smatch(cmd, "^lang%s*(.*)$")
     local demoArg = _smatch(cmd, "^demo%s*(.*)$")
     local compactArg = _smatch(cmd, "^compact%s*(.*)$")
+    local raidArg = _smatch(cmd, "^raid%s*(.*)$")
     if langArg then
         LangCommand(langArg)
     elseif demoArg then
         DemoCommand(demoArg)
     elseif compactArg then
         MS:CompactCommand(compactArg)
+    elseif raidArg and MS.RaidCommand then
+        MS:RaidCommand(raidArg)
     elseif _smatch(cmd, "^removeloot") then
         -- /sb removeloot [item]: Shift-click the item into the line.
         local link = _smatch(msg or "", "|H(item:[%-%d:]+)") or _smatch(msg or "", "(item:%d+)")
@@ -87,7 +90,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
             MS.Say(L["That item isn't on any of your runs from the last day."])
         end
     elseif cmd == "" then
-        MS:ShowScoreboard()
+        if MS.OpenBoard then MS:OpenBoard() else MS:ShowScoreboard() end
     elseif cmd == "stats" then
         MS:ShowScoreboard()
         UI.OpenStats()
@@ -100,6 +103,7 @@ SlashCmdList["MYTHICSCOREBOARD"] = function(msg)
             .. "  " .. L["Commands:"] .. " /sb, /sb stats, /sb abandon, /sb clear, /sb autoreset, /sb lang,"
             .. " /sb demo, /sb compact, /sb removeloot, "
             .. (MS.SayInstanceLimit and "/sb limit, " or "")
+            .. (MS.RaidCommand and "/sb raid, " or "")
             .. (MS.ShowBlacklist and "/sb blacklist, " or "") .. "/sb help")
     elseif cmd == "autoreset" then
         local newVal = not MS:GetAutoResetMeter()

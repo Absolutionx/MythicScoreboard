@@ -18,6 +18,7 @@ F.progressStats = true
 F.blacklist     = true
 F.silentBosses  = true
 F.journalIcons  = false
+F.bossHealth    = true
 F.directions    = true
 MS.FLAVOR = F.name
 
