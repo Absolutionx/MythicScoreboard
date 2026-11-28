@@ -1,5 +1,22 @@
 # Changelog
 
+## 2.19.0
+
+### Everyone
+- **Settings in pages.** The settings window lists its pages down the left (Window, In-run frame, Run history, Combat logging; on WoW Forever also Directions and Blacklist) and shows one at a time, so each stays short.
+- **More choices for the in-run frame:** pick its style (Detailed, Compact or Minimal) in settings as well as by right-clicking it, set its size with Reset size, and lock it so it can't be moved or resized. A style picked in settings now shows in the preview too.
+- **Combat logging, for log sites** (off until you turn it on): a reminder when you go in with logging off, or logging that starts on the way in and stops on the way out. For raids, dungeons or both, and it can turn on Advanced Combat Logging, which log sites need.
+
+### WoW Forever
+- **Raid view: the stat tabs read like the game's damage meter.** One ranked list in two columns, each line with its class and role icons, the player, the amount and per second (damage with DPS, healing with HPS), and a thin bar in the class colour. Column headings say what's what: Player, Deaths and the stat.
+- **Raid view: hover the trash on the boss timeline** for how long it took and who died on it.
+- **Raid view: settings and the blacklist** from their buttons beside the close button.
+- **Raid view: Lock the window** holds the raid window too, and the run history list closes when you click elsewhere or pick another tab.
+- **The Raids button steps aside** while your stats are open, instead of sitting on their tabs.
+- **The in-run frame's preview shows the boss's health** during each sample fight.
+- **Directions:** choose whether they may use your hearthstone and teleports, show the arrow above your character or only the steps, and show the dungeon entrances and the route on the world map.
+- **Blacklist warnings:** choose chat, on screen and a sound separately, and whether their groups get a red border in Looking For Group.
+
 ## 2.18.0
 
 ### WoW Forever
