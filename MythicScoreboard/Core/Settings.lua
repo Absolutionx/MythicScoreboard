@@ -25,7 +25,20 @@ local DEFAULTS = {
     windowLocked            = false,       -- the scoreboard can't be dragged or resized
     windowScale             = 1,           -- the scoreboard's size (0.6 to 1.4)
     compactScale            = 1,           -- the in-run frame's size (0.6 to 1.6)
+    compactLocked           = false,       -- the in-run frame can't be dragged or resized
+    mapEntrances            = true,        -- WoW Forever: dungeon entrances on the world map
+    mapRoute                = true,        -- WoW Forever: the route drawn on the world map
+    routeJumps              = true,        -- WoW Forever: directions may use your hearthstone and teleports
+    navArrow                = true,        -- WoW Forever: the arrow above your character (the steps show either way)
+    blacklistChat           = true,        -- WoW Forever: blacklist warnings in chat
+    blacklistScreen         = true,        -- WoW Forever: ... on screen
+    blacklistSound          = true,        -- WoW Forever: ... with a sound
+    blacklistBorder         = true,        -- WoW Forever: a red border round their listings in Looking For Group
     blacklistWarn           = true,        -- WoW Forever: a warning when someone on your blacklist is in your group
+    -- Combat logging (UI_CombatLog.lua): off | remind | auto. Off until turned on.
+    combatLog               = "off",
+    combatLogWhere          = "raids",     -- raids | dungeons | all (raids and dungeons)
+    combatLogACL            = true,        -- turn on Advanced Combat Logging when logging starts
     compactStyle            = "detailed",  -- the in-run frame: compact | detailed | minimal | off (not saved until picked)
     -- compactPos: no default (the frame starts near the top right)
     -- windowPos:  no default (the scoreboard window starts in the middle)
@@ -115,6 +128,32 @@ MS.GetMinimapButton,        MS.SetMinimapButton        = Bool("minimapButton")
 MS.GetAutoTakeFlights,      MS.SetAutoTakeFlights      = Bool("autoTakeFlights")
 MS.GetStartOnPull,          MS.SetStartOnPull          = Bool("startOnPull")
 MS.GetBlacklistWarn,        MS.SetBlacklistWarn        = Bool("blacklistWarn")
+MS.GetMapEntrances,         MS.SetMapEntrances         = Bool("mapEntrances")
+MS.GetMapRoute,             MS.SetMapRoute             = Bool("mapRoute")
+MS.GetRouteJumps,           MS.SetRouteJumps           = Bool("routeJumps")
+MS.GetNavArrow,             MS.SetNavArrow             = Bool("navArrow")
+MS.GetBlacklistChat,        MS.SetBlacklistChat        = Bool("blacklistChat")
+MS.GetBlacklistScreen,      MS.SetBlacklistScreen      = Bool("blacklistScreen")
+MS.GetBlacklistSound,       MS.SetBlacklistSound       = Bool("blacklistSound")
+MS.GetBlacklistBorder,      MS.SetBlacklistBorder      = Bool("blacklistBorder")
+function MS:GetCompactLocked() return self:GetSetting("compactLocked") == true end
+function MS:SetCompactLocked(v) self:SetSetting("compactLocked", v and true or false) end
+MS.GetCombatLogACL,         MS.SetCombatLogACL         = Bool("combatLogACL")
+
+-- Combat logging: off, remind or auto; in raids, dungeons, or both.
+local COMBAT_LOG = { off = true, remind = true, auto = true }
+function MS:GetCombatLog()
+    local v = self:GetSetting("combatLog")
+    return COMBAT_LOG[v] and v or DEFAULTS.combatLog
+end
+function MS:SetCombatLog(v) if COMBAT_LOG[v] then self:SetSetting("combatLog", v) end end
+local LOG_WHERE = { raids = true, dungeons = true, all = true }
+function MS:GetCombatLogWhere()
+    local v = self:GetSetting("combatLogWhere")
+    return LOG_WHERE[v] and v or "raids"
+end
+function MS:SetCombatLogWhere(v) self:SetSetting("combatLogWhere", LOG_WHERE[v] and v or "raids") end
+
 -- (Off unless turned on.)
 function MS:GetWindowLocked() return self:GetSetting("windowLocked") == true end
 function MS:SetWindowLocked(v) self:SetSetting("windowLocked", v and true or false) end

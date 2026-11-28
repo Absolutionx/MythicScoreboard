@@ -190,6 +190,14 @@ if MS.currentRun and MS.currentRun._suspended then MS:ClosePausedRun() end
 SlashCmdList.MYTHICSCOREBOARD("compact demo Blackrock Depths"); M.RunTimers(2)
 local d = MS._CompactDemo()
 check("demo in Blackrock Depths", d and d.dungeonName == "Blackrock Depths", d and d.dungeonName)
+-- The demo's boss fight shows made-up health, as a real one would.
+local fought
+for _ = 1, 600 do
+    M.now = M.now + 1; MS:RefreshCompact(); M.RunTimers(1)
+    if d.activeBoss and not d.activeBoss.killTime then fought = d.activeBoss; break end
+end
+check("demo fight: the boss's health", fought and fought.demoHealth and shown("^" .. fought.demoHealth .. "%%$"),
+    fought and fought.demoHealth)
 SlashCmdList.MYTHICSCOREBOARD("compact demo"); M.RunTimers(2)
 check("demo again: hidden", MS._CompactDemo() == nil)
 SlashCmdList.MYTHICSCOREBOARD("compact demo depths"); M.RunTimers(2)

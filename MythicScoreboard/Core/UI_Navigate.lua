@@ -184,8 +184,14 @@ local function Build()
     end
     local name = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     Size(name, 14)
-    name:SetPoint("TOP", arrow, "BOTTOM", 0, -2)
     frame.name = name
+    -- Under the arrow, or at the top without it.
+    function frame.PlaceName()
+        name:ClearAllPoints()
+        if MS:GetNavArrow() then name:SetPoint("TOP", arrow, "BOTTOM", 0, -2)
+        else name:SetPoint("TOP", frame, "TOP", 0, -2) end
+    end
+    frame.PlaceName()
     local step = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
     Size(step, 14)
     step:SetPoint("TOP", name, "BOTTOM", 0, -3)
@@ -367,9 +373,10 @@ local function SetText(fs, key, text)
 end
 
 -- The arrow pointing (its bearing kept, for the frames in between), or hidden.
+-- (Turned off in settings: no arrow, the steps where it was.)
 local function Point(turn, bearing)
     frame.bearing = bearing
-    frame.arrow:Show(); frame.arrow:SetRotation(turn)
+    frame.arrow:SetShown(MS:GetNavArrow()); frame.arrow:SetRotation(turn)
 end
 local function NoPoint()
     frame.bearing = nil
@@ -492,6 +499,18 @@ function MS:NavigateTo(t)
     MS:UpdateArrow()
     RouteChanged()
 end
+
+-- Settings: the arrow shown or not; the route worked out again with or
+-- without your hearthstone and teleports; the route on the map redrawn.
+MS:OnSettingChanged("navArrow", function()
+    if not frame then return end
+    frame.PlaceName()
+    if not MS:GetNavArrow() then frame.arrow:Hide() elseif frame.bearing then frame.arrow:Show() end
+end)
+MS:OnSettingChanged("routeJumps", function()
+    if target then plan, planAt, airFor = nil, nil, nil; MS:UpdateArrow(); RouteChanged() end
+end)
+MS:OnSettingChanged("mapRoute", function() RouteChanged() end)
 
 function MS:StopNavigation()
     target, plan, planAt, airFor = nil, nil, nil, nil

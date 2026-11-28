@@ -10,8 +10,8 @@ local _fmt, _floor, _max, _min, _ceil = string.format, math.floor, math.max, mat
 --   Header: the raid, its size, bosses down; time, wipes, deaths, raid DPS.
 --   Boss pulls: every pull along the run, a kill or a wipe.
 --   Tabs: Overview (everyone, every column; 20 and 40 grouped into tanks,
---   healers and damage; 40 scrolls), then one stat at a time over the raid
---   in groups of five, like raid frames, and the loot.
+--   healers and damage; 40 scrolls), then one stat at a time, ranked like
+--   the game's damage meter on its thin setting, and the loot.
 -- Each sample's window is built the first time it's shown and kept.
 
 local W, PAD = UI.FRAME_W, 22
@@ -305,7 +305,7 @@ local function BuildHeader(f, r, t)
         { L["Deaths"], tostring(t.deaths), P.ivory }, { L["Raid DPS"], UI.Abbrev(t.dps), P.bronzeHi },
     }
     for i = #stats, 1, -1 do
-        local x = -(PAD + 46 + (#stats - i) * 112)
+        local x = -(PAD + 46 + 60 + (#stats - i) * 112)      -- (60: room for settings and the blacklist)
         local lbl = Text(f, "medium", 12, P.ash, "RIGHT")
         lbl:SetPoint("TOPRIGHT", x, -20); lbl:SetText(stats[i][1])
         local val = Text(f, "semibold", 24, stats[i][3], "RIGHT")
@@ -319,7 +319,55 @@ local function BuildHeader(f, r, t)
     close:HookScript("OnEnter", function() x:SetTextColor(P.ivory[1], P.ivory[2], P.ivory[3]) end)
     close:HookScript("OnLeave", function() x:SetTextColor(P.ash[1], P.ash[2], P.ash[3]) end)
     close:SetScript("OnClick", function() f:Hide() end)
+    -- Settings and (on Forever) the blacklist, beside it, as on the dungeon
+    -- scoreboard: the same settings, opened under this window's gear.
+    local gear = UI.IconButton(f, "Gear", 24)
+    gear:SetPoint("RIGHT", close, "LEFT", -6, 0)
+    gear:SetScript("OnClick", function(self) GameTooltip:Hide(); UI.RaidSettings(f, self) end)
+    gear:HookScript("OnEnter", function(b)
+        GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(L["Settings"]); GameTooltip:Show()
+    end)
+    gear:HookScript("OnLeave", GameTooltip_Hide)
+    f.settingsButton = gear
+    if MS.ToggleBlacklist then
+        local bl = UI.IconButton(f, "Skull", 24, P.bloodHi)
+        bl:SetPoint("RIGHT", gear, "LEFT", -6, 0)
+        bl:SetScript("OnClick", function()
+            GameTooltip:Hide()
+            local pop = UI.frame and UI.frame.SettingsPopup
+            if pop and pop:GetParent() == f then pop:Hide() end
+            MS:ToggleBlacklist()
+        end)
+        bl:HookScript("OnEnter", function(b)
+            GameTooltip:SetOwner(b, "ANCHOR_BOTTOM"); GameTooltip:SetText(L["Blacklist"])
+            GameTooltip:AddLine(MS.Plural(#MS:BlacklistEntries(), "%d player", "%d players"), 0.8, 0.8, 0.8)
+            GameTooltip:Show()
+        end)
+        bl:HookScript("OnLeave", GameTooltip_Hide)
+        f.blacklistButton = bl
+    end
     Rule(f, -HDR_H)
+end
+
+-- The settings popup belongs to the dungeon scoreboard; the raid window
+-- borrows it, under its own gear, and gives it back when the scoreboard opens.
+function UI.RaidSettings(f, anchor)
+    if not UI.frame then MS:BuildUI() end
+    local pop = UI.frame and UI.frame.SettingsPopup
+    if not pop then return end
+    if pop:IsShown() and pop:GetParent() == f then pop:Hide(); return end
+    pop:Hide()
+    pop:SetParent(f); pop:SetFrameStrata("FULLSCREEN_DIALOG")
+    pop:ClearAllPoints(); pop:SetPoint("TOPRIGHT", anchor, "BOTTOMRIGHT", 0, -4)
+    pop:Show()
+end
+local function SettingsHome()
+    local sb = UI.frame
+    local pop = sb and sb.SettingsPopup
+    if not pop or pop:GetParent() == sb then return end
+    pop:Hide()
+    pop:SetParent(sb); pop:SetFrameStrata("FULLSCREEN_DIALOG")
+    pop:ClearAllPoints(); pop:SetPoint("TOPRIGHT", sb.SettingsBtn, "BOTTOMRIGHT", 0, -4)
 end
 
 -- ── Boss pulls ─────────────────────────────────────────────────────────────
@@ -518,6 +566,41 @@ local function BuildPulls(f, r)
         f.pullHits[#f.pullHits + 1] = hit
         Hover(hit, function(self) PullTip(self, p) end)
         hit:SetScript("OnMouseUp", function() UI.RaidFocus(r, p) end)
+    end
+
+    -- The trash between pulls can be hovered too, as on the dungeon timeline:
+    -- how long it took, and who died on it.
+    local fights = {}
+    for _, p in ipairs(r.pulls) do if p.s and p.e then fights[#fights + 1] = p end end
+    table.sort(fights, function(a, b) return a.s < b.s end)
+    local function DeathsIn(t1, t2)
+        local n = 0
+        for _, p in ipairs(r.players) do
+            for _, d in ipairs(p.deathLog or {}) do if d.t >= t1 and d.t < t2 then n = n + 1 end end
+        end
+        return n
+    end
+    f.trashHits = {}
+    local prev = 0
+    for i = 1, #fights + 1 do
+        local t1, t2 = prev, fights[i] and fights[i].s or RT
+        if t2 - t1 >= 1 and X(t2) - X(t1) >= 4 then
+            local hit = CreateFrame("Frame", nil, f)
+            hit:SetSize(X(t2) - X(t1), LH + 12); hit:SetPoint("TOPLEFT", f, "TOPLEFT", X(t1), LINE_Y + 6)
+            hit:SetFrameLevel(f:GetFrameLevel() + 4)
+            hit.from, hit.to = t1, t2
+            Hover(hit, function(self)
+                GameTooltip:SetOwner(self, "ANCHOR_CURSOR_RIGHT", 12, 12)
+                GameTooltip:SetText(L["Trash"], P.ivory[1], P.ivory[2], P.ivory[3])
+                Tip2(L["Duration"], Clock(t2 - t1))
+                Tip2(L["Time"], Clock(t1) .. " - " .. Clock(t2))
+                local d = DeathsIn(t1, t2)
+                if d > 0 then Tip2(L["Deaths"], tostring(d), nil, P.bloodHi) end
+                GameTooltip:Show()
+            end)
+            f.trashHits[#f.trashHits + 1] = hit
+        end
+        prev = fights[i] and _max(prev, fights[i].e) or prev
     end
 
     -- Each kill's boss on the line at the moment it died, its time beside it
@@ -763,7 +846,7 @@ local function GroupHeader(v, y, g, list, time)
     return y - 24
 end
 
-local OVERVIEW_BODY_40 = 411
+local OVERVIEW_BODY_40 = 451
 
 local function BuildOverview(f, r, t)
     local v = View(f)
@@ -833,15 +916,15 @@ local METRICS = {
     { key = "kicks",   tab = LK("Interrupts"),   col = LK("Interrupts") },
     { key = "dispels", tab = LK("Dispels"),      col = LK("Dispels") },
 }
--- The raid in groups of five, like the game's raid frames: 10 players in
--- two groups side by side, 20 in four, 40 in two rows of four. Each player
--- is a cell that fills with their class colour by the stat, with their role,
--- deaths and rank across the raid. Tanks, then healers, then damage are dealt
--- round the groups, so each group has its share of each.
-local CELL_H, CELL_GAP, GHDR_H, GCOL_GAP, GROW_GAP, BAND_H = 30, 4, 22, 14, 14, 26
+-- One stat at a time, ranked like the game's damage meter on its thin
+-- setting: the class icon, "1. Name", the amount (and per second) on the
+-- right, and a thin bar in the class colour under each line. Two columns,
+-- read down the first and then the second.
+-- (Players are still dealt into groups of five, tanks, healers and damage
+-- round the groups, for the "Group N" in their tooltip.)
+local ROW_H, COL_GAP, BAND_H, BAR_H, DIED_R = 22, 28, 26, 2, 112
+local NAME_X = 2 * ROW_H - 2 + 26          -- where the names start in a line
 local ROLE_ORDER = { TANK = 1, HEALER = 2, DAMAGER = 3 }
-
-local function GroupCols(size) return size >= 20 and 4 or 2 end
 
 local function DealGroups(r)
     local roster = {}
@@ -861,64 +944,61 @@ local function DealGroups(r)
     return groups
 end
 
-local function MakeCell(parent, w)
+local function MakeLine(parent, w)
     local c = CreateFrame("Frame", nil, parent)
-    c:SetSize(w, CELL_H)
-    c.bg = Solid(c, "BACKGROUND", 0, 0, 0, 0, 0.32); c.bg:SetAllPoints()
-    c.fill = c:CreateTexture(nil, "BACKGROUND", nil, 1)
-    c.fill:SetPoint("TOPLEFT", 1, -1); c.fill:SetPoint("BOTTOMLEFT", 1, 1)
-    c.barW = w - 2
-    c.line = Outline(c, P.line, 1, "BORDER", 0)
+    c:SetSize(w, ROW_H)
+    c.hoverBg = Solid(c, "BACKGROUND", 1, P.bronze[1], P.bronze[2], P.bronze[3], 0.10); c.hoverBg:SetAllPoints()
+    c.hoverBg:Hide()
+    c.selfBg = Solid(c, "BACKGROUND", 0, P.bronze[1], P.bronze[2], P.bronze[3], 0.08); c.selfBg:SetAllPoints()
+    -- The class icon, then the role (tank, healer, damage).
+    c.icon = c:CreateTexture(nil, "ARTWORK")
+    c.icon:SetTexture(CLASS_TEX); c.icon:SetSize(ROW_H - 4, ROW_H - 4); c.icon:SetPoint("LEFT", 0, 0)
     c.role = c:CreateTexture(nil, "ARTWORK")
-    c.role:SetTexture(UI.ROLE_ICON_TEX); c.role:SetSize(16, 16); c.role:SetPoint("LEFT", 6, 0)
-    c.rank = Text(c, "medium", 12, P.ash, "RIGHT"); c.rank:SetPoint("RIGHT", -6, 0); c.rank:SetWidth(30)
-    c.value = Text(c, "semibold", 14, P.ivory, "RIGHT"); c.value:SetPoint("RIGHT", -38, 0)
-    -- Names are first and last (as on Forever): cut short with "..." when
-    -- they don't fit; deaths sit by the value, so they never move.
-    c.died = Text(c, "semibold", 12, P.bloodHi, "RIGHT"); c.died:SetPoint("RIGHT", c.value, "LEFT", -8, 0)
-    c.name = Text(c, "semibold", 13, P.ivory); c.name:SetPoint("LEFT", 28, 0)
-    c.name:SetWidth(w - 28 - 38 - 46 - 26); c.name:SetWordWrap(false)
+    c.role:SetTexture(UI.ROLE_ICON_TEX); c.role:SetSize(ROW_H - 6, ROW_H - 6); c.role:SetPoint("LEFT", ROW_H, 0)
+    local x = 2 * ROW_H - 2
+    c.rank = Text(c, "medium", 13, P.ash, "RIGHT"); c.rank:SetPoint("RIGHT", c, "LEFT", x + 22, 1)
+    c.name = Text(c, "semibold", 14, P.ivory); c.name:SetPoint("LEFT", x + 26, 1)
+    c.value = Text(c, "semibold", 14, P.ivory, "RIGHT"); c.value:SetPoint("RIGHT", 0, 1)
+    -- Deaths in a column of their own, under their heading.
+    c.died = Text(c, "semibold", 13, P.bloodHi, "RIGHT"); c.died:SetPoint("RIGHT", -DIED_R, 1)
+    c.name:SetWidth(w - x - 26 - 170); c.name:SetWordWrap(false)
+    -- The bar: a dark track under the line, filled in the class colour.
+    c.track = Solid(c, "BORDER", 0, 0, 0, 0, 0.45)
+    c.track:SetPoint("BOTTOMLEFT", x + 4, 0); c.track:SetPoint("BOTTOMRIGHT", 0, 0); c.track:SetHeight(BAR_H)
+    c.bar = Solid(c, "ARTWORK", 1, 1, 1, 1, 1)
+    c.bar:SetPoint("BOTTOMLEFT", c.track, "BOTTOMLEFT"); c.bar:SetHeight(BAR_H)
+    c.barW = w - x - 4
     return c
 end
 
 local function BuildRanks(f, r)
     local v = View(f)
-    local cols = GroupCols(r.size)
-    local inner = W - 2 * PAD
-    local colW = _floor((inner - (cols - 1) * GCOL_GAP) / cols)
+    local n = #r.players
+    local perCol = _ceil(n / 2)
+    local colW = _floor((W - 2 * PAD - COL_GAP) / 2)
     LabelBand(v, 0, BAND_H)
-    v.hint = Text(v, "medium", 12, P.ash, "RIGHT"); v.hint:SetPoint("RIGHT", v, "TOPRIGHT", -PAD, -BAND_H / 2)
-    v.groupLbl = Text(v, "medium", 12, P.ash); v.groupLbl:SetPoint("LEFT", v, "TOPLEFT", PAD, -BAND_H / 2)
-    v.groupLbl:SetText(MS.Plural(_ceil(#r.players / 5), "%d group", "%d groups"))
-    v.groups, v.cells = DealGroups(r), {}
-    local groupH = GHDR_H + 5 * (CELL_H + CELL_GAP)
-    v.groupFrames = {}
-    for gi, list in ipairs(v.groups) do
-        local col, row = (gi - 1) % cols, _floor((gi - 1) / cols)
-        local x, y = PAD + col * (colW + GCOL_GAP), -(BAND_H + 10) - row * (groupH + GROW_GAP)
-        local g = CreateFrame("Frame", nil, v)
-        g:SetSize(colW, groupH); g:SetPoint("TOPLEFT", x, y)
-        g.col, g.row = col, row
-        g.title = Text(g, "semibold", 13, P.bronzeHi); g.title:SetPoint("TOPLEFT", 2, -3)
-        g.title:SetText(_fmt(L["Group %d"], gi))
-        g.sum = Text(g, "medium", 12, P.ash, "RIGHT"); g.sum:SetPoint("TOPRIGHT", -2, -4)
-        local u = Solid(g, "BORDER", 0, P.bronzeDk[1], P.bronzeDk[2], P.bronzeDk[3], 1)
-        u:SetPoint("TOPLEFT", 0, -(GHDR_H - 4)); u:SetPoint("TOPRIGHT", 0, -(GHDR_H - 4)); u:SetHeight(1)
-        g.cells = {}
-        for i = 1, 5 do
-            local c = MakeCell(g, colW)
-            c:SetPoint("TOPLEFT", 0, -GHDR_H - (i - 1) * (CELL_H + CELL_GAP))
-            c.player = list[i]
-            c:SetShown(list[i] ~= nil)
-            Hover(c, function(self) UI.RaidPlayerTooltip(self, self.player, r, v.metric) end, c.line,
-                function(self) return self.player and self.player.name == ME and P.bronzeHi or P.line end)
-            g.cells[i] = c
-            if list[i] then v.cells[#v.cells + 1] = c end
-        end
-        v.groupFrames[gi] = g
+    -- Headings over each column: the player, deaths, and the stat.
+    v.heads = {}
+    for col = 0, 1 do
+        local x0 = PAD + col * (colW + COL_GAP)
+        local hp = Text(v, "medium", 12, P.ash); hp:SetPoint("LEFT", v, "TOPLEFT", x0 + NAME_X, -BAND_H / 2)
+        hp:SetText(L["Player"])
+        local hd = Text(v, "medium", 12, P.ash, "RIGHT")
+        hd:SetPoint("RIGHT", v, "TOPLEFT", x0 + colW - DIED_R, -BAND_H / 2); hd:SetText(L["Deaths"])
+        local hs = Text(v, "medium", 12, P.ash, "RIGHT")
+        hs:SetPoint("RIGHT", v, "TOPLEFT", x0 + colW, -BAND_H / 2)
+        v.heads[#v.heads + 1] = { player = hp, deaths = hd, stat = hs }
     end
-    local rows = _ceil(#v.groups / cols)
-    v.height = BAND_H + 10 + rows * groupH + (rows - 1) * GROW_GAP + 6
+    v.groups, v.cells = DealGroups(r), {}
+    for i = 1, n do
+        local col, row = _floor((i - 1) / perCol), (i - 1) % perCol
+        local c = MakeLine(v, colW)
+        c:SetPoint("TOPLEFT", PAD + col * (colW + COL_GAP), -(BAND_H + 8) - row * ROW_H)
+        c.col, c.row = col, row
+        Hover(c, function(self) if self.player then UI.RaidPlayerTooltip(self, self.player, r, v.metric) end end)
+        v.cells[i] = c
+    end
+    v.height = BAND_H + 8 + perCol * ROW_H + 6
     v.total = Text(v, "medium", 15, P.dmg)
     v.total:SetPoint("LEFT", Footer(v), "RIGHT", 14, 0)
     return v
@@ -934,32 +1014,44 @@ local function FillRanks(v, r, t, m)
     local ranked, top = {}, 0
     for i, p in ipairs(r.players) do ranked[i] = p; top = _max(top, p[m.key] or 0) end
     SortBy(ranked, m.key)
-    local place = {}
-    for i, p in ipairs(ranked) do place[p] = i end
-    for gi, g in ipairs(v.groupFrames) do
-        local sum = 0
-        for _, c in ipairs(g.cells) do
-            local p = c.player
-            if p then
-                local val = p[m.key] or 0
-                sum = sum + val
-                local cr, cg, cb = UI.ClassColor(p.class)
-                local me = p.name == ME
-                HGrad(c.fill, { cr, cg, cb }, { cr, cg, cb }, 0.34, 0.16)
-                c.fill:SetWidth(_max(1, c.barW * (top > 0 and val / top or 0)))
-                c.fill:SetShown(val > 0)
-                c.line:SetColor(me and P.bronzeHi or P.line, me and 0.9 or 1)
-                local rc = UI.ROLE_ICON_COORDS[p.role] or UI.ROLE_ICON_COORDS.DAMAGER
-                c.role:SetTexCoord(rc[1], rc[2], rc[3], rc[4])
-                c.name:SetText(p.name); c.name:SetTextColor(cr, cg, cb)
-                c.died:SetText(m.key ~= "deaths" and (p.deaths or 0) > 0 and ("x" .. p.deaths) or "")
-                c.value:SetText(Fmt(m, val))
-                c.rank:SetText("#" .. place[p])
-            end
+    local secs = _max(1, r.runTime or r.time or 1)
+    local grey = _fmt("|cff%02x%02x%02x", P.ash[1] * 255, P.ash[2] * 255, P.ash[3] * 255)
+    for i, c in ipairs(v.cells) do
+        local p = ranked[i]
+        c.player = p
+        local val = p[m.key] or 0
+        local cr, cg, cb = UI.ClassColor(p.class)
+        local me = p.name == ME
+        c.selfBg:SetShown(me)
+        local cc = UI.CLASS_ICON_COORDS[p.class] or UI.CLASS_ICON_COORDS.UNKNOWN
+        c.icon:SetTexCoord(cc[1], cc[2], cc[3], cc[4])
+        local rc2 = UI.ROLE_ICON_COORDS[p.role] or UI.ROLE_ICON_COORDS.DAMAGER
+        c.role:SetTexCoord(rc2[1], rc2[2], rc2[3], rc2[4])
+        c.rank:SetText(i .. ".")
+        local rc = me and P.bronzeHi or P.ash
+        c.rank:SetTextColor(rc[1], rc[2], rc[3])
+        c.name:SetText(p.name); c.name:SetTextColor(cr, cg, cb)
+        c.died:SetText(m.key ~= "deaths" and (p.deaths or 0) > 0 and ("x" .. p.deaths) or "")
+        -- The amount, and per second after it, as the game's meter has it:
+        -- damage (DPS), healing (HPS), damage taken (per second).
+        local text
+        if m.share then
+            local amt = p[m.share] or 0
+            text = (amt > 0 and UI.Abbrev(amt) or "-") .. " " .. grey .. "(" .. Fmt(m, val) .. ")|r"
+        elseif m.key == "taken" then
+            text = Fmt(m, val) .. " " .. grey .. "(" .. (val > 0 and UI.Abbrev(val / secs) or "-") .. ")|r"
+        else
+            text = Fmt(m, val)
         end
-        g.sum:SetText(Fmt(m, sum))
+        c.value:SetText(text)
+        c.bar:SetColorTexture(cr, cg, cb, 0.9)
+        c.bar:SetWidth(_max(1, c.barW * (top > 0 and val / top or 0)))
+        c.bar:SetShown(val > 0)
     end
-    v.hint:SetText(_fmt(L["Bars by %s, # is the rank in the raid"], L[m.col]))
+    for _, h in ipairs(v.heads) do
+        h.stat:SetText(m.share and (L[m.tab] .. " (" .. L[m.col] .. ")") or L[m.tab])
+        h.deaths:SetShown(m.key ~= "deaths")
+    end
     local sum = m.share and t[m.share] or t[m.key]
     v.total:SetText((m.abbr and UI.Abbrev(sum) or tostring(sum)) .. " " .. L[m.tab]
         .. (m.share and ("    " .. UI.Abbrev(t[m.key]) .. " " .. L[m.col]) or ""))
@@ -1043,6 +1135,7 @@ end
 
 local function SelectTab(f, tab)
     f.selected = tab
+    if f.history then f.history:Hide() end
     for _, b in ipairs(f.tabs) do
         local on = b == tab
         b._outline:SetColor(on and P.bronze or P.line, 1)
@@ -1090,7 +1183,8 @@ local function Build(r)
     f:SetFrameStrata("HIGH")
     f:SetClampedToScreen(true)
     f:SetMovable(true); f:EnableMouse(true); f:RegisterForDrag("LeftButton")
-    f:SetScript("OnDragStart", f.StartMoving)
+    -- (Locked with the scoreboard: Lock the window holds this one too.)
+    f:SetScript("OnDragStart", function(self) if not MS:GetWindowLocked() then self:StartMoving() end end)
     f:SetScript("OnDragStop", f.StopMovingOrSizing)
     UI.BuildChrome(f, 90)
     BuildHeader(f, r, t)
@@ -1098,7 +1192,11 @@ local function Build(r)
     BuildTabs(f, r, t)
     UI.AddRaidSwitch(f)
     -- Closing the window closes the sample's in-run frame too.
-    f:SetScript("OnHide", function() if UI.HideRaidFrame then UI.HideRaidFrame() end end)
+    f:SetScript("OnHide", function()
+        if UI.HideRaidFrame then UI.HideRaidFrame() end
+        local pop = UI.frame and UI.frame.SettingsPopup
+        if pop and pop:GetParent() == f then pop:Hide() end
+    end)
     tinsert(UISpecialFrames, f:GetName())
     f:Hide()
     return f
@@ -1298,7 +1396,13 @@ local function BuildHistory(f, anchor)
         d.rows[i] = row
     end
     d:SetSize(w, #list * HIST_ROW + 8)
+    -- A click anywhere else closes it (its own button toggles it).
+    d:SetScript("OnEvent", function(self, event)
+        if event == "GLOBAL_MOUSE_DOWN" and not self:IsMouseOver() and not anchor:IsMouseOver() then self:Hide() end
+    end)
+    d:SetScript("OnHide", function(self) pcall(self.UnregisterEvent, self, "GLOBAL_MOUSE_DOWN") end)
     d:SetScript("OnShow", function()
+        pcall(d.RegisterEvent, d, "GLOBAL_MOUSE_DOWN")
         local base = f.run.base or f.run
         for _, row in ipairs(d.rows) do
             row.selected = row.raid == base
@@ -1346,6 +1450,25 @@ local function AddDungeonSwitch()
     b:SetSize(68, 24)
     b:SetPoint("TOPRIGHT", sb.CloseButton, "BOTTOMRIGHT", 0, -6)
     sb.raidButton = b
+    b:SetShown(not UI.statsOpen)
+    sb:HookScript("OnShow", SettingsHome)
+end
+-- Your stats have their own tabs where the Raids button sits: it steps aside
+-- while they're open.
+local openStats, closeStats = UI.OpenStats, UI.CloseStats
+if openStats then
+    UI.OpenStats = function(...)
+        local r = openStats(...)
+        if UI.frame and UI.frame.raidButton then UI.frame.raidButton:Hide() end
+        return r
+    end
+end
+if closeStats then
+    UI.CloseStats = function(...)
+        local r = closeStats(...)
+        if UI.frame and UI.frame.raidButton then UI.frame.raidButton:Show() end
+        return r
+    end
 end
 -- The dungeon scoreboard opening any way (at a key's end, say) takes over
 -- from the raid window.

@@ -145,6 +145,13 @@ local function DemoPlayers(r)
     return list
 end
 
+-- The boss being fought: its health, from full at the pull down to a sliver
+-- just before the kill.
+local function DemoHealth(now, b)
+    local f = (now - b[2]) / _max(1, b[3] - b[2])
+    return _max(1, _min(100, _floor(100 - f * 97 + 0.5)))
+end
+
 local function KeyAt(r, t)
     local S = r._script or KEY_SCRIPT
     local now = _min(t, S.finish)
@@ -157,7 +164,7 @@ local function KeyAt(r, t)
         if now >= b[2] then
             local boss = { name = b[1], pullTime = b[2], killTime = done and b[3] or nil }
             _ins(r.bosses, boss)
-            if not done then r.activeBoss = boss end
+            if not done then r.activeBoss = boss; boss.demoHealth = DemoHealth(now, b) end
         end
         _ins(r._demoObjectives, { name = b[1], done = done })
     end
@@ -192,7 +199,7 @@ local function ForeverAt(r, t)
         if now >= b[2] then
             local boss = { name = b[1], pullTime = b[2], killTime = now >= b[3] and b[3] or nil }
             _ins(r.bosses, boss)
-            if boss.killTime then bossXP = bossXP + 640 else r.activeBoss = boss end
+            if boss.killTime then bossXP = bossXP + 640 else r.activeBoss = boss; boss.demoHealth = DemoHealth(now, b) end
         end
     end
     local kills = _max(0, _min(_floor(S.finish / 18), _floor((now - 30) / 18)))

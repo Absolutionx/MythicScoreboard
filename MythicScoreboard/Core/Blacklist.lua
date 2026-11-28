@@ -141,13 +141,16 @@ local function Warned()
     return db.blacklistWarned
 end
 
+-- In chat, on screen and with a sound, each as the settings say.
 local function Alert(text, note)
-    MS.Say(RED .. text .. ((note or "") ~= "" and (": " .. note) or "") .. "|r")
+    if MS:GetBlacklistChat() then
+        MS.Say(RED .. text .. ((note or "") ~= "" and (": " .. note) or "") .. "|r")
+    end
     local frame = rawget(_G, "RaidWarningFrame")
     local Notice = rawget(_G, "RaidNotice_AddMessage")
-    if frame and Notice then pcall(Notice, frame, text, { r = 1, g = 0.13, b = 0.13 }) end
+    if MS:GetBlacklistScreen() and frame and Notice then pcall(Notice, frame, text, { r = 1, g = 0.13, b = 0.13 }) end
     local Sound, kit = rawget(_G, "PlaySound"), rawget(_G, "SOUNDKIT")
-    if Sound and kit and kit.RAID_WARNING then pcall(Sound, kit.RAID_WARNING) end
+    if MS:GetBlacklistSound() and Sound and kit and kit.RAID_WARNING then pcall(Sound, kit.RAID_WARNING) end
 end
 
 function MS:CheckGroupForBlacklist()
@@ -316,7 +319,7 @@ end
 local lastEntry, lastEntryAt  -- the listing last right-clicked: its menu comes next
 local function HookBrowse()
     Hook("LFGBrowseSearchEntry_Update", function(entry)
-        if entry then SetBorder(entry, AnyListed(entry.resultID)) end
+        if entry then SetBorder(entry, MS:GetBlacklistBorder() and AnyListed(entry.resultID)) end
     end)
     Hook("LFGBrowseSearchEntryTooltip_UpdateAndShow", function(tip)
         if not AnyoneListed() then return end

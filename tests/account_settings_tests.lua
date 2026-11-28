@@ -100,6 +100,19 @@ local reset = pop and pop.ResetScaleBtn
 check("settings: a Reset size button", reset ~= nil)
 if reset then reset:GetScript("OnClick")(reset) end
 check("settings: Reset size: 100%", MS:GetWindowScale() == 1)
+-- Settings: pages down the left, one shown at a time.
+if pop then
+    local names = {}
+    for i, e in ipairs(pop.nav) do names[i] = e.label._text end
+    local list = table.concat(names, ",")
+    local want = MS.FLAVOR == "forever" and "Window,In-run frame,Run history,Combat logging,Directions,Blacklist"
+        or "Window,In-run frame,Run history,Combat logging"
+    check("settings: its pages", list == want, list)
+    check("settings: the first page shown", pop.pages[1]._shown and not pop.pages[2]._shown and pop.nav[1].on)
+    pop.nav[3]:GetScript("OnClick")(pop.nav[3])
+    check("settings: another page", pop.pages[3]._shown and not pop.pages[1]._shown and pop.nav[3].on and not pop.nav[1].on)
+    pop.nav[1]:GetScript("OnClick")(pop.nav[1])
+end
 -- Window size: 5% a click.
 MS:SetWindowScale(1)
 local plusStep = (function()

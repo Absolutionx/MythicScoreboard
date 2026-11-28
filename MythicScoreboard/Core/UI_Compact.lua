@@ -196,7 +196,8 @@ function BuildBosses(run, best)
             if Same(run, x.n, n.name) then bt = x.t end
         end
         _ins(out, { name = n.name, kill = b and b.killTime, done = n.done or (b and b.killTime ~= nil),
-                    fighting = b ~= nil and run.activeBoss == b and not b.killTime, best = bt })
+                    fighting = b ~= nil and run.activeBoss == b and not b.killTime, best = bt,
+                    demoHealth = b and b.demoHealth })
     end
     return out
 end
@@ -491,6 +492,12 @@ UI._BossUnit = BossUnit                      -- for tests
 
 -- Fills the bar and the percent; false when there's no health to show.
 local function ShowBossHealth(bar, pct)
+    -- The preview's boss has made-up health, going down as the fight goes on.
+    if bar.demoPct then
+        bar:SetMinMaxValues(0, 100); bar:SetValue(bar.demoPct)
+        pct:SetText(_fmt("%d%%", bar.demoPct))
+        return true
+    end
     local u = BossUnit(bar.bossName)
     if not u then return false end
     local okC, hp = pcall(G("UnitHealth"), u)
@@ -579,7 +586,7 @@ local function BossRows(run, bosses, y, withBest)
             hp:SetPoint("TOPLEFT", f, "TOPLEFT", PAD + 16, y - 15)
             hp:SetPoint("TOPRIGHT", f, "TOPLEFT", W - PAD - (withBest and COLS.kill or 0), y - 15)
             hp:SetHeight(2)
-            hp.kill, hp.bossName = kill, b.name
+            hp.kill, hp.bossName, hp.demoPct = kill, b.name, b.demoHealth
             PlaceRight(hp.pct, W - PAD - (withBest and COLS.kill or 0), y)
             local ok = ShowBossHealth(hp, hp.pct)
             hp.pct:SetShown(ok); hp:SetAlpha(ok and 1 or 0); kill:SetAlpha(ok and 0 or 1)
@@ -999,7 +1006,10 @@ local function Build()
     else
         f:SetPoint("TOPRIGHT", UIParent, "TOPRIGHT", -260, -220)
     end
-    f:SetScript("OnDragStart", Safe(function(self) self:StartMoving(); self._moved = true end))
+    f:SetScript("OnDragStart", Safe(function(self)
+        if MS:GetCompactLocked() then return end          -- (Lock the in-run frame)
+        self:StartMoving(); self._moved = true
+    end))
     f:SetScript("OnDragStop", Safe(function(self) self:StopMovingOrSizing(); SavePosition() end))
     f:SetScript("OnClick", Safe(function(self, button)
         if self._moved then self._moved = nil; return end
@@ -1022,7 +1032,7 @@ local function Build()
         set = function(v) MS:SetCompactScale(v) end,
         min = MS.COMPACT_SCALE_MIN, max = MS.COMPACT_SCALE_MAX,
         posKey = "compactPos", setting = "compactScale",
-        shown = function() return demo ~= nil end,
+        shown = function() return demo ~= nil and not MS:GetCompactLocked() end, shownBy = { "compactLocked" },
     })
 
     -- Anything that changes in the run redraws the frame at its next check
@@ -1197,4 +1207,6 @@ MS:WatchRunState(function(state)
     if state == "active" then demo, previewStyle = nil, nil end      -- a real run takes the frame
     MS:RefreshCompact()
 end)
-MS:OnSettingChanged("compactStyle", function() MS:RefreshCompact() end)
+-- A style picked (in settings too) shows in the preview as well.
+MS:OnSettingChanged("compactStyle", function() previewStyle = nil; MS:RefreshCompact() end)
+UI._CompactShownStyle = function() return ShownStyle() end      -- for tests

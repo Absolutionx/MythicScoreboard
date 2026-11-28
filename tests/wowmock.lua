@@ -245,6 +245,12 @@ InCombatLockdown = function() return false end
 GetAddOnMetadata = function() return "test" end
 C_AddOns = { GetAddOnMetadata = function() return "test" end }
 
+-- Combat logging and console variables.
+M.logging, M.cvars = false, {}
+LoggingCombat = function(v) if v ~= nil then M.logging = v and true or false end; return M.logging end
+GetCVar = function(k) return M.cvars[k] end
+SetCVar = function(k, v) M.cvars[k] = tostring(v) end
+
 M.instance = { "Ragefire Chasm", "party", 1 }
 GetInstanceInfo = function() return M.instance[1], M.instance[2], M.instance[3], "Normal", 5, 0, false, M.instance[4] or 389 end
 IsInInstance = function() return M.instance[2] ~= "none", M.instance[2] end

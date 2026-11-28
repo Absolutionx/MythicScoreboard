@@ -442,6 +442,7 @@ end
 -- there: item (the hearthstone) or spell }.
 function MS:Jumps()
     local out = {}
+    if not MS:GetRouteJumps() then return out end           -- (turned off in settings)
     local hearth = MS:HearthPlace()
     if hearth then
         -- Astral Recall first: it's on the shorter cooldown.

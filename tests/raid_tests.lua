@@ -30,9 +30,9 @@ end
 local function has(f, pat)
     for _, t in ipairs(texts(f)) do if t:find(pat) then return t end end
 end
--- The player ranked first in a groups view, and each group's size.
+-- The player ranked first in a stat tab, and each group's size.
 local function first(v)
-    for _, c in ipairs(v.cells) do if c.rank._text == "#1" then return c.name._text end end
+    for _, c in ipairs(v.cells) do if c.rank._text == "1." then return c.name._text end end
 end
 local function sizes(v)
     local out = {}
@@ -68,12 +68,18 @@ local b = win("barrow")
 check("10: tabs", #b.tabs == 8 and b.tabs[1].label._text == "Overview" and b.tabs[8].label._text == "Loot")
 check("10: opens on Overview", b.views.overview._shown and not b.views.ranks._shown)
 b.tabs[2]:GetScript("OnClick")(b.tabs[2])
-check("10: Damage: its groups", b.views.ranks._shown and not b.views.overview._shown)
+check("10: Damage: its ranking", b.views.ranks._shown and not b.views.overview._shown)
 check("10: two groups of five", sizes(b.views.ranks) == "5,5" and #b.views.ranks.cells == 10, sizes(b.views.ranks))
 check("10: top damage ranked first", first(b.views.ranks) == "Kaelthor Oakshield", first(b.views.ranks))
 check("10: the tank leads group 1", b.views.ranks.groups[1][1].name == "Dunmore Kettlewick")
-check("10: group labels", has(b.views.ranks, "^Group 1$") and has(b.views.ranks, "^Group 2$"))
-check("10: the hint names the stat", has(b.views.ranks, "^Bars by DPS"))
+check("10: thin lines, two columns of five", b.views.ranks.cells[5].col == 0 and b.views.ranks.cells[6].col == 1
+    and b.views.ranks.cells[6].row == 0)
+check("10: damage with DPS after it", b.views.ranks.cells[1].value._text:find("^[%d%.]+[KM]? |cff%x+%(") ~= nil,
+    b.views.ranks.cells[1].value._text)
+check("10: headings over each column", #b.views.ranks.heads == 2 and b.views.ranks.heads[2].player._text == "Player"
+    and b.views.ranks.heads[1].deaths._text == "Deaths" and b.views.ranks.heads[2].stat._text == "Damage (DPS)")
+check("10: bars by the top player", b.views.ranks.cells[1].bar:GetWidth() > b.views.ranks.cells[10].bar:GetWidth())
+check("10: the hint names the stat", has(b.views.ranks, "^Damage %(DPS%)$"))
 b.tabs[1]:GetScript("OnClick")(b.tabs[1])
 check("10: overview tab", b.views.overview._shown and not b.views.ranks._shown)
 b.tabs[8]:GetScript("OnClick")(b.tabs[8])
@@ -126,16 +132,16 @@ w.tabs[2]:GetScript("OnClick")(w.tabs[2])
 check("40: eight groups of five", #rv.cells == 40 and sizes(rv) == "5,5,5,5,5,5,5,5", sizes(rv))
 check("40: ranks shown first", rv._shown and not w.views.loot._shown)
 check("40: top damage dealer ranked first", first(rv) == "Kaelthor Oakshield", first(rv))
-local g4, g5 = rv.groupFrames[4], rv.groupFrames[5]
-check("40: two rows of four", g4.row == 0 and g4.col == 3 and g5.row == 1 and g5.col == 0)
+check("40: two columns of twenty", rv.cells[20].col == 0 and rv.cells[20].row == 19 and rv.cells[21].col == 1)
 local tanks = 0
 for gi = 1, 3 do if rv.groups[gi][1].role == "TANK" then tanks = tanks + 1 end end
 check("40: tanks spread over groups 1-3", tanks == 3)
 -- The Healing tab re-ranks.
 w.tabs[3]:GetScript("OnClick")(w.tabs[3])
-check("40: healing tab", has(rv, "^Bars by HPS") and first(rv) == "Edric Ravenhill", first(rv))
+check("40: healing tab", has(rv, "^Healing %(HPS%)$") and first(rv) == "Edric Ravenhill", first(rv))
 w.tabs[5]:GetScript("OnClick")(w.tabs[5])
 check("40: deaths tab", first(rv) == "Vexalia Elmstead", first(rv))
+check("40: deaths tab: no second deaths heading", not rv.heads[1].deaths._shown and rv.heads[1].stat._text == "Deaths")
 check("40: selected tab has no fill", w.tabs[1].glow == nil)
 local ht = w.tabs[4]
 check("tab hover: has hover handlers", ht:GetScript("OnEnter") and ht:GetScript("OnLeave")
@@ -159,6 +165,9 @@ slash("raid 40")
 w.tabs[2]:GetScript("OnClick")(w.tabs[2])
 local kael
 for _, c in ipairs(rv.cells) do if c.player.name == "Kaelthor Oakshield" then kael = c end end
+local th = w.trashHits and w.trashHits[1]
+check("hover trash: says it was trash", th and hover(th) and tip[1] == "=Trash" and tipHas("^Duration|"), tip[1])
+check("trash between every pull", #w.trashHits >= 2, w.trashHits and #w.trashHits)
 check("hover a player: tooltip", hover(kael) and tip[1] == "=Kaelthor Oakshield", tip[1])
 check("hover: role and group", tipHas("^Damage|Group %d$"), table.concat(tip, " / "))
 check("hover: damage with DPS and rank", tipHas("^Damage|.* DPS   #1$"), tipHas("^Damage|"))
@@ -391,6 +400,47 @@ end
 check("overview: loot icons on the players who looted", withLoot > 0 and icons == #UI.RaidDemo("20").loot, withLoot .. " " .. icons)
 check("overview: the loot total", has(lw.views.overview, "^9 items$"))
 
+-- ── Lock the window holds the raid window too ─────────────────────────────
+slash("raid 10")
+local lw = win("barrow")
+local moved = false
+local sm = lw.StartMoving
+lw.StartMoving = function() moved = true end
+MS:SetWindowLocked(true)
+lw:GetScript("OnDragStart")(lw)
+check("locked: the raid window stays put", not moved)
+MS:SetWindowLocked(false)
+lw:GetScript("OnDragStart")(lw)
+check("unlocked: the raid window moves", moved)
+lw.StartMoving = sm
+
+-- Settings and the blacklist from the raid window.
+slash("raid 10")
+local sw = win("barrow")
+check("raid window: a settings button", sw.settingsButton ~= nil)
+sw.settingsButton:GetScript("OnClick")(sw.settingsButton)
+local spop = UI.frame and UI.frame.SettingsPopup
+check("raid settings: the settings, on the raid window", spop and spop._shown and spop:GetParent() == sw)
+sw.settingsButton:GetScript("OnClick")(sw.settingsButton)
+check("raid settings: again closes it", not spop._shown)
+sw.settingsButton:GetScript("OnClick")(sw.settingsButton)
+MS:ShowScoreboard()
+check("dungeon scoreboard: the settings come back to it", spop:GetParent() == UI.frame and not spop._shown)
+if MS.ToggleBlacklist then
+    slash("raid 10")
+    check("raid window: a blacklist button", sw.blacklistButton ~= nil)
+    sw.blacklistButton:GetScript("OnClick")(sw.blacklistButton)
+    local blf = rawget(_G, "MythicScoreboardBlacklistFrame")
+    check("raid window: opens the blacklist", blf and blf._shown)
+    if blf then blf:Hide() end
+end
+-- Your stats' tabs sit where the Raids button is: it steps aside.
+MS:ShowScoreboard()
+UI.OpenStats()
+check("stats: no Raids button over their tabs", not UI.frame.raidButton._shown)
+UI.CloseStats()
+check("back from stats: the Raids button", UI.frame.raidButton._shown)
+
 -- ── Raid history ───────────────────────────────────────────────────────────
 slash("raid 10")
 local hb = win("barrow")
@@ -399,6 +449,20 @@ check("history: opens", hb.history and hb.history._shown and #hb.history.rows ==
 check("history: the open raid marked", hb.history.rows[1].selected and not hb.history.rows[2].selected)
 check("history: what each raid did", has(hb.history, "^4 of 8 bosses$") and has(hb.history, "^Cleared$")
     and has(hb.history, "^1:14:02$"))
+-- A click anywhere else closes it; so does another tab; its button toggles it.
+M.Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+check("history: a click elsewhere closes it", not hb.history._shown)
+hb.historyButton:GetScript("OnClick")(hb.historyButton)
+hb.history._mouse = true
+M.Fire("GLOBAL_MOUSE_DOWN", "LeftButton")
+check("history: a click on it keeps it open", hb.history._shown)
+hb.history._mouse = nil
+hb.tabs[3]:GetScript("OnClick")(hb.tabs[3])
+check("history: another tab closes it", not hb.history._shown)
+hb.historyButton:GetScript("OnClick")(hb.historyButton)
+hb.historyButton:GetScript("OnClick")(hb.historyButton)
+check("history: its button closes it", not hb.history._shown)
+hb.historyButton:GetScript("OnClick")(hb.historyButton)
 hb.history.rows[2]:GetScript("OnClick")(hb.history.rows[2])
 check("history: opens the raid picked", win("hyjal")._shown and not hb._shown and not hb.history._shown)
 

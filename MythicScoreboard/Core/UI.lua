@@ -33,6 +33,7 @@ local function IconButton(parent, file, size, hoverCol)
     b._icon = ic
     return b
 end
+UI.IconButton = IconButton
 
 -- The window's stone-and-bronze look, for any size of frame (the in-run
 -- frame uses it too). washH: how far the warm light from the top reaches.

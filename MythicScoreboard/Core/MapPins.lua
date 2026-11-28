@@ -24,6 +24,7 @@ end
 -- The markers for a map: { x, y, list of { name, lo, hi } }, one per spot.
 function MS:EntrancePins(mapID)
     local pins, at = {}, {}
+    if not MS:GetMapEntrances() then return pins end        -- (turned off in settings)
     for _, e in ipairs(MS.ForeverData and MS.ForeverData.ENTRANCES or {}) do
         local x, y = OnMap(e.map, e.x, e.y, mapID)
         if x and x >= 0 and x <= 1 and y >= 0 and y <= 1 then
@@ -165,6 +166,12 @@ local function AddProvider()
     map:AddDataProvider(provider)
     MS._entranceProvider = provider
 end
+
+-- Turned on or off in settings: the map open now redrawn.
+MS:OnSettingChanged("mapEntrances", function()
+    local p = MS._entranceProvider
+    if p then pcall(p.RefreshAllData, p) end
+end)
 
 -- After login, or once Blizzard's map loads if it loads later.
 MS:On("PLAYER_LOGIN", function() pcall(AddProvider) end)

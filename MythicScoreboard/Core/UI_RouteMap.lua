@@ -58,6 +58,7 @@ local function OnIt(x, y) return x >= 0 and x <= 1 and y >= 0 and y <= 1 end
 -- The route on a map: lines { x1, y1, x2, y2, how } and dots { x, y, last }.
 -- Or nil when there's no way being shown.
 function MS:RouteOnMap(mapID)
+    if not MS:GetMapRoute() then return nil end              -- (turned off in settings)
     local legs = MS:NavigationTarget() and MS:NavigationSteps()
     if not (legs and legs[1] and mapID) then return nil end
     local lines, dots = {}, {}
